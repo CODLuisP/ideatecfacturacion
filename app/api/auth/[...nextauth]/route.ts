@@ -1,0 +1,116 @@
+import NextAuth, { AuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+
+// TODO: Activar cuando el backend implemente refresh token
+// async function refreshAccessToken(token: any) { ... }
+
+export const authOptions: AuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        identifier: { label: "RUC o Email", type: "text" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.identifier || !credentials?.password) {
+          throw new Error("Credenciales incompletas");
+        }
+
+        try {
+          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/Auth/login`;
+          
+          console.log('🔵 Intentando conectar a:', apiUrl);
+
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              identifier: credentials.identifier,
+              password: credentials.password,
+            }),
+          });
+
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const textResponse = await response.text();
+            console.error('❌ Respuesta no es JSON:', textResponse.substring(0, 200));
+            throw new Error(`El servidor no respondió con JSON. Status: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            throw new Error(data.message || "Credenciales inválidas");
+          }
+
+          console.log('✅ Login exitoso');
+
+          return {
+            id: data.user.usuarioID.toString(),
+            email: data.user.email,
+            name: data.user.nombreCompleto,
+            username: data.user.username,
+            rol: data.user.rol,
+            ruc: data.user.ruc,
+            razonSocial: data.user.razonSocial,
+            imagen: data.user.imagen,
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+          };
+        } catch (error: any) {
+          console.error("❌ Error en authorize:", error);
+          throw new Error(error.message || "Error al autenticar");
+        }
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      // Al hacer login, guardar datos del usuario
+      if (user) {
+        console.log('🆕 Nuevo login - Token válido por 24 horas');
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.username = user.username;
+        token.rol = user.rol;
+        token.ruc = user.ruc;
+        token.razonSocial = user.razonSocial;
+        token.imagen = user.imagen;
+        token.accessToken = user.accessToken;
+        token.refreshToken = user.refreshToken;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      session.user = {
+        id: token.id as string,
+        email: token.email as string,
+        name: token.name as string,
+        username: token.username as string,
+        rol: token.rol as string,
+        ruc: token.ruc as string,
+        razonSocial: token.razonSocial as string,
+        imagen: token.imagen as string,
+      };
+      session.accessToken = token.accessToken as string;
+      session.refreshToken = token.refreshToken as string;
+      
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/login",
+  },
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 horas
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
