@@ -1,0 +1,23 @@
+import { LucideIcon } from 'lucide-react';
+
+export type View = 'dashboard' | 'emision' | 'clientes' | 'productos' | 'reportes' | 'sunat' | 'configuracion' | 'usuarios';
+
+export interface MenuItem {
+  id: View;
+  label: string;
+  icon: LucideIcon;
+}
+
+export interface SalesData {
+  name: string;
+  sales: number;
+  docs: number;
+}
+
+export interface Document {
+  id: string;
+  client: string;
+  total: string;
+  status: string;
+  date: string;
+}

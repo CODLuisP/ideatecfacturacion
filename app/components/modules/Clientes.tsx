@@ -1,12 +1,13 @@
 "use client";
 import React from 'react';
 import { Search, Filter, Plus, MoreVertical } from 'lucide-react';
-import { Button } from '@/app/components/ui/Button';
-import { Card } from '@/app/components/ui/Card';
-import { Modal } from '@/app/components/ui/Modal';
-import { Badge } from '@/app/components/ui/Badge';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { Modal } from '../ui/Modal';
+import { Badge } from '../ui/Badge';
 
-export default function ClientesPage() {
+
+export const ClientesView = () => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   return (
@@ -62,7 +63,11 @@ export default function ClientesPage() {
         </div>
       </Card>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Nuevo Cliente">
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title="Registrar Nuevo Cliente"
+      >
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setIsModalOpen(false); }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -98,4 +103,5 @@ export default function ClientesPage() {
       </Modal>
     </div>
   );
-}
+};
+

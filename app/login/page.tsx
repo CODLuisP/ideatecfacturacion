@@ -291,7 +291,7 @@ const LoginPage: React.FC = () => {
       </section>
 
       {/* Right Column: Hero / Brand Panel (Visible on Desktop) */}
-      <section className="hidden md:flex md:w-[55%] lg:w-[60%] bg-[#0c2a72] relative overflow-hidden items-center justify-center p-8 lg:p-16">
+      <section className="hidden md:flex md:w-[55%] lg:w-[60%] bg-[#0f2e64] relative overflow-hidden items-center justify-center p-8 lg:p-16">
         {/* Peruvian Red Gradient Accents */}
         <div className="absolute top-0 right-0 w-1/2 h-full bg-linear-to-l from-red-600/15 to-transparent pointer-events-none" />        
         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-red-600/5 rounded-full blur-[100px]" />
