@@ -41,11 +41,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'emision', label: 'Emisión', icon: FileText },
+    { id: 'ver-comprobantes', label: 'Comprobantes', icon: FileBox },
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'sunat', label: 'SUNAT', icon: Zap },
-    { id: 'ver-comprobantes', label: 'Comprobantes', icon: FileBox },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
     { id: 'usuarios', label: 'Usuarios', icon: UserCircle },
   ];
