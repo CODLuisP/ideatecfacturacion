@@ -26,14 +26,14 @@ export const Sidebar = ({
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}
     >
-      <div className="p-6 flex items-center gap-3 shrink-0">
+      <div className="px-4 py-6 flex items-center gap-3 shrink-0">
         <div className="w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-900/20">
           <ShieldCheck className="w-6 h-6 text-white" />
         </div>
         {isOpen && (
           <div className="overflow-hidden whitespace-nowrap">
             <h1 className="text-2xl font-extrabold text-blue-50 tracking-tight">
-              IDEA<span className="text-[#a9def9]">TEC</span>
+              IDEA<span className="text-[#FF3562]">TEC</span>
             </h1>
             <p className="text-[8px] text-blue-50 font-bold uppercase tracking-widest">
               Sistema de Facturación

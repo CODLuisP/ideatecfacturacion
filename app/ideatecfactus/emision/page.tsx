@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { FileText, AlertCircle, Plus, Search, Printer, ShieldCheck, ChevronLeft } from 'lucide-react';
+import { FileText, AlertCircle, Plus, Search, Printer, ShieldCheck, ChevronLeft, Truck } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Card } from '@/app/components/ui/Card';
 
@@ -15,17 +15,18 @@ export default function EmisionPage() {
 
   if (step === 'selection') {
     return (
-      <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      <div className=" mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold text-gray-900">¿Qué comprobante deseas emitir?</h2>
           <p className="text-gray-500">Selecciona el tipo de documento para comenzar el proceso de emisión.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { title: 'Factura Electrónica', desc: 'Para empresas y negocios con RUC (con derecho a crédito fiscal).', icon: FileText, type: 'Factura' },
-            { title: 'Boleta de Venta', desc: 'Para personas naturales y consumidores finales sin RUC.', icon: FileText, type: 'Boleta' },
-            { title: 'Nota de Crédito', desc: 'Para anular o modificar comprobantes emitidos previamente.', icon: AlertCircle, type: 'NC' },
-            { title: 'Nota de Débito', desc: 'Para aumentar el valor de un comprobante emitido previamente.', icon: Plus, type: 'ND' },
+            { title: 'Factura Electrónica',  desc: 'Para empresas y negocios con RUC (con derecho a crédito fiscal).', icon: FileText,    type: 'Factura' },
+            { title: 'Boleta de Venta',      desc: 'Para personas naturales y consumidores finales sin RUC.',           icon: FileText,    type: 'Boleta'  },
+            { title: 'Nota de Crédito',      desc: 'Para anular o modificar comprobantes emitidos previamente.',        icon: AlertCircle, type: 'NC'      },
+            { title: 'Nota de Débito',       desc: 'Para aumentar el valor de un comprobante emitido previamente.',     icon: Plus,        type: 'ND'      },
+            { title: 'Guía de Remisión',     desc: 'Para sustentar el traslado de bienes a nivel nacional entre direcciones.', icon: Truck, type: 'GR'   },
           ].map((item, i) => (
             <button
               key={i}

@@ -17,10 +17,20 @@ import {
   ShieldAlert,
   Zap,
   BarChart3,
-  ShieldCheck
+  ShieldCheck,
+  X,
+  Mail,
+  Send,
+  Phone,
+  MessageSquare,
+  Clock,
+  PlayCircle,
+  ChevronRight
 } from 'lucide-react';
 
 import IncaPattern from '../components/IncaPattern';
+
+// ─── Enums & Interfaces ────────────────────────────────────────────────────────
 
 enum LoginStatus {
   IDLE = 'IDLE',
@@ -28,6 +38,8 @@ enum LoginStatus {
   SUCCESS = 'SUCCESS',
   ERROR = 'ERROR'
 }
+
+type ModalType = 'forgotPassword' | 'demo' | 'support' | 'terms' | 'privacy' | null;
 
 interface FormErrors {
   identifier?: string;
@@ -40,6 +52,485 @@ interface LoginFormData {
   rememberMe: boolean;
 }
 
+// ─── Modal Base ────────────────────────────────────────────────────────────────
+
+const Modal: React.FC<{ open: boolean; onClose: () => void; children: React.ReactNode }> = ({ open, onClose, children }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors z-10"
+        >
+          <X size={18} />
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Olvidé mi Contraseña ───────────────────────────────────────────────
+
+const ForgotPasswordModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    // Simular envío
+    await new Promise(r => setTimeout(r, 1500));
+    setLoading(false);
+    setSent(true);
+  };
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-700">
+          <Lock size={20} />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">Recuperar Contraseña</h3>
+          <p className="text-xs text-slate-500">Te enviaremos un enlace seguro</p>
+        </div>
+      </div>
+
+      {sent ? (
+        <div className="text-center py-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 size={32} className="text-green-600" />
+          </div>
+          <h4 className="text-base font-bold text-slate-900 mb-2">¡Correo enviado!</h4>
+          <p className="text-sm text-slate-500 mb-6">
+            Revisa tu bandeja de entrada en <span className="font-semibold text-slate-700">{email}</span>. El enlace expira en 30 minutos.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-colors"
+          >
+            Entendido
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <p className="text-sm text-slate-600">
+            Ingresa el correo electrónico o RUC asociado a tu cuenta y te enviaremos instrucciones para restablecer tu contraseña.
+          </p>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-slate-700">Correo Electrónico o RUC</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Mail size={17} />
+              </div>
+              <input
+                type="text"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="correo@empresa.com o RUC"
+                className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-blue-700 focus:ring-4 focus:ring-blue-50 rounded-xl outline-none text-slate-900 font-medium text-sm transition-all"
+                required
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !email}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-colors"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Send size={16} />
+                Enviar instrucciones
+              </>
+            )}
+          </button>
+          <p className="text-center text-xs text-slate-400">
+            ¿Recuerdas tu contraseña?{' '}
+            <button type="button" onClick={onClose} className="font-bold text-blue-700 hover:text-blue-900">
+              Volver al login
+            </button>
+          </p>
+        </form>
+      )}
+    </div>
+  );
+};
+
+// ─── Modal: Solicitar Demostración ────────────────────────────────────────────
+
+interface DemoModalProps {
+  onClose: () => void;
+  onFillDemo: () => void;
+}
+
+const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
+  const [step, setStep] = useState<'info' | 'form'>('info');
+  const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleTryDemo = () => {
+    onFillDemo();
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1500));
+    setLoading(false);
+    setSent(true);
+  };
+
+  if (sent) {
+    return (
+      <div className="p-8 text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 size={32} className="text-green-600" />
+        </div>
+        <h4 className="text-base font-bold text-slate-900 mb-2">¡Solicitud recibida!</h4>
+        <p className="text-sm text-slate-500 mb-6">
+          Uno de nuestros asesores se contactará contigo en las próximas 24 horas hábiles para coordinar tu demostración personalizada.
+        </p>
+        <button
+          onClick={onClose}
+          className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-blue-900 to-blue-800 p-6 text-white">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+            <PlayCircle size={22} />
+          </div>
+          <div>
+            <h3 className="text-base font-bold">Demo de IDEATEC</h3>
+            <p className="text-blue-200 text-xs">Sin compromiso, 100% gratuito</p>
+          </div>
+        </div>
+        <p className="text-sm text-blue-100">
+          Conoce todas las funcionalidades de nuestra plataforma de facturación electrónica.
+        </p>
+      </div>
+
+      <div className="p-6 space-y-4">
+        {/* Acceso rápido con cuenta demo */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-xs font-bold text-amber-800 mb-1 uppercase tracking-wide">⚡ Acceso Inmediato</p>
+          <p className="text-sm text-amber-700 mb-3">
+            Prueba la plataforma ahora mismo con nuestra cuenta de demostración.
+          </p>
+          <div className="flex gap-2 text-xs text-amber-800 bg-amber-100 rounded-lg p-2.5 font-mono mb-3">
+            <span>Usuario: <strong>demo</strong></span>
+            <span>·</span>
+            <span>Contraseña: <strong>demo123</strong></span>
+          </div>
+          <button
+            onClick={handleTryDemo}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-sm transition-colors"
+          >
+            <Zap size={15} />
+            Autocompletar y probar ahora
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-slate-200" />
+          <span className="text-xs text-slate-400 font-medium">o agenda una demo personalizada</span>
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+
+        {/* Formulario de contacto */}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Tu nombre completo"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-blue-700 focus:ring-4 focus:ring-blue-50 transition-all"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="text"
+              value={company}
+              onChange={e => setCompany(e.target.value)}
+              placeholder="Empresa o RUC"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-blue-700 focus:ring-4 focus:ring-blue-50 transition-all"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="Número de contacto"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-blue-700 focus:ring-4 focus:ring-blue-50 transition-all"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-900 hover:bg-blue-950 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-colors"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Send size={15} />
+                Agendar demostración
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Soporte ────────────────────────────────────────────────────────────
+
+const SupportModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const channels = [
+    {
+      icon: <Phone size={20} />,
+      color: 'bg-green-100 text-green-700',
+      title: 'Llamada Directa',
+      desc: 'Lunes a viernes de 8am a 6pm',
+      value: '+51 (01) 700-5000',
+      action: 'tel:+5117005000',
+      label: 'Llamar ahora',
+      btnColor: 'bg-green-600 hover:bg-green-700',
+    },
+    {
+      icon: <MessageSquare size={20} />,
+      color: 'bg-emerald-100 text-emerald-700',
+      title: 'WhatsApp',
+      desc: 'Respuesta en menos de 1 hora',
+      value: '+51 999 123 456',
+      action: 'https://wa.me/51999123456',
+      label: 'Abrir WhatsApp',
+      btnColor: 'bg-emerald-600 hover:bg-emerald-700',
+    },
+    {
+      icon: <Mail size={20} />,
+      color: 'bg-blue-100 text-blue-700',
+      title: 'Correo Electrónico',
+      desc: 'Respuesta en 24 horas hábiles',
+      value: 'soporte@ideatec.pe',
+      action: 'mailto:soporte@ideatec.pe',
+      label: 'Enviar correo',
+      btnColor: 'bg-blue-700 hover:bg-blue-900',
+    },
+  ];
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-700">
+          <LifeBuoy size={20} />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">Centro de Soporte</h3>
+          <p className="text-xs text-slate-500">Estamos aquí para ayudarte</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {channels.map((ch, i) => (
+          <div key={i} className="border border-slate-100 rounded-xl p-4 hover:border-slate-200 transition-colors">
+            <div className="flex items-start gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${ch.color}`}>
+                {ch.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-900">{ch.title}</p>
+                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                  <Clock size={11} /> {ch.desc}
+                </p>
+                <p className="text-sm font-semibold text-slate-700 mt-1">{ch.value}</p>
+              </div>
+              <a
+                href={ch.action}
+                target={ch.action.startsWith('http') ? '_blank' : undefined}
+                rel="noreferrer"
+                className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-colors ${ch.btnColor}`}
+              >
+                {ch.label} <ChevronRight size={12} />
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 bg-slate-50 rounded-xl p-4">
+        <p className="text-xs font-bold text-slate-700 mb-1">📚 Base de Conocimiento</p>
+        <p className="text-xs text-slate-500 mb-3">Encuentra respuestas rápidas en nuestra documentación.</p>
+        <a
+          href="https://docs.ideatec.pe"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900"
+        >
+          Ver documentación <ChevronRight size={13} />
+        </a>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Términos de Servicio ───────────────────────────────────────────────
+
+const TermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="p-8">
+    <div className="flex items-center gap-3 mb-6">
+      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-700">
+        <FileText size={20} />
+      </div>
+      <div>
+        <h3 className="text-lg font-bold text-slate-900">Términos de Servicio</h3>
+        <p className="text-xs text-slate-500">Última actualización: Enero 2025</p>
+      </div>
+    </div>
+    <div className="space-y-5 text-sm text-slate-600 leading-relaxed overflow-y-auto max-h-[55vh] pr-2">
+      {[
+        {
+          title: '1. Aceptación de los Términos',
+          body: 'Al acceder y utilizar la plataforma IDEATEC Factus, usted acepta estar sujeto a estos Términos de Servicio. Si no está de acuerdo con alguno de estos términos, le pedimos que no utilice nuestros servicios.',
+        },
+        {
+          title: '2. Descripción del Servicio',
+          body: 'IDEATEC Factus es una plataforma de facturación electrónica que permite a empresas y personas naturales con negocio emitir comprobantes de pago electrónicos conforme a las normas de la SUNAT (Superintendencia Nacional de Aduanas y de Administración Tributaria) del Perú.',
+        },
+        {
+          title: '3. Obligaciones del Usuario',
+          body: 'El usuario se compromete a: (a) proporcionar información verídica y actualizada; (b) mantener la confidencialidad de sus credenciales de acceso; (c) usar el servicio conforme a la legislación peruana vigente; (d) no utilizar la plataforma para emitir comprobantes falsos o fraudulentos.',
+        },
+        {
+          title: '4. Propiedad Intelectual',
+          body: 'Todos los derechos de propiedad intelectual sobre la plataforma, incluyendo software, diseño, logotipos y contenido, son propiedad exclusiva de IDEATEC S.A.C. Queda prohibida su reproducción total o parcial sin autorización expresa.',
+        },
+        {
+          title: '5. Limitación de Responsabilidad',
+          body: 'IDEATEC no será responsable por daños indirectos, incidentales o consecuentes derivados del uso o imposibilidad de uso del servicio. Nuestra responsabilidad máxima estará limitada al monto pagado por el usuario en los últimos 12 meses.',
+        },
+        {
+          title: '6. Modificaciones',
+          body: 'Nos reservamos el derecho de modificar estos términos en cualquier momento. Las modificaciones entrarán en vigor 30 días después de su publicación en la plataforma. El uso continuado del servicio constituye la aceptación de los nuevos términos.',
+        },
+        {
+          title: '7. Ley Aplicable',
+          body: 'Estos términos se rigen por las leyes de la República del Perú. Cualquier controversia será sometida a los tribunales competentes de la ciudad de Lima.',
+        },
+      ].map((section, i) => (
+        <div key={i}>
+          <h4 className="font-bold text-slate-900 mb-1">{section.title}</h4>
+          <p>{section.body}</p>
+        </div>
+      ))}
+    </div>
+    <button
+      onClick={onClose}
+      className="mt-6 w-full py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-colors"
+    >
+      Entendido
+    </button>
+  </div>
+);
+
+// ─── Modal: Política de Privacidad ────────────────────────────────────────────
+
+const PrivacyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="p-8">
+    <div className="flex items-center gap-3 mb-6">
+      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-700">
+        <Globe size={20} />
+      </div>
+      <div>
+        <h3 className="text-lg font-bold text-slate-900">Política de Privacidad</h3>
+        <p className="text-xs text-slate-500">Última actualización: Enero 2025</p>
+      </div>
+    </div>
+    <div className="space-y-5 text-sm text-slate-600 leading-relaxed overflow-y-auto max-h-[55vh] pr-2">
+      {[
+        {
+          title: '1. Información que Recopilamos',
+          body: 'Recopilamos información que usted nos proporciona directamente, como nombre, RUC, correo electrónico, datos tributarios y de facturación. También recopilamos automáticamente datos de uso, dirección IP, tipo de navegador y actividad dentro de la plataforma.',
+        },
+        {
+          title: '2. Uso de la Información',
+          body: 'Utilizamos su información para: (a) proveer y mejorar nuestros servicios; (b) procesar transacciones y comprobantes electrónicos; (c) enviar notificaciones relacionadas con su cuenta; (d) cumplir con obligaciones legales y tributarias ante la SUNAT.',
+        },
+        {
+          title: '3. Compartición de Datos',
+          body: 'Compartimos su información únicamente con: organismos reguladores (SUNAT, SUNAT OSE/PSE) conforme a la ley, proveedores de servicios que nos asisten en la operación de la plataforma bajo acuerdos de confidencialidad, y en casos requeridos por ley o autoridad competente.',
+        },
+        {
+          title: '4. Seguridad de los Datos',
+          body: 'Implementamos medidas de seguridad técnicas y organizativas de nivel bancario, incluyendo encriptación SSL de 256 bits, autenticación de dos factores y auditorías periódicas de seguridad para proteger su información personal y empresarial.',
+        },
+        {
+          title: '5. Retención de Datos',
+          body: 'Conservamos sus datos por el período necesario para cumplir con los fines descritos y conforme a la legislación tributaria peruana, que exige mantener registros de comprobantes electrónicos por un mínimo de 5 años.',
+        },
+        {
+          title: '6. Sus Derechos (ARCO)',
+          body: 'De acuerdo con la Ley N° 29733 de Protección de Datos Personales del Perú, usted tiene derecho de Acceso, Rectificación, Cancelación y Oposición (ARCO) sobre sus datos. Para ejercerlos, contáctenos en privacidad@ideatec.pe.',
+        },
+        {
+          title: '7. Cookies',
+          body: 'Usamos cookies estrictamente necesarias para el funcionamiento de la plataforma y cookies analíticas para mejorar la experiencia. Puede configurar su navegador para rechazar cookies, aunque esto puede afectar algunas funcionalidades.',
+        },
+      ].map((section, i) => (
+        <div key={i}>
+          <h4 className="font-bold text-slate-900 mb-1">{section.title}</h4>
+          <p>{section.body}</p>
+        </div>
+      ))}
+    </div>
+    <button
+      onClick={onClose}
+      className="mt-6 w-full py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-colors"
+    >
+      Entendido
+    </button>
+  </div>
+);
+
+// ─── Página Principal ──────────────────────────────────────────────────────────
+
 const LoginPage: React.FC = () => {
   const router = useRouter();
   const [formData, setFormData] = useState<LoginFormData>({
@@ -51,71 +542,54 @@ const LoginPage: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState<LoginStatus>(LoginStatus.IDLE);
   const [apiError, setApiError] = useState<string>('');
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   const validate = (name: string, value: string) => {
-  let error = '';
-  if (name === 'identifier') {
-    if (!value) {
-      error = 'RUC o correo electrónico es requerido';
-    }
-    // ✅ Comentadas las validaciones estrictas
-    // else if (value.includes('@')) {
-    //   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    //   if (!emailRegex.test(value)) error = 'Correo electrónico inválido';
-    // } else {
-    //   const rucRegex = /^\d{11}$/;
-    //   if (!rucRegex.test(value)) error = 'El RUC debe tener 11 dígitos numéricos';
-    // }
-  }
-  if (name === 'password') {
-    if (!value) error = 'La contraseña es requerida';
-    // ✅ Comentada la validación de longitud mínima
-    // else if (value.length < 6) error = 'Mínimo 6 caracteres';
-  }
-  return error;
-};
+    let error = '';
+    if (name === 'identifier' && !value) error = 'RUC o correo electrónico es requerido';
+    if (name === 'password' && !value) error = 'La contraseña es requerida';
+    return error;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     const val = type === 'checkbox' ? checked : value;
-    
     setFormData(prev => ({ ...prev, [name]: val }));
-    
-    const error = validate(name, (val as string));
+    const error = validate(name, val as string);
     setErrors(prev => ({ ...prev, [name]: error }));
-    setApiError(''); // Limpiar error de API
+    setApiError('');
+  };
+
+  // Autocompletar con credenciales de demo
+  const fillDemoCredentials = () => {
+    setFormData(prev => ({ ...prev, identifier: 'demo', password: 'demo123' }));
+    setErrors({});
+    setApiError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     const idError = validate('identifier', formData.identifier);
     const passError = validate('password', formData.password);
-    
     if (idError || passError) {
       setErrors({ identifier: idError, password: passError });
       return;
     }
-
     setStatus(LoginStatus.LOADING);
     setApiError('');
-
     try {
       const result = await signIn('credentials', {
         identifier: formData.identifier,
         password: formData.password,
         redirect: false,
       });
-
       if (result?.error) {
         setStatus(LoginStatus.ERROR);
         setApiError('Credenciales inválidas. Verifica tus datos.');
         return;
       }
-
       if (result?.ok) {
         setStatus(LoginStatus.SUCCESS);
-        // Pequeño delay para mostrar el estado de éxito
         setTimeout(() => {
           router.push('/ideatecfactus');
           router.refresh();
@@ -129,247 +603,304 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-white">
-      {/* Left Column: Login Form */}
-      <section className="w-full md:w-[45%] lg:w-[40%] flex flex-col justify-center min-h-screen p-6 sm:p-10 lg:p-16 relative overflow-hidden">
-        <IncaPattern />
-        
-        <div className="w-full max-w-md mx-auto space-y-8 relative z-10">
-          {/* Logo */}
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white shadow-lg">
-              <Building2 size={24} />
+    <>
+      {/* ── Modales ─────────────────────────────────────────────────────────── */}
+
+      <Modal open={activeModal === 'forgotPassword'} onClose={() => setActiveModal(null)}>
+        <ForgotPasswordModal onClose={() => setActiveModal(null)} />
+      </Modal>
+
+      <Modal open={activeModal === 'demo'} onClose={() => setActiveModal(null)}>
+        <DemoModal
+          onClose={() => setActiveModal(null)}
+          onFillDemo={fillDemoCredentials}
+        />
+      </Modal>
+
+      <Modal open={activeModal === 'support'} onClose={() => setActiveModal(null)}>
+        <SupportModal onClose={() => setActiveModal(null)} />
+      </Modal>
+
+      <Modal open={activeModal === 'terms'} onClose={() => setActiveModal(null)}>
+        <TermsModal onClose={() => setActiveModal(null)} />
+      </Modal>
+
+      <Modal open={activeModal === 'privacy'} onClose={() => setActiveModal(null)}>
+        <PrivacyModal onClose={() => setActiveModal(null)} />
+      </Modal>
+
+      {/* ── Layout Principal ─────────────────────────────────────────────────── */}
+
+      <div className="min-h-screen flex flex-col md:flex-row bg-white">
+
+        {/* Left Column: Login Form */}
+        <section className="w-full md:w-[45%] lg:w-[40%] flex flex-col justify-center min-h-screen p-6 sm:p-10 lg:p-16 relative overflow-hidden">
+          <IncaPattern />
+          
+          <div className="w-full max-w-md mx-auto space-y-8 relative z-10">
+            {/* Logo */}
+            <div className="flex items-center gap-2 mb-8">
+              <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white shadow-lg">
+                <Building2 size={24} />
+              </div>
+              <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">
+                IDEA<span className="text-red-600">TEC</span>
+              </h1>
             </div>
-            <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">
-              IDEA<span className="text-red-600">TEC</span>
-            </h1>
-          </div>
 
-          {/* Main Content */}
-          <div>
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">Iniciar Sesión</h2>
-              <p className="text-slate-500">Accede a tu panel de facturación electrónica.</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Error de API */}
-              {apiError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                  <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700 font-medium">{apiError}</p>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label htmlFor="identifier" className="block text-sm font-semibold text-slate-700">
-                  RUC o Correo Electrónico
-                </label>
-                <div className="relative group">
-                  <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors ${errors.identifier ? 'text-red-500' : 'text-slate-400 group-focus-within:text-blue-700'}`}>
-                    <User size={18} />
-                  </div>
-                  <input
-                    id="identifier"
-                    name="identifier"
-                    type="text"
-                    placeholder="20123456789 o tu@email.com"
-                    className={`block w-full pl-11 pr-4 py-3.5 bg-slate-50 border ${errors.identifier ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:ring-4 focus:ring-blue-50 focus:border-blue-700'} rounded-xl transition-all outline-none text-slate-900 font-medium`}
-                    value={formData.identifier}
-                    onChange={handleChange}
-                    autoComplete="username"
-                  />
-                </div>
-                {errors.identifier && (
-                  <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-600 mt-1.5">
-                    <AlertCircle size={14} /> {errors.identifier}
-                  </p>
-                )}
+            {/* Main Content */}
+            <div>
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Iniciar Sesión</h2>
+                <p className="text-slate-500 text-[14px]">Accede a tu panel de facturación electrónica.</p>
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
-                    Contraseña
-                  </label>
-                  <a href="#" className="text-xs font-bold text-blue-700 hover:text-red-600 transition-colors">
-                    ¿Olvidaste tu contraseña?
-                  </a>
-                </div>
-                <div className="relative group">
-                  <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors ${errors.password ? 'text-red-500' : 'text-slate-400 group-focus-within:text-blue-700'}`}>
-                    <Lock size={18} />
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Error de API */}
+                {apiError && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700 font-medium">{apiError}</p>
                   </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    className={`block w-full pl-11 pr-11 py-3.5 bg-slate-50 border ${errors.password ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:ring-4 focus:ring-blue-50 focus:border-blue-700'} rounded-xl transition-all outline-none text-slate-900 font-medium`}
-                    value={formData.password}
-                    onChange={handleChange}
-                    autoComplete="current-password"
-                  />
+                )}
+
+                {/* Identifier */}
+                <div className="space-y-1.5">
+                  <label htmlFor="identifier" className="block text-sm font-semibold text-slate-700">
+                    Usuario
+                  </label>
+                  <div className="relative group">
+                    <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none transition-colors ${errors.identifier ? 'text-red-500' : 'text-slate-400 group-focus-within:text-blue-700'}`}>
+                      <User size={18} />
+                    </div>
+                    <input
+                      id="identifier"
+                      name="identifier"
+                      type="text"
+                      placeholder="Usuario o RUC"
+                      className={`block w-full pl-11 pr-4 py-3 bg-slate-50 border ${errors.identifier ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:ring-4 focus:ring-blue-50 focus:border-blue-700'} rounded-xl transition-all outline-none text-slate-900 font-medium`}
+                      value={formData.identifier}
+                      onChange={handleChange}
+                      autoComplete="username"
+                    />
+                  </div>
+                  {errors.identifier && (
+                    <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-600 mt-1.5">
+                      <AlertCircle size={14} /> {errors.identifier}
+                    </p>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
+                      Contraseña
+                    </label>
+                    {/* ✅ Botón de Olvidé contraseña */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal('forgotPassword')}
+                      className="text-xs font-bold text-blue-700 hover:text-red-600 transition-colors"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  </div>
+                  <div className="relative group">
+                    <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors ${errors.password ? 'text-red-500' : 'text-slate-400 group-focus-within:text-blue-700'}`}>
+                      <Lock size={18} />
+                    </div>
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className={`block w-full pl-11 pr-11 py-3.5 bg-slate-50 border ${errors.password ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus:ring-4 focus:ring-blue-50 focus:border-blue-700'} rounded-xl transition-all outline-none text-slate-900 font-medium`}
+                      value={formData.password}
+                      onChange={handleChange}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-600 mt-1.5">
+                      <AlertCircle size={14} /> {errors.password}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center group cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="rememberMe"
+                      className="w-5 h-5 text-blue-900 border-slate-300 rounded focus:ring-blue-500"
+                      checked={formData.rememberMe}
+                      onChange={handleChange}
+                    />
+                    <span className="ml-2.5 text-sm font-medium text-slate-600">Recordarme</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={status === LoginStatus.LOADING}
+                  className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl text-sm font-bold text-white transition-all ${
+                    status === LoginStatus.LOADING 
+                      ? 'bg-blue-800 opacity-80 cursor-not-allowed' 
+                      : 'bg-blue-900 hover:bg-blue-950 hover:shadow-xl'
+                  }`}
+                >
+                  {status === LoginStatus.LOADING ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      <span>Verificando...</span>
+                    </div>
+                  ) : status === LoginStatus.SUCCESS ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={20} className="text-green-400" />
+                      <span>¡Bienvenido!</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span>Entrar al Sistema</span>
+                      <ArrowRight size={20} />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <div className="mt-10 pt-2 border-t border-slate-100 text-center">
+                <p className="text-sm text-slate-600">
+                  ¿Necesitas una demostración?{' '}
+                  {/* ✅ Abre modal de demo */}
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                    onClick={() => setActiveModal('demo')}
+                    className="font-bold text-red-600 hover:text-red-700 transition-colors"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    Click aquí
                   </button>
-                </div>
-                {errors.password && (
-                  <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-600 mt-1.5">
-                    <AlertCircle size={14} /> {errors.password}
-                  </p>
-                )}
+                </p>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center group cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="rememberMe"
-                    className="w-5 h-5 text-blue-900 border-slate-300 rounded focus:ring-blue-500"
-                    checked={formData.rememberMe}
-                    onChange={handleChange}
-                  />
-                  <span className="ml-2.5 text-sm font-medium text-slate-600">Recordarme</span>
-                </label>
-              </div>
-
+            {/* Footer */}
+            <footer className="flex flex-wrap justify-center gap-x-6 gap-y-2">
               <button
-                type="submit"
-                disabled={status === LoginStatus.LOADING}
-                className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl text-sm font-bold text-white transition-all ${
-                  status === LoginStatus.LOADING 
-                    ? 'bg-blue-800 opacity-80 cursor-not-allowed' 
-                    : 'bg-blue-900 hover:bg-blue-950 hover:shadow-xl'
-                }`}
+                type="button"
+                onClick={() => setActiveModal('support')}
+                className="text-xs font-semibold text-slate-400 hover:text-blue-900 flex items-center gap-1 transition-colors"
               >
-                {status === LoginStatus.LOADING ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                    <span>Verificando...</span>
-                  </div>
-                ) : status === LoginStatus.SUCCESS ? (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 size={20} className="text-green-400" />
-                    <span>¡Bienvenido!</span>
-                  </div>
-                ) : (
-                  <>
-                    <span>Entrar al Sistema</span>
-                    <ArrowRight size={20} />
-                  </>
-                )}
+                <LifeBuoy size={14} /> Soporte
               </button>
-            </form>
+              <button
+                type="button"
+                onClick={() => setActiveModal('terms')}
+                className="text-xs font-semibold text-slate-400 hover:text-blue-900 flex items-center gap-1 transition-colors"
+              >
+                <FileText size={14} /> Términos
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal('privacy')}
+                className="text-xs font-semibold text-slate-400 hover:text-blue-900 flex items-center gap-1 transition-colors"
+              >
+                <Globe size={14} /> Privacidad
+              </button>
+            </footer>
+          </div>
+        </section>
 
-            <div className="mt-10 pt-8 border-t border-slate-100 text-center">
-              <p className="text-sm text-slate-600">
-                ¿Eres una nueva empresa?{' '}
-                <a href="#" className="font-bold text-red-600 hover:text-red-700 transition-colors">
-                  Regístrate aquí
-                </a>
+        {/* Right Column: Hero / Brand Panel */}
+        <section className="hidden md:flex md:w-[55%] lg:w-[60%] bg-[#0f2e64] relative overflow-hidden items-center justify-center p-8 lg:p-16">
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-linear-to-l from-red-600/15 to-transparent pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-red-600/5 rounded-full blur-[100px]" />
+
+          <div className="relative z-10 w-full max-w-2xl">
+            <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <h3 className="text-3xl lg:text-4xl xl:text-4xl font-brand font-extrabold text-white leading-tight">
+                La Facturación 
+                <span className="text-red-500 italic"> más inteligente</span> <br /> 
+                del Perú.
+              </h3>
+              <p className="text-blue-200 text-[14px] mt-4 leading-relaxed max-w-lg">
+                Optimiza la gestión tributaria de tu empresa con cumplimiento 100% SUNAT, reportes en tiempo real y soporte especializado.
               </p>
             </div>
-          </div>
 
-          <footer className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-            <a href="#" className="text-xs font-semibold text-slate-400 hover:text-blue-900 flex items-center gap-1">
-              <LifeBuoy size={14} /> Soporte
-            </a>
-            <a href="#" className="text-xs font-semibold text-slate-400 hover:text-blue-900 flex items-center gap-1">
-              <FileText size={14} /> Términos
-            </a>
-            <a href="#" className="text-xs font-semibold text-slate-400 hover:text-blue-900 flex items-center gap-1">
-              <Globe size={14} /> Privacidad
-            </a>
-          </footer>
-        </div>
-      </section>
-
-      {/* Right Column: Hero / Brand Panel (Visible on Desktop) */}
-      <section className="hidden md:flex md:w-[55%] lg:w-[60%] bg-[#0f2e64] relative overflow-hidden items-center justify-center p-8 lg:p-16">
-        {/* Peruvian Red Gradient Accents */}
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-linear-to-l from-red-600/15 to-transparent pointer-events-none" />        
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-red-600/5 rounded-full blur-[100px]" />
-
-        <div className="relative z-10 w-full max-w-2xl">
-          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <h3 className="text-4xl lg:text-5xl xl:text-6xl font-brand font-extrabold text-white leading-tight">
-              La Facturación <br /> 
-              <span className="text-red-500 italic">más inteligente</span> <br /> 
-              del Perú.
-            </h3>
-            <p className="text-blue-200 text-base lg:text-lg mt-6 leading-relaxed max-w-lg">
-              Optimiza la gestión tributaria de tu empresa con cumplimiento 100% SUNAT, reportes en tiempo real y soporte especializado.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 lg:p-5 rounded-2xl">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mb-3">
-                <Zap size={20} />
-              </div>
-              <h4 className="text-white font-bold mb-1 text-sm lg:text-base">Emisión Instantánea</h4>
-              <p className="text-blue-200/70 text-xs lg:text-sm">Genera facturas, boletas y guías en segundos desde cualquier dispositivo.</p>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 lg:p-5 rounded-2xl">
-              <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center text-green-400 mb-3">
-                <ShieldCheck size={20} />
-              </div>
-              <h4 className="text-white font-bold mb-1 text-sm lg:text-base">Seguridad Bancaria</h4>
-              <p className="text-blue-200/70 text-xs lg:text-sm">Tus datos empresariales protegidos con los estándares más altos de encriptación.</p>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 lg:p-5 rounded-2xl">
-              <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center text-red-400 mb-3">
-                <BarChart3 size={20} />
-              </div>
-              <h4 className="text-white font-bold mb-1 text-sm lg:text-base">Análisis Financiero</h4>
-              <p className="text-blue-200/70 text-xs lg:text-sm">Visualiza tus ventas y crecimiento con dashboards dinámicos y reportes PDF/Excel.</p>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 lg:p-5 rounded-2xl">
-              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-400 mb-3">
-                <Globe size={20} />
-              </div>
-              <h4 className="text-white font-bold mb-1 text-sm lg:text-base">Conectividad OSE/PSE</h4>
-              <p className="text-blue-200/70 text-xs lg:text-sm">Sincronización directa y masiva con los sistemas de validación de SUNAT.</p>
-            </div>
-          </div>
-          
-          <div className="mt-8 flex items-center gap-6 animate-in fade-in duration-1000 delay-500">
-            <div className="flex -space-x-3">
-              {[1,2,3,4].map(i => (
-                <div key={i} className="w-10 h-10 rounded-full border-2 border-blue-900 bg-slate-300 overflow-hidden">
-                  <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" className="w-full h-full object-cover" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+              {[
+                {
+                  icon: <Zap size={20} />,
+                  color: 'bg-blue-500/20 text-blue-400',
+                  title: 'Emisión Instantánea',
+                  desc: 'Genera facturas, boletas y guías en segundos desde cualquier dispositivo.',
+                },
+                {
+                  icon: <ShieldCheck size={20} />,
+                  color: 'bg-green-500/20 text-green-400',
+                  title: 'Seguridad Bancaria',
+                  desc: 'Tus datos empresariales protegidos con los estándares más altos de encriptación.',
+                },
+                {
+                  icon: <BarChart3 size={20} />,
+                  color: 'bg-red-500/20 text-red-400',
+                  title: 'Análisis Financiero',
+                  desc: 'Visualiza tus ventas y crecimiento con dashboards dinámicos y reportes PDF/Excel.',
+                },
+                {
+                  icon: <Globe size={20} />,
+                  color: 'bg-amber-500/20 text-amber-400',
+                  title: 'Conectividad OSE/PSE',
+                  desc: 'Sincronización directa y masiva con los sistemas de validación de SUNAT.',
+                },
+              ].map((card, i) => (
+                <div key={i} className="bg-white/10 backdrop-blur-md border border-white/10 p-4 lg:p-5 rounded-2xl">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${card.color}`}>
+                    {card.icon}
+                  </div>
+                  <h4 className="text-white font-bold mb-1 text-sm lg:text-base">{card.title}</h4>
+                  <p className="text-blue-200/70 text-xs lg:text-sm">{card.desc}</p>
                 </div>
               ))}
             </div>
-            <p className="text-blue-200 text-xs lg:text-sm">
-              <span className="text-white font-bold">Más de 5,000</span> empresas peruanas <br /> ya confían en IDEATEC.
-            </p>
-          </div>
-        </div>
-      </section>
 
-      {/* Security Badge */}
-      <div className="fixed bottom-6 right-6 md:left-6 md:right-auto z-20 pointer-events-none">
-        <div className="bg-white/90 backdrop-blur shadow-xl border border-slate-200 p-3 rounded-xl flex items-center gap-3">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-            <ShieldAlert size={16} />
+            <div className="mt-8 flex items-center gap-6 animate-in fade-in duration-1000 delay-500">
+              <div className="flex -space-x-3">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-blue-900 bg-slate-300 overflow-hidden">
+                    <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="User" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <p className="text-blue-200 text-xs lg:text-sm">
+                <span className="text-white font-bold">Más de 5,000</span> empresas peruanas <br /> ya confían en IDEATEC.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Conexión Segura</p>
-            <p className="text-xs font-semibold text-slate-700">Encriptación SSL de 256 bits</p>
+        </section>
+
+        {/* Security Badge */}
+        <div className="fixed bottom-6 right-6 md:left-6 md:right-auto z-20 pointer-events-none">
+          <div className="bg-white/90 backdrop-blur shadow-xl border border-slate-200 p-2 rounded-xl flex items-center gap-3">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+              <ShieldAlert size={16} />
+            </div>
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Conexión Segura</p>
+              <p className="text-[10px] font-semibold text-slate-700">Encriptación SSL de 256 bits</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

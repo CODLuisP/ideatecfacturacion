@@ -15,21 +15,7 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ req, token }) => {
-        const { pathname } = req.nextUrl
-
-        // Permitir acceso a /login y / sin autenticación
-        if (pathname === '/login' || pathname === '/') {
-          return true
-        }
-
-        // Rutas protegidas requieren token
-        if (pathname.startsWith('/ideatecfactus')) {
-          return !!token
-        }
-
-        return true
-      },
+      authorized: () => true, // ✅ Todas las rutas son accesibles sin autenticación
     },
     pages: {
       signIn: '/login',
