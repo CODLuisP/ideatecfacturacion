@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 
-export type View = 'dashboard' | 'emision' | 'clientes' | 'productos' | 'reportes' | 'sunat' | 'configuracion' | 'usuarios';
+export type View = 'dashboard' | 'emision' | 'clientes' | 'productos' | 'reportes' | 'sunat' | 'configuracion' | 'usuarios' | 'ver-comprobantes';
 
 export interface MenuItem {
   id: View;

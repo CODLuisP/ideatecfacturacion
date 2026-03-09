@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FileText, Users, Package,
-  BarChart3, Zap, Settings, UserCircle, Download, Plus
+  BarChart3, Zap, Settings, UserCircle, Download, Plus, FileBox
 } from 'lucide-react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Topbar } from '../components/layout/Topbar';
@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'sunat', label: 'SUNAT', icon: Zap },
+    { id: 'ver-comprobantes', label: 'Comprobantes', icon: FileBox },
     { id: 'configuracion', label: 'Configuración', icon: Settings },
     { id: 'usuarios', label: 'Usuarios', icon: UserCircle },
   ];
