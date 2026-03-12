@@ -75,10 +75,13 @@ export const Topbar = ({ isSidebarOpen, toggleSidebar, activeView }: TopbarProps
       {/* Right */}
       <div className="flex items-center gap-4">
         {/* SUNAT badge */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-xs font-bold uppercase tracking-wider">SUNAT Online</span>
-        </div>
+<div className="flex items-center gap-2.5 pl-3 border-l-2 border-blue-800">
+  <div className="flex flex-col leading-none gap-0.5">
+    <span className="text-[9px] font-semibold text-gray-800 uppercase tracking-widest">Empresa</span>
+    <span className="text-xs font-black text-blue-900 uppercase tracking-wide">VELSAT S.A.C.</span>
+  </div>
+</div>
+
 
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>

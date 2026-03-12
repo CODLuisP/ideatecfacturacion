@@ -1,15 +1,16 @@
 "use client";
 import React, { useState } from 'react';
 import {
-  BarChart3, FileText, Zap, ChevronRight, X, Download, Eye,
+  BarChart3, FileText, Zap, ChevronRight, X,
   Send, RotateCcw, CheckCircle2, AlertTriangle,
-  XCircle, Bell, Search, ChevronDown, Clock,
-  ShieldCheck, AlertCircle, Calendar, Building2, Hash, Mail, AtSign
+  XCircle, Bell, ChevronDown, Clock,
+  ShieldCheck, AlertCircle, Calendar, Building2, Hash, AtSign, Eye, Download, Mail
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip
 } from 'recharts';
+import { useRouter } from 'next/navigation';
 import { RECENT_DOCS, SALES_DATA } from '@/app/components/data/mockData';
 import { Card } from '@/app/components/ui/Card';
 import { Button } from '@/app/components/ui/Button';
@@ -43,7 +44,7 @@ interface Notificacion {
   comprobante?: string;
 }
 
-// ─── Mock Data Extendido ───────────────────────────────────────────────────────
+// ─── Mock Data ─────────────────────────────────────────────────────────────────
 
 const ALL_COMPROBANTES: Comprobante[] = [
   { id: 'F001-00124', client: 'Corporación Lima SAC', ruc: '20501234567', date: '15/01/2025', total: 'S/ 1,180.00', igv: 'S/ 180.00', subtotal: 'S/ 1,000.00', status: 'Aceptado', type: 'Factura', serie: 'F001', correlativo: '00124' },
@@ -101,361 +102,6 @@ const ModalHeader: React.FC<{ title: string; subtitle?: string; onClose: () => v
   </div>
 );
 
-// ─── Modal: Enviar por Correo ──────────────────────────────────────────────────
-
-const EnviarCorreoModal: React.FC<{ doc: Comprobante; onClose: () => void }> = ({ doc, onClose }) => {
-  const [email, setEmail] = useState('');
-  const [mensaje, setMensaje] = useState(`Estimado cliente,\n\nAdjunto encontrará el comprobante electrónico ${doc.id} por un importe de ${doc.total}.\n\nGracias por su preferencia.\n\nIDEATEC Factus`);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setSending(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setSending(false);
-    setSent(true);
-  };
-
-  return (
-    <Modal open onClose={onClose}>
-      <ModalHeader
-        title="Enviar por Correo"
-        subtitle={`Comprobante ${doc.id} · ${doc.total}`}
-        onClose={onClose}
-        icon={<Mail size={18} />}
-        iconColor="bg-blue-100 text-blue-700"
-      />
-      {sent ? (
-        <div className="p-8 text-center">
-          <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <CheckCircle2 size={28} className="text-emerald-600" />
-          </div>
-          <p className="text-base font-bold text-slate-900 mb-1">¡Correo enviado!</p>
-          <p className="text-sm text-slate-500 mb-5">El comprobante fue enviado a <span className="font-semibold text-slate-700">{email}</span></p>
-          <button onClick={onClose} className="w-full py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-colors">Cerrar</button>
-        </div>
-      ) : (
-        <form onSubmit={handleSend} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide">Destinatario</label>
-            <div className="relative">
-              <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="correo@cliente.com"
-                className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-50 transition-all"
-                required
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide">Mensaje (opcional)</label>
-            <textarea
-              value={mensaje}
-              onChange={e => setMensaje(e.target.value)}
-              rows={5}
-              className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-50 transition-all resize-none"
-            />
-          </div>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
-              <FileText size={14} className="text-red-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-slate-800">{doc.id}.pdf</p>
-              <p className="text-[11px] text-slate-400">Comprobante electrónico · PDF</p>
-            </div>
-            <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-          </div>
-          <button
-            type="submit"
-            disabled={sending || !email}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-900 hover:bg-blue-950 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-colors"
-          >
-            {sending ? (
-              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enviando...</>
-            ) : (
-              <><Send size={14} /> Enviar comprobante</>
-            )}
-          </button>
-        </form>
-      )}
-    </Modal>
-  );
-};
-
-// ─── Modal: Detalle de Comprobante ─────────────────────────────────────────────
-
-const DetalleComprobanteModal: React.FC<{ doc: Comprobante | null; onClose: () => void }> = ({ doc, onClose }) => {
-  const [showEnviarCorreo, setShowEnviarCorreo] = useState(false);
-  if (!doc) return null;
-
-  const statusConfig = {
-    Aceptado: { icon: <CheckCircle2 size={14} />, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    Pendiente: { icon: <Clock size={14} />, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-    Rechazado: { icon: <XCircle size={14} />, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-  };
-
-  const cfg = statusConfig[doc.status];
-
-  return (
-    <>
-      {showEnviarCorreo && <EnviarCorreoModal doc={doc} onClose={() => setShowEnviarCorreo(false)} />}
-      <Modal open={!!doc} onClose={onClose}>
-        <ModalHeader
-          title={doc.id}
-          subtitle={`${doc.type} · ${doc.date}`}
-          onClose={onClose}
-          icon={<FileText size={18} />}
-          iconColor="bg-blue-100 text-blue-700"
-        />
-
-        <div className="overflow-y-auto p-6 space-y-5">
-          <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold w-fit", cfg.color)}>
-            {cfg.icon}
-            Estado SUNAT: {doc.status}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: 'Cliente / Receptor', value: doc.client, icon: <Building2 size={13} /> },
-              { label: 'RUC / DNI', value: doc.ruc, icon: <Hash size={13} /> },
-              { label: 'Fecha de Emisión', value: doc.date, icon: <Calendar size={13} /> },
-              { label: 'Tipo de Comprobante', value: doc.type, icon: <FileText size={13} /> },
-              { label: 'Serie', value: doc.serie, icon: <Hash size={13} /> },
-              { label: 'Correlativo', value: doc.correlativo, icon: <Hash size={13} /> },
-            ].map((item, i) => (
-              <div key={i} className="bg-slate-50 rounded-xl p-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                  {item.icon} {item.label}
-                </p>
-                <p className="text-sm font-semibold text-slate-800">{item.value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="border border-slate-100 rounded-xl overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Resumen de Importes</p>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {[
-                { label: 'Subtotal (sin IGV)', value: doc.subtotal },
-                { label: 'IGV (18%)', value: doc.igv },
-              ].map((row, i) => (
-                <div key={i} className="flex justify-between px-4 py-3 text-sm">
-                  <span className="text-slate-600">{row.label}</span>
-                  <span className="font-medium text-slate-800">{row.value}</span>
-                </div>
-              ))}
-              <div className="flex justify-between px-4 py-3 bg-blue-50">
-                <span className="text-sm font-bold text-blue-900">TOTAL</span>
-                <span className="text-sm font-bold text-blue-900">{doc.total}</span>
-              </div>
-            </div>
-          </div>
-
-          {doc.status === 'Rechazado' && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-bold text-rose-800">Comprobante rechazado</p>
-                <p className="text-xs text-rose-600 mt-0.5">Corrija los datos y vuelva a emitir el comprobante. No puede reenviarse el mismo.</p>
-              </div>
-            </div>
-          )}
-          {doc.status === 'Pendiente' && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-bold text-amber-800">Pendiente de envío a SUNAT</p>
-                <p className="text-xs text-amber-600 mt-0.5">Use el botón "Reenviar" para intentar el envío manual al OSE/SUNAT.</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer acciones — horizontal directo, sin menú desplegable */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center gap-2 shrink-0 flex-wrap">
-          <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors">
-            <Eye size={13} /> Ver PDF
-          </button>
-          <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
-            <Download size={13} /> Descargar PDF
-          </button>
-          {doc.status === 'Aceptado' && (
-            <button
-              onClick={() => setShowEnviarCorreo(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
-            >
-              <Send size={13} /> Enviar por correo
-            </button>
-          )}
-          {doc.status === 'Pendiente' && (
-            <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors">
-              <RotateCcw size={13} /> Reenviar a SUNAT
-            </button>
-          )}
-        </div>
-      </Modal>
-    </>
-  );
-};
-
-// ─── Modal: Todos los Comprobantes ─────────────────────────────────────────────
-
-const TodosComprobantesModal: React.FC<{ onClose: () => void; onSelect: (doc: Comprobante) => void }> = ({ onClose, onSelect }) => {
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('Todos');
-  const [filterType, setFilterType] = useState<string>('Todos');
-
-  const filtered = ALL_COMPROBANTES.filter(doc => {
-    const matchSearch = doc.id.toLowerCase().includes(search.toLowerCase()) ||
-      doc.client.toLowerCase().includes(search.toLowerCase()) ||
-      doc.ruc.includes(search);
-    const matchStatus = filterStatus === 'Todos' || doc.status === filterStatus;
-    const matchType = filterType === 'Todos' || doc.type === filterType;
-    return matchSearch && matchStatus && matchType;
-  });
-
-  const statusBadgeClass = (status: string) => ({
-    Aceptado: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    Pendiente: 'bg-amber-50 text-amber-700 border border-amber-200',
-    Rechazado: 'bg-rose-50 text-rose-700 border border-rose-200',
-  }[status] ?? '');
-
-  return (
-    <Modal open onClose={onClose} wide>
-      <ModalHeader
-        title="Todos los Comprobantes"
-        subtitle={`${filtered.length} comprobantes encontrados`}
-        onClose={onClose}
-        icon={<FileText size={18} />}
-        iconColor="bg-blue-100 text-blue-700"
-      />
-
-      {/* Filtros */}
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-3 shrink-0">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar por ID, cliente o RUC..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition-all"
-          />
-        </div>
-        <div className="relative">
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 cursor-pointer"
-          >
-            {['Todos', 'Aceptado', 'Pendiente', 'Rechazado'].map(s => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
-        <div className="relative">
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 cursor-pointer"
-          >
-            {['Todos', 'Factura', 'Boleta', 'Nota de Crédito', 'Guía de Remisión'].map(t => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-          <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* Tabla */}
-      <div className="overflow-y-auto flex-1">
-        <table className="w-full text-left">
-          <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
-            <tr>
-              {['Comprobante', 'Cliente / RUC', 'Fecha', 'Total', 'Estado', 'Acciones'].map(h => (
-                <th key={h} className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">
-                  No se encontraron comprobantes con ese criterio.
-                </td>
-              </tr>
-            ) : filtered.map((doc, i) => (
-              <tr key={i} className="hover:bg-slate-50/80 transition-colors group">
-                <td className="px-4 py-3">
-                  <div>
-                    <p className="text-sm font-bold text-blue-700">{doc.id}</p>
-                    <p className="text-[11px] text-slate-400">{doc.type}</p>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-sm font-medium text-slate-800 leading-tight">{doc.client}</p>
-                  <p className="text-[11px] text-slate-400">{doc.ruc}</p>
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{doc.date}</td>
-                <td className="px-4 py-3 text-sm font-bold text-slate-900 whitespace-nowrap">{doc.total}</td>
-                <td className="px-4 py-3">
-                  <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold", statusBadgeClass(doc.status))}>
-                    {doc.status === 'Aceptado' && <CheckCircle2 size={10} />}
-                    {doc.status === 'Pendiente' && <Clock size={10} />}
-                    {doc.status === 'Rechazado' && <XCircle size={10} />}
-                    {doc.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => { onSelect(doc); onClose(); }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
-                    >
-                      <Eye size={12} /> Ver
-                    </button>
-                    <button className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap">
-                      <Download size={12} /> PDF
-                    </button>
-                    {doc.status === 'Aceptado' && (
-                      <button className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap">
-                        <Send size={12} /> Correo
-                      </button>
-                    )}
-                    {doc.status === 'Pendiente' && (
-                      <button className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors whitespace-nowrap">
-                        <RotateCcw size={12} /> Reenviar
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
-        <p className="text-xs text-slate-400">Mostrando {filtered.length} de {ALL_COMPROBANTES.length} comprobantes</p>
-        <button className="flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors">
-          <Download size={13} /> Exportar a Excel
-        </button>
-      </div>
-    </Modal>
-  );
-};
-
 // ─── Modal: Todas las Alertas SUNAT ───────────────────────────────────────────
 
 const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -479,7 +125,7 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       />
 
       <div className="flex flex-1 overflow-hidden" style={{ minHeight: 0, height: '520px' }}>
-        {/* Lista de notificaciones */}
+        {/* Lista */}
         <div className="w-[42%] border-r border-slate-100 overflow-y-auto shrink-0">
           {ALL_NOTIFICACIONES.map((notif) => {
             const cfg = iconConfig[notif.type];
@@ -506,7 +152,7 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           })}
         </div>
 
-        {/* Detalle de notificación */}
+        {/* Detalle */}
         {selected ? (
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             <div className="flex items-start gap-3">
@@ -582,53 +228,10 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-// ─── Acciones inline horizontales ─────────────────────────────────────────────
-
-const AccionesInline: React.FC<{
-  doc: Comprobante;
-  onVerDetalle: () => void;
-  onEnviarCorreo: () => void;
-}> = ({ doc, onVerDetalle, onEnviarCorreo }) => (
-  <div className="flex items-center justify-end gap-1.5">
-    <button
-      onClick={onVerDetalle}
-      title="Ver detalle"
-      className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
-    >
-      <Eye size={12} /> Ver
-    </button>
-    <button
-      title="Descargar PDF"
-      className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
-    >
-      <Download size={12} /> PDF
-    </button>
-    {doc.status === 'Aceptado' && (
-      <button
-        onClick={onEnviarCorreo}
-        title="Enviar por correo"
-        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
-      >
-        <Send size={12} /> Correo
-      </button>
-    )}
-    {doc.status === 'Pendiente' && (
-      <button
-        title="Reenviar a SUNAT"
-        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors whitespace-nowrap"
-      >
-        <RotateCcw size={12} /> Reenviar
-      </button>
-    )}
-  </div>
-);
-
 // ─── Dashboard Page ────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [detalleDoc, setDetalleDoc] = useState<Comprobante | null>(null);
-  const [correoDoc, setCorreoDoc] = useState<Comprobante | null>(null);
-  const [showTodosComprobantes, setShowTodosComprobantes] = useState(false);
+  const router = useRouter();
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
 
   const statusBadgeClass = (status: string) => ({
@@ -639,18 +242,8 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* ── Modales ─────────────────────────────────────────────────────────── */}
-      <DetalleComprobanteModal doc={detalleDoc} onClose={() => setDetalleDoc(null)} />
-      {correoDoc && <EnviarCorreoModal doc={correoDoc} onClose={() => setCorreoDoc(null)} />}
-      {showTodosComprobantes && (
-        <TodosComprobantesModal
-          onClose={() => setShowTodosComprobantes(false)}
-          onSelect={(doc) => { setDetalleDoc(doc); setShowTodosComprobantes(false); }}
-        />
-      )}
       {showTodasAlertas && <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />}
 
-      {/* ── Layout ──────────────────────────────────────────────────────────── */}
       <div className="space-y-4 animate-in fade-in duration-500">
 
         {/* KPI Grid */}
@@ -724,11 +317,15 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Recent Documents */}
+        {/* Comprobantes Recientes — sin columna Acciones */}
         <Card
           title="Comprobantes Recientes"
           action={
-            <Button variant="ghost" className="text-brand-blue" onClick={() => setShowTodosComprobantes(true)}>
+            <Button
+              variant="ghost"
+              className="text-brand-blue"
+              onClick={() => router.push('/ideatecfactus/ver-comprobantes')}
+            >
               Ver todos <ChevronRight className="w-4 h-4" />
             </Button>
           }
@@ -742,19 +339,13 @@ export default function DashboardPage() {
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {ALL_COMPROBANTES.slice(0, 5).map((doc, i) => (
                   <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => setDetalleDoc(doc)}
-                        className="text-sm font-medium text-brand-blue hover:underline"
-                      >
-                        {doc.id}
-                      </button>
+                      <span className="text-sm font-medium text-brand-blue">{doc.id}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">{doc.client}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{doc.date}</td>
@@ -764,20 +355,13 @@ export default function DashboardPage() {
                         {doc.status}
                       </Badge>
                     </td>
-                    {/* ✅ Botones directos horizontales, sin menú desplegable */}
-                    <td className="px-6 py-4">
-                      <AccionesInline
-                        doc={doc}
-                        onVerDetalle={() => setDetalleDoc(doc)}
-                        onEnviarCorreo={() => setCorreoDoc(doc)}
-                      />
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </Card>
+
       </div>
     </>
   );

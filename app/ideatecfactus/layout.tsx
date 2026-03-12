@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'sunat', label: 'SUNAT', icon: Zap },
-    { id: 'configuracion', label: 'Configuración', icon: Settings },
+    { id: 'empresa', label: 'Empresa', icon: Settings },
     { id: 'usuarios', label: 'Usuarios', icon: UserCircle },
   ];
 
