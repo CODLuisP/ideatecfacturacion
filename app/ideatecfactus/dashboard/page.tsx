@@ -271,7 +271,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Sales Chart */}
           <Card className="lg:col-span-2" title="Rendimiento de Ventas" subtitle="Resumen de los últimos 7 días">
-            <div className="h-[300px] w-full mt-4">
+            <div className="h-75 w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={SALES_DATA}>
                   <defs>
