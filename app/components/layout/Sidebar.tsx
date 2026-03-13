@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { ShieldCheck, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react"; 
 
 import { cn } from "@/app/utils/cn";
 import { MenuItem, View } from "@/app/types";
@@ -18,10 +19,13 @@ export const Sidebar = ({
   onViewChange,
   menuItems,
 }: SidebarProps) => {
+
+  const handleLogout = () => signOut({ callbackUrl: '/login' });
+
   return (
     <aside
       className={cn(
-        "bg-[#172B4D] text-white transition-all duration-300 flex flex-col fixed inset-y-0 z-50 lg:relative h-full overflow-hidden",
+        "bg-brand-dark text-white transition-all duration-300 flex flex-col fixed inset-y-0 z-50 lg:relative h-full overflow-hidden",
         isOpen ? "w-64" : "w-20",
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}
@@ -51,7 +55,7 @@ export const Sidebar = ({
               "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all group relative overflow-hidden",
               !isOpen && "justify-center",
               activeView === item.id
-                ? "bg-[#0052CC] text-white shadow-md shadow-blue-900/20"
+                ? "bg-brand-blue text-white shadow-md shadow-blue-900/20"
                 : "text-gray-400 hover:bg-white/5 hover:text-white",
             )}
           >
@@ -75,6 +79,7 @@ export const Sidebar = ({
 
       <div className="p-4 border-t border-white/5 shrink-0">
         <button
+          onClick={handleLogout}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all group",
             !isOpen && "justify-center",
