@@ -1,10 +1,11 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Building2, MapPin, Phone, Upload, X, User, ChevronDown, Loader2 } from 'lucide-react';
 import { useToast } from '@/app/components/ui/Toast';
 import { Card } from '@/app/components/ui/Card';
 import { Button } from '@/app/components/ui/Button';
 import { cn } from '@/app/utils/cn';
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Regimen = '0' | '1' | '2' | '3';
@@ -263,6 +264,14 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false);
   const [savingSeries, setSavingSeries] = useState(false);
   const [logo, setLogo] = useState('');
+  const { user } = useAuth();
+
+    useEffect(() => {
+    console.log("Usuario actual:", user);
+    console.log("Nombre:", user?.nombreCompleto);
+    console.log("RUC:", user?.ruc);
+    console.log("Rol:", user?.rol);
+  }, [user]);
 
   const [form, setForm] = useState<EmpresaForm>({
     ruc: '',
