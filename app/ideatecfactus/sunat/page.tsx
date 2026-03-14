@@ -342,23 +342,7 @@ export default function SunatPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
 
       {/* Header actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={cn('w-2 h-2 rounded-full', status.connected ? 'bg-emerald-500' : 'bg-red-500')} />
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {config.environment === 'beta' ? 'Beta / Homologación' : 'Producción'}
-            </span>
-            {config.saved && (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium ml-2">
-                <CheckCheck className="w-3.5 h-3.5" /> Guardado
-              </span>
-            )}
-          </div>
-          <Button variant="outline" onClick={handleRefresh} disabled={syncing}>
-            <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} />
-            {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
-          </Button>
-        </div>
+
 
       {/* Estado conexión + certificado */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -397,52 +381,71 @@ export default function SunatPage() {
         </Card>
 
         {/* Certificado Digital */}
-        <Card title="Certificado Digital (PSF)" subtitle="Validación y vigencia">
-          <div className="space-y-6">
-            <div className={cn(
-              'p-4 rounded-xl border space-y-3',
-              daysLeft < 30 ? 'border-amber-100 bg-amber-50/50' : 'border-emerald-100 bg-emerald-50/50'
-            )}>
-              <div className="flex justify-between items-center">
-                <span className={cn('text-xs font-bold uppercase', daysLeft < 30 ? 'text-amber-800' : 'text-emerald-800')}>Vigencia</span>
-                <Badge variant={certBadgeVariant}>
-                  {daysLeft < 7 ? 'Por vencer' : daysLeft < 30 ? 'Próximo a vencer' : 'Vigente'}
-                </Badge>
-              </div>
-              <div className={cn('h-2 rounded-full overflow-hidden', daysLeft < 30 ? 'bg-amber-500' : 'bg-emerald-200')}>
-                <div
-                  className={cn('h-full rounded-full transition-all', daysLeft < 30 ? 'bg-amber-500' : 'bg-emerald-500')}
-                  style={{ width: `${certPct}%` }}
-                />
-              </div>
-              <p className={cn('text-xs', daysLeft < 30 ? 'text-amber-700' : 'text-emerald-700')}>
-                Expira el <strong>{new Date(config.certExpiry).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> (en {daysLeft} días).
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-gray-500 uppercase">Detalles del Certificado</p>
-              <div className="text-sm space-y-1">
-                {[
-                  ['Emisor', config.certIssuer],
-                  ['RUC', config.certRuc],
-                  ['Tipo', 'PFX / P12'],
-                  ['Archivo', config.certFile ?? 'No cargado'],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between">
-                    <span className="text-gray-500">{k}:</span>
-                    <span className={cn('font-medium', !config.certFile && k === 'Archivo' ? 'text-red-500' : 'text-gray-900')}>{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+     <Card title="Certificado Digital (PSF)" subtitle="Validación y vigencia">
+  <div className="space-y-6">
+    <div className={cn(
+      'p-4 rounded-xl border space-y-3',
+      !config.certFile
+        ? 'border-gray-100 bg-gray-50/50'
+        : daysLeft < 30 ? 'border-amber-100 bg-amber-50/50' : 'border-emerald-100 bg-emerald-50/50'
+    )}>
+      <div className="flex justify-between items-center">
+        <span className={cn(
+          'text-xs font-bold uppercase',
+          !config.certFile ? 'text-gray-400' : daysLeft < 30 ? 'text-amber-800' : 'text-emerald-800'
+        )}>Vigencia</span>
+        <Badge variant={!config.certFile ? 'default' : certBadgeVariant}>
+          {!config.certFile ? 'Sin certificado' : daysLeft < 7 ? 'Por vencer' : daysLeft < 30 ? 'Próximo a vencer' : 'Vigente'}
+        </Badge>
+      </div>
+      <div className={cn(
+        'h-2 rounded-full overflow-hidden',
+        !config.certFile ? 'bg-gray-200' : daysLeft < 30 ? 'bg-amber-100' : 'bg-emerald-200'
+      )}>
+        <div
+          className={cn(
+            'h-full rounded-full transition-all',
+            !config.certFile ? 'bg-gray-300' : daysLeft < 30 ? 'bg-amber-500' : 'bg-emerald-500'
+          )}
+          style={{ width: !config.certFile ? '0%' : `${certPct}%` }}
+        />
+      </div>
+      <p className={cn('text-xs', !config.certFile ? 'text-gray-400' : daysLeft < 30 ? 'text-amber-700' : 'text-emerald-700')}>
+        {!config.certFile
+          ? 'Cargue un certificado para determinar la cantidad de días.'
+          : <>Expira el <strong>{new Date(config.certExpiry).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> (en {daysLeft} días).</>
+        }
+      </p>
+    </div>
 
-            <Button variant="outline" className="w-full" onClick={() => setIsModalOpen(true)}>
-              <Upload className="w-4 h-4" />
-              {config.certFile ? 'Reemplazar Certificado' : 'Actualizar Certificado'}
-            </Button>
+    <div className="space-y-2">
+      <p className="text-xs font-bold text-gray-500 uppercase">Detalles del Certificado</p>
+      <div className="text-sm space-y-1">
+        {[
+          ['Emisor', config.certFile ? config.certIssuer : '—'],
+          ['RUC', config.certFile ? config.certRuc : '—'],
+          ['Tipo', config.certFile ? 'PFX / P12' : '—'],
+          ['Archivo', config.certFile ?? 'No cargado'],
+        ].map(([k, v]) => (
+          <div key={k} className="flex justify-between">
+            <span className="text-gray-500">{k}:</span>
+            <span className={cn(
+              'font-medium',
+              !config.certFile && k === 'Archivo' ? 'text-red-500' : config.certFile ? 'text-gray-900' : 'text-gray-400'
+            )}>{v}</span>
           </div>
-        </Card>
+        ))}
+      </div>
+    </div>
+
+    <Button variant="outline" className="w-full" onClick={() => setIsModalOpen(true)}>
+      <Upload className="w-4 h-4" />
+      {config.certFile ? 'Actualizar Certificado' : 'Subir Certificado'}
+    </Button>
+  </div>
+</Card>
+
       </div>
 
       {/* ── Configuración ── */}
