@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import IncaPattern from "../components/IncaPattern";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Enums & Interfaces ────────────────────────────────────────────────────────
 
