@@ -29,7 +29,7 @@ export const Modal = ({ isOpen, onClose, title, children, className }: ModalProp
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className={cn(
-                "bg-white rounded-2xl shadow-2xl pointer-events-auto w-full max-w-lg overflow-hidden flex flex-col",
+                "bg-white rounded-2xl shadow-2xl pointer-events-auto w-full max-w-3xl overflow-hidden flex flex-col",
                 className
               )}
             >
