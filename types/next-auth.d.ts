@@ -6,7 +6,6 @@ declare module "next-auth" {
     rol?: string;
     ruc?: string;
     razonSocial?: string;
-    imagen?: string;
     accessToken?: string;
     refreshToken?: string;
     accessTokenExpires?: number;
@@ -15,13 +14,10 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      name?: string | null;
       email?: string | null;
       username?: string;
       rol?: string;
       ruc?: string;
-      razonSocial?: string;
-      imagen?: string;
     };
     accessToken?: string;
     refreshToken?: string;
@@ -36,7 +32,6 @@ declare module "next-auth/jwt" {
     rol?: string;
     ruc?: string;
     razonSocial?: string;
-    imagen?: string;
     accessToken?: string;
     refreshToken?: string;
     accessTokenExpires?: number;

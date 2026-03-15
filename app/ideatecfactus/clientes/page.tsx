@@ -10,6 +10,7 @@ import { Card } from '@/app/components/ui/Card';
 import { Modal } from '@/app/components/ui/Modal';
 import { Badge } from '@/app/components/ui/Badge';
 import { cn } from '@/app/utils/cn';
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface Direccion {
@@ -71,7 +72,12 @@ export default function ClientesPage() {
   const [correoCliente, setCorreoCliente] = useState<Cliente | null>(null);
   const [editarCliente, setEditarCliente] = useState<Cliente | null>(null);
   const [eliminarCliente, setEliminarCliente] = useState<Cliente | null>(null);
-
+  const { user } = useAuth();
+  useEffect(() => {
+    console.log("Usuario actual:", user);
+    console.log("RUC:", user?.ruc);
+    console.log("Rol:", user?.rol);
+  }, [user]);
   // ── Nuevo cliente form ──
   const nuevoClienteInicial = {
     tipoDocumentoId: '01',

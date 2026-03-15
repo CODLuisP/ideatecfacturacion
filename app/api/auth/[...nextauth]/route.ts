@@ -51,12 +51,9 @@ export const authOptions: AuthOptions = {
           return {
             id: data.user.usuarioID.toString(),
             email: data.user.email,
-            name: data.user.nombreCompleto,
             username: data.user.username,
             rol: data.user.rol,
             ruc: data.user.ruc,
-            razonSocial: data.user.razonSocial,
-            imagen: data.user.imagen,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
           };
@@ -74,12 +71,9 @@ export const authOptions: AuthOptions = {
         console.log('🆕 Nuevo login - Token válido por 24 horas');
         token.id = user.id;
         token.email = user.email;
-        token.name = user.name;
         token.username = user.username;
         token.rol = user.rol;
         token.ruc = user.ruc;
-        token.razonSocial = user.razonSocial;
-        token.imagen = user.imagen;
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
       }
@@ -89,12 +83,9 @@ export const authOptions: AuthOptions = {
       session.user = {
         id: token.id as string,
         email: token.email as string,
-        name: token.name as string,
         username: token.username as string,
         rol: token.rol as string,
         ruc: token.ruc as string,
-        razonSocial: token.razonSocial as string,
-        imagen: token.imagen as string,
       };
       session.accessToken = token.accessToken as string;
       session.refreshToken = token.refreshToken as string;

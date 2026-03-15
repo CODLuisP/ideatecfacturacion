@@ -5,12 +5,9 @@ import { useSession, signOut } from "next-auth/react";
 export interface AuthUser {
   id: string;
   username: string;
-  nombreCompleto: string;
   email: string;
   rol: string;
   ruc: string;
-  razonSocial: string;
-  imagen: string | null;
 }
 
 interface AuthContextValue {
@@ -33,12 +30,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     ? {
         id: session.user.id ?? "",
         username: session.user.username ?? "",
-        nombreCompleto: session.user.name ?? "",
         email: session.user.email ?? "",
         rol: session.user.rol ?? "",
-        ruc: session.user.ruc ?? "",
-        razonSocial: session.user.razonSocial ?? "",
-        imagen: session.user.imagen ?? null,
+        ruc: session.user.ruc ?? ""
       }
     : null;
 
