@@ -15,7 +15,6 @@ import { EditarClienteModal } from './gestionClientes/EditarCliente';
 import { EnviarCorreoCliente } from './gestionClientes/EnviarCorreoCliente';
 import { Direccion, Cliente } from './gestionClientes/Cliente';
 
-
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const formatDireccion = (direcciones: Direccion[]): string => {
   if (!direcciones || direcciones.length === 0) return 'Sin dirección';
@@ -47,12 +46,7 @@ export default function ClientesPage() {
   const [clienteCorreo, setClienteCorreo] = useState<Cliente | null>(null);
   const [clienteEditar, setClienteEditar] = useState<Cliente | null>(null);  
   const [eliminarCliente, setEliminarCliente] = useState<Cliente | null>(null);
-  const { user } = useAuth();
-  useEffect(() => {
-    console.log("Usuario actual:", user);
-    console.log("RUC:", user?.ruc);
-    console.log("Rol:", user?.rol);
-  }, [user]);
+
   // ── Nuevo cliente form ──
   const nuevoClienteInicial = {
     tipoDocumentoId: '01',
