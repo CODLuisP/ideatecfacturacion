@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useMemo, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 
 export interface AuthUser {
@@ -21,34 +21,39 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { data: session, status } = useSession();
 
-  const user: AuthUser | null = session?.user
-    ? {
-        id: session.user.id ?? "",
-        username: session.user.username ?? "",
-        email: session.user.email ?? "",
-        rol: session.user.rol ?? "",
-        ruc: session.user.ruc ?? ""
-      }
-    : null;
+  const user: AuthUser | null = useMemo(() => {
+    if (!session?.user) return null;
+    return {
+      id: session.user.id ?? "",
+      username: session.user.username ?? "",
+      email: session.user.email ?? "",
+      rol: session.user.rol ?? "",
+      ruc: session.user.ruc ?? "",
+    };
+  }, [
+    session?.user?.id,
+    session?.user?.username,
+    session?.user?.email,
+    session?.user?.rol,
+    session?.user?.ruc,
+  ]);
 
-  const logout = () => signOut({ callbackUrl: "/login" });
+  const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);
+
+  const value = useMemo(() => ({
+    user,
+    accessToken: session?.accessToken ?? null,
+    refreshToken: session?.refreshToken ?? null,
+    isAuthenticated: status === "authenticated",
+    isLoading: status === "loading",
+    logout,
+  }), [user, session?.accessToken, session?.refreshToken, status, logout]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        accessToken: session?.accessToken ?? null,
-        refreshToken: session?.refreshToken ?? null,
-        isAuthenticated: status === "authenticated",
-        isLoading: status === "loading",
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
