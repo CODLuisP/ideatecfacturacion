@@ -51,12 +51,6 @@ const DEPARTAMENTOS = [
   'San Martín','Tacna','Tumbes','Ucayali',
 ];
 
-const REGIMENES: { value: Regimen; label: string; desc: string }[] = [
-  { value: '0', label: 'Régimen General', desc: 'Ingresos anuales mayores a 1700 UIT' },
-  { value: '1', label: 'Régimen MYPE Tributario', desc: 'Ingresos hasta 1700 UIT anuales' },
-  { value: '2', label: 'Régimen Especial (RER)', desc: 'Ingresos hasta 525,000 soles anuales' },
-  { value: '3', label: 'Nuevo RUS', desc: 'Para personas naturales con ingresos mínimos' },
-];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -268,7 +262,6 @@ export default function ConfiguracionPage() {
 
     useEffect(() => {
     console.log("Usuario actual:", user);
-    console.log("Nombre:", user?.nombreCompleto);
     console.log("RUC:", user?.ruc);
     console.log("Rol:", user?.rol);
   }, [user]);
@@ -368,6 +361,9 @@ export default function ConfiguracionPage() {
 
       {/* ── Datos de la Empresa ── */}
       <Card title="Datos de la Empresa" subtitle="Información que aparecerá en tus comprobantes electrónicos">
+        
+        <p>{user?.ruc}</p>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           <LogoUploader logo={logo} onLogo={setLogo} />
@@ -387,14 +383,7 @@ export default function ConfiguracionPage() {
             hint="Número de RUC de 11 dígitos registrado en SUNAT"
           />
 
-          <Select
-            label="Régimen Tributario"
-            required
-            value={form.regimen}
-            onChange={upd('regimen')}
-            options={REGIMENES.map((r) => ({ value: r.value, label: `${r.label} — ${r.desc}` }))}
-            hint="Determina las obligaciones tributarias y límites de emisión"
-          />
+         
 
           <Input label="Razón Social" value={form.razonSocial} onChange={upd('razonSocial')} required placeholder="Nombre legal de la empresa" />
           <Input label="Nombre Comercial" value={form.nombreComercial} onChange={upd('nombreComercial')} placeholder="Nombre con el que opera (opcional)" />
