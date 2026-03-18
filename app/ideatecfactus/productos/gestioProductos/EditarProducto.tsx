@@ -138,7 +138,7 @@ export default function EditarProducto({
       title="Editar Producto"
     >
       <form className="space-y-4" onSubmit={handleEditar}>
-        <FormFields 
+        <FormEditarProducto 
           form={form}
           setForm={setForm}
           precioInput={precioInput}
@@ -164,7 +164,7 @@ export default function EditarProducto({
   );
 }
 
-function FormFields({ form, setForm, precioInput, setPrecioInput, onChange, categorias }: FormFieldsProps) {
+function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChange, categorias }: FormFieldsProps) {
   return (
     <>
       <InputBase
@@ -303,8 +303,8 @@ function FormFields({ form, setForm, precioInput, setPrecioInput, onChange, cate
           placeholder="Ej: 43211503"
         />
         <InputBase
-          label="Código / SKU"
-          labelOptional="(opcional)"
+          label="Código"
+          labelOptional=""
           value={form.codigo}
           onChange={onChange("codigo")}
           placeholder="PROD-001"

@@ -41,6 +41,11 @@ export default function AgregarProducto({
 }: Props) {
 
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
+    React.useEffect(() => {
+    if (!isOpen) {
+      setForm(emptyForm);
+    }
+  }, [isOpen]);
 
 const handleFormChange =
   (field: keyof NuevoProducto) =>
@@ -66,10 +71,10 @@ const handleFormChange =
     try {
         
         console.log("producto enviado: ", form)
-        /*const response = await axios.post<Producto>( `${process.env.NEXT_PUBLIC_API_URL}/api/Producto`, form ); 
+        const response = await axios.post<Producto>( `${process.env.NEXT_PUBLIC_API_URL}/api/Producto`, form ); 
         onProductoAgregado(response.data);
         setForm(emptyForm);
-        onClose();*/
+        onClose();
 
     } catch (error) {
         console.error("Error guardando producto:", error);
@@ -84,7 +89,7 @@ const handleFormChange =
     >
       <form className="space-y-4" onSubmit={handleGuardar}>
 
-        <FormFields form={form} onChange={handleFormChange} categorias={categorias} />
+        <FormAgregarNuevo form={form} onChange={handleFormChange} categorias={categorias} />
 
         <div className="pt-4 flex justify-end gap-3">
           <Button
@@ -105,7 +110,7 @@ const handleFormChange =
   );
 }
 
-function FormFields({ form, onChange,categorias }: FormFieldsProps) {
+function FormAgregarNuevo({ form, onChange,categorias }: FormFieldsProps) {
   return (
     <>
       <InputBase
@@ -233,8 +238,8 @@ function FormFields({ form, onChange,categorias }: FormFieldsProps) {
         />
 
         <InputBase
-          label="Código / SKU"
-          labelOptional="(opcional)"
+          label="Código"
+          labelOptional=""
           value={form.codigo}
           onChange={onChange("codigo")}
           placeholder="PROD-001"
