@@ -140,17 +140,14 @@ export default function Page() {
         toEmail: email,
         toName: usuario,
         subject: "¡Bienvenido a Factura Digital! 🎉",
-        body: `Hola ${usuario},\n\n¡Tu registro en Factura Digital ha sido exitoso!\n\nYa puedes comenzar a emitir tus comprobantes electrónicos certificados por SUNAT.\n\nEstos son tus datos de acceso:\n  • Usuario: ${usuario}\n  • RUC: ${ruc}\n  • Empresa: ${empresaData?.razonSocial ?? ""}\n  • Contraseña: 12345678 (por defecto)\n\n⚠️ Por seguridad, te recomendamos cambiar tu contraseña lo antes posible desde la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.\n\nSi tienes alguna consulta, no dudes en contactarnos.\n\n¡Bienvenido a bordo!\n\nEl equipo de Factura Digital`,
+        body: `Hola ${usuario},\n\n¡Tu registro en Factura Digital ha sido exitoso!\n\nYa puedes comenzar a emitir tus comprobantes electrónicos certificados por SUNAT.\n\nEstos son tus datos de acceso:\n  • Usuario: ${usuario}\n  • RUC: ${ruc}\n  • Empresa: ${empresaData?.razonSocial ?? ""}\n  • Contraseña: 12345678 (por defecto)\n\nPor seguridad, te recomendamos cambiar tu contraseña lo antes posible desde la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.\n\nSi tienes alguna consulta, no dudes en contactarnos.\n\n¡Bienvenido a bordo!\n\nEl equipo de Factura Digital`,
         tipo: "0",
       });
       showToast("Correo de bienvenida enviado", "success");
 
       setSuccess(true);
     } catch (error: any) {
-      const msg =
-        error.response?.data?.message || error.message || "Error inesperado";
-      console.error("Error:", msg);
-
+      const msg = error.response?.data?.message || error.message || "Error inesperado";
       const lower = msg.toLowerCase();
       if (lower.includes("username") || lower.includes("usuario")) {
         showToast("El nombre de usuario ya está registrado", "error");
