@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import axios from "axios";
+import { useToast } from "../components/ui/Toast";
 
 export default function Page() {
   const [ruc, setRuc] = useState("");
@@ -31,6 +32,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
 
   const CLAVE_SECRETA = "vadmin123";
+  const { showToast } = useToast();
 
   const handleRUC = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -44,7 +46,6 @@ export default function Page() {
           `https://dniruc.apisperu.com/api/v1/ruc/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
         );
         const data = await res.json();
-        console.log("Datos RUC:", data);
 
         if (data.ruc) {
           setEmpresaData(data);
@@ -107,12 +108,12 @@ export default function Page() {
           rol: "admin",
         },
       );
-      console.log("✅ Usuario registrado");
+      showToast("Usuario registrado correctamente", "success");
 
-      // 2. Crear empresa directamente con todos los datos
+      // 2. Crear empresa
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/companies`, {
         ruc: ruc,
-        razonSocial: empresaData?.razonSocial ?? null,
+        razonSocial: empresaData?.razonSocial ?? "",
         nombreComercial: empresaData?.nombreComercial ?? null,
         direccion: empresaData?.direccion ?? null,
         ubigeo: empresaData?.ubigeo ?? null,
@@ -129,27 +130,37 @@ export default function Page() {
         solClave: null,
         clienteId: null,
         clientSecret: null,
-        plan: null,
-        environment: null,
+        plan: "free",
+        environment: "beta",
       });
-      console.log("✅ Empresa creada");
+      showToast("Empresa registrada correctamente", "success");
 
       // 3. Enviar correo de bienvenida
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Email/send`, {
         toEmail: email,
         toName: usuario,
         subject: "¡Bienvenido a Factura Digital! 🎉",
-        body: `Hola ${usuario},\n\n¡Tu registro en Factura Digital ha sido exitoso!\n\nYa puedes comenzar a emitir tus comprobantes electrónicos certificados por SUNAT.\n\nEstos son tus datos de acceso:\n  • Usuario: ${usuario}\n  • RUC: ${ruc}\n  • Empresa: ${empresaData?.razonSocial ?? ""}\n  • Contraseña: 12345678 (por defecto)\n\nPor seguridad, te recomendamos cambiar tu contraseña lo antes posible desde la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.\n\nSi tienes alguna consulta, no dudes en contactarnos.\n\n¡Bienvenido a bordo!\n\nEl equipo de Factura Digital`,
+        body: `Hola ${usuario},\n\n¡Tu registro en Factura Digital ha sido exitoso!\n\nYa puedes comenzar a emitir tus comprobantes electrónicos certificados por SUNAT.\n\nEstos son tus datos de acceso:\n  • Usuario: ${usuario}\n  • RUC: ${ruc}\n  • Empresa: ${empresaData?.razonSocial ?? ""}\n  • Contraseña: 12345678 (por defecto)\n\n⚠️ Por seguridad, te recomendamos cambiar tu contraseña lo antes posible desde la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.\n\nSi tienes alguna consulta, no dudes en contactarnos.\n\n¡Bienvenido a bordo!\n\nEl equipo de Factura Digital`,
         tipo: "0",
       });
-      console.log("✅ Correo de bienvenida enviado");
+      showToast("Correo de bienvenida enviado", "success");
 
       setSuccess(true);
     } catch (error: any) {
       const msg =
         error.response?.data?.message || error.message || "Error inesperado";
-      console.error("❌ Error:", msg);
-      alert(`Error: ${msg}`);
+      console.error("Error:", msg);
+
+      const lower = msg.toLowerCase();
+      if (lower.includes("username") || lower.includes("usuario")) {
+        showToast("El nombre de usuario ya está registrado", "error");
+      } else if (lower.includes("email") && lower.includes("otro ruc")) {
+        showToast("El correo ya está registrado con otro RUC", "error");
+      } else if (lower.includes("ruc")) {
+        showToast("El RUC ya tiene un usuario registrado", "error");
+      } else {
+        showToast(`Error: ${msg}`, "error");
+      }
     } finally {
       setLoading(false);
     }
