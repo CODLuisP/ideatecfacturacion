@@ -1,33 +1,27 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, MapPin, Phone, Upload, X, User, ChevronDown, Loader2 } from 'lucide-react';
+import { Building2, MapPin, Phone, Upload, X, ChevronDown, Loader2 } from 'lucide-react';
+import axios from 'axios';
 import { useToast } from '@/app/components/ui/Toast';
 import { Card } from '@/app/components/ui/Card';
 import { Button } from '@/app/components/ui/Button';
 import { cn } from '@/app/utils/cn';
 import { useAuth } from "@/context/AuthContext";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Regimen = '0' | '1' | '2' | '3';
+const BASE_URL = 'http://localhost:5004';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface EmpresaForm {
   ruc: string;
   razonSocial: string;
   nombreComercial: string;
-  regimen: Regimen;
-  // Ubicación
   departamento: string;
   provincia: string;
   distrito: string;
   direccion: string;
   ubigeo: string;
-  urbanizacion: string;
-  // Contacto
   telefono: string;
   email: string;
-  // Representante
-  repLegal: string;
-  repLegalDni: string;
 }
 
 interface SeriesForm {
@@ -45,12 +39,24 @@ interface SeriesForm {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const DEPARTAMENTOS = [
-  'Amazonas','Áncash','Apurímac','Arequipa','Ayacucho','Cajamarca','Callao',
-  'Cusco','Huancavelica','Huánuco','Ica','Junín','La Libertad','Lambayeque',
-  'Lima','Loreto','Madre de Dios','Moquegua','Pasco','Piura','Puno',
-  'San Martín','Tacna','Tumbes','Ucayali',
+  'AMAZONAS','ÁNCASH','APURÍMAC','AREQUIPA','AYACUCHO','CAJAMARCA','CALLAO',
+  'CUSCO','HUANCAVELICA','HUÁNUCO','ICA','JUNÍN','LA LIBERTAD','LAMBAYEQUE',
+  'LIMA','LORETO','MADRE DE DIOS','MOQUEGUA','PASCO','PIURA','PUNO',
+  'SAN MARTÍN','TACNA','TUMBES','UCAYALI',
 ];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function toDataUrl(base64: string): string {
+  if (!base64) return '';
+  if (base64.startsWith('data:')) return base64;
+  return `data:image/jpeg;base64,${base64}`;
+}
+
+function stripDataUrlPrefix(dataUrl: string): string {
+  if (!dataUrl) return '';
+  const idx = dataUrl.indexOf(',');
+  return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -77,7 +83,7 @@ function Input({ label, required, hint, disabled, className, ...props }: InputPr
         className={cn(
           'w-full px-4 py-2.5 border rounded-xl outline-none text-sm transition-colors',
           disabled
-            ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+            ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed select-none'
             : 'bg-white border-gray-200 focus:border-brand-blue',
           className
         )}
@@ -133,25 +139,14 @@ function SectionHeader({ icon: Icon, title, subtitle }: { icon: React.ElementTyp
   );
 }
 
-function Toggle({ checked, onChange, label, desc }: { checked: boolean; onChange: () => void; label: string; desc: string }) {
-  return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-      <div>
-        <p className="font-bold text-gray-900 text-sm">{label}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onChange}
-        className={cn('w-10 h-5 rounded-full relative transition-colors', checked ? 'bg-brand-blue' : 'bg-gray-200')}
-      >
-        <div className={cn('absolute top-1 w-3 h-3 bg-white rounded-full transition-all', checked ? 'right-1' : 'left-1')} />
-      </button>
-    </div>
-  );
+// ─── Logo Uploader ────────────────────────────────────────────────────────────
+interface LogoUploaderProps {
+  logoDataUrl: string;
+  uploading: boolean;
+  onFileSelected: (file: File, previewDataUrl: string) => void;
+  onLogoRemove: () => void;
 }
-
-function LogoUploader({ logo, onLogo }: { logo: string; onLogo: (url: string) => void }) {
+function LogoUploader({ logoDataUrl, uploading, onFileSelected, onLogoRemove }: LogoUploaderProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -159,8 +154,9 @@ function LogoUploader({ logo, onLogo }: { logo: string; onLogo: (url: string) =>
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type)) return;
     if (file.size > 2 * 1024 * 1024) return;
-    const url = URL.createObjectURL(file);
-    onLogo(url);
+    const reader = new FileReader();
+    reader.onload = () => onFileSelected(file, reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -173,22 +169,31 @@ function LogoUploader({ logo, onLogo }: { logo: string; onLogo: (url: string) =>
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
-        onClick={() => ref.current?.click()}
+        onClick={() => !uploading && ref.current?.click()}
       >
-        {logo ? (
-          <img src={logo} alt="Logo" className="w-full h-full object-contain p-1" />
+        {uploading ? (
+          <Loader2 className="w-6 h-6 text-brand-blue animate-spin" />
+        ) : logoDataUrl ? (
+          <img src={logoDataUrl} alt="Logo" className="w-full h-full object-contain p-1" />
         ) : (
           <Upload className="w-6 h-6 text-gray-300" />
         )}
-        <input ref={ref} type="file" accept="image/jpeg,image/png,image/svg+xml,image/webp" className="hidden" onChange={(e) => handle(e.target.files?.[0])} />
+        <input
+          ref={ref}
+          type="file"
+          accept="image/jpeg,image/png,image/svg+xml,image/webp"
+          className="hidden"
+          onChange={(e) => handle(e.target.files?.[0])}
+        />
       </div>
       <div className="space-y-2">
         <div className="flex gap-2">
-          <Button variant="outline" className="h-9 text-xs" type="button" onClick={() => ref.current?.click()}>
-            <Upload className="w-3.5 h-3.5" /> Subir Logo
+          <Button variant="outline" className="h-9 text-xs" type="button" disabled={uploading} onClick={() => ref.current?.click()}>
+            <Upload className="w-3.5 h-3.5" />
+            {uploading ? 'Subiendo...' : 'Subir Logo'}
           </Button>
-          {logo && (
-            <Button variant="outline" className="h-9 text-xs" type="button" onClick={() => onLogo('')}>
+          {logoDataUrl && !uploading && (
+            <Button variant="outline" className="h-9 text-xs" type="button" onClick={onLogoRemove}>
               <X className="w-3.5 h-3.5" /> Quitar
             </Button>
           )}
@@ -204,13 +209,7 @@ function LogoUploader({ logo, onLogo }: { logo: string; onLogo: (url: string) =>
 
 // ─── Serie Row ────────────────────────────────────────────────────────────────
 function SerieRow({
-  label,
-  serieKey,
-  correlativoKey,
-  series,
-  setSeries,
-  prefix,
-  hint,
+  label, serieKey, correlativoKey, series, setSeries, prefix, hint,
 }: {
   label: string;
   serieKey: keyof SeriesForm;
@@ -222,31 +221,29 @@ function SerieRow({
 }) {
   return (
     <div className="flex gap-3 items-start">
-      <div className="flex-1">
-        <div className="space-y-1.5">
-          <FieldLabel>{label} — Serie</FieldLabel>
-          <input
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-brand-blue bg-white transition-colors"
-            value={series[serieKey] as string}
-            onChange={(e) => setSeries((s) => ({ ...s, [serieKey]: e.target.value }))}
-            placeholder={hint}
-            maxLength={4}
-          />
-          <p className="text-[10px] text-gray-400 italic">Empieza con "{prefix}" — máx. 4 caracteres</p>
-        </div>
+      <div className="flex-1 space-y-1.5">
+        <FieldLabel>{label} — Serie</FieldLabel>
+        <input
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-brand-blue bg-white transition-colors"
+          value={series[serieKey] as string}
+          onChange={(e) => setSeries((s) => ({ ...s, [serieKey]: e.target.value }))}
+          placeholder={hint}
+          maxLength={4}
+        />
+        <p className="text-[10px] text-gray-400 italic">Empieza con "{prefix}" — máx. 4 caracteres</p>
       </div>
-      <div className="w-36">
-        <div className="space-y-1.5">
-          <FieldLabel>Correlativo inicial</FieldLabel>
-          <input
-            type="number"
-            min={1}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-brand-blue bg-white transition-colors"
-            value={series[correlativoKey] as number}
-            onChange={(e) => setSeries((s) => ({ ...s, [correlativoKey]: Math.max(1, parseInt(e.target.value) || 1) }))}
-          />
-          <p className="text-[10px] text-gray-400 italic">Por defecto: 1</p>
-        </div>
+      <div className="w-36 space-y-1.5">
+        <FieldLabel>Correlativo inicial</FieldLabel>
+        <input
+          type="number"
+          min={1}
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-brand-blue bg-white transition-colors"
+          value={series[correlativoKey] as number}
+          onChange={(e) =>
+            setSeries((s) => ({ ...s, [correlativoKey]: Math.max(1, parseInt(e.target.value) || 1) }))
+          }
+        />
+        <p className="text-[10px] text-gray-400 italic">Por defecto: 1</p>
       </div>
     </div>
   );
@@ -257,30 +254,27 @@ export default function ConfiguracionPage() {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [savingSeries, setSavingSeries] = useState(false);
-  const [logo, setLogo] = useState('');
-  const { user } = useAuth();
+  const [loadingEmpresa, setLoadingEmpresa] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
-    useEffect(() => {
-    console.log("Usuario actual:", user);
-    console.log("RUC:", user?.ruc);
-    console.log("Rol:", user?.rol);
-  }, [user]);
+  // logoDataUrl    → data-URL para mostrar en <img>
+  // logoBase64Pure → base64 puro para el PUT (null si se quitó)
+  const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [logoBase64Pure, setLogoBase64Pure] = useState<string | null>(null);
+
+  const { user } = useAuth();
 
   const [form, setForm] = useState<EmpresaForm>({
     ruc: '',
     razonSocial: '',
     nombreComercial: '',
-    regimen: '1',
     departamento: '',
     provincia: '',
     distrito: '',
     direccion: '',
     ubigeo: '',
-    urbanizacion: '',
     telefono: '',
     email: '',
-    repLegal: '',
-    repLegalDni: '',
   });
 
   const [series, setSeries] = useState<SeriesForm>({
@@ -296,14 +290,78 @@ export default function ConfiguracionPage() {
     correlativoGuia: 1,
   });
 
-  const [icbper, setIcbper] = useState(false);
-  const [retencion, setRetencion] = useState(false);
-  const [detraccion, setDetraccion] = useState(false);
-  const [percepcion, setPercepcion] = useState(false);
+  // ── GET ───────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const ruc = user?.ruc;
+    if (!ruc) return;
 
-  const upd = (key: keyof EmpresaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+    setLoadingEmpresa(true);
+    axios
+      .get(`${BASE_URL}/api/companies/${ruc}`)
+      .then((res) => {
+        const d = res.data;
+        setForm({
+          ruc:             d.ruc             ?? '',
+          razonSocial:     d.razonSocial     ?? '',
+          nombreComercial: d.nombreComercial ?? '',
+          departamento:    (d.departamento   ?? '').toUpperCase(),
+          provincia:       d.provincia       ?? '',
+          distrito:        d.distrito        ?? '',
+          direccion:       d.direccion       ?? '',
+          ubigeo:          d.ubigeo          ?? '',
+          telefono:        d.telefono        ?? '',
+          email:           d.email           ?? '',
+        });
 
+        if (d.logoBase64) {
+          setLogoBase64Pure(d.logoBase64);
+          setLogoDataUrl(toDataUrl(d.logoBase64));
+        }
+      })
+      .catch(() => {
+        showToast('No se pudo cargar los datos de la empresa', 'error');
+      })
+      .finally(() => {
+        setLoadingEmpresa(false);
+      });
+  }, [user?.ruc]);
+
+  // ── Subir logo (multipart/form-data) ─────────────────────────────────────
+  const handleFileSelected = async (file: File, previewDataUrl: string) => {
+    setLogoDataUrl(previewDataUrl);
+    setLogoBase64Pure(stripDataUrlPrefix(previewDataUrl));
+    setUploadingLogo(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('File', file);
+      await axios.post(`${BASE_URL}/api/companies/file/base64`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      showToast('Logo subido correctamente', 'success');
+    } catch {
+      setLogoDataUrl('');
+      setLogoBase64Pure(null);
+      showToast('Error al subir el logo. Inténtalo de nuevo.', 'error');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  // ── Quitar logo ───────────────────────────────────────────────────────────
+  // null explícito → el backend borra logoBase64 de la DB
+  const handleLogoRemove = () => {
+    setLogoDataUrl('');
+    setLogoBase64Pure(null);
+  };
+
+  const upd =
+    (key: keyof EmpresaForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  // ── PUT parcial: solo mandamos los campos que gestiona este form ──────────
+  // El backend mantiene el resto de campos intactos (certificados, SOL, etc.)
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.ruc || !form.razonSocial || !form.direccion || !form.email) {
@@ -313,30 +371,23 @@ export default function ConfiguracionPage() {
     setSaving(true);
     try {
       const payload = {
-        ruc: form.ruc,
-        razonSocial: form.razonSocial,
-        nombreComercial: form.nombreComercial,
-        direccion: form.direccion,
-        ubigeo: form.ubigeo,
-        urbanizacion: form.urbanizacion,
-        provincia: form.provincia,
-        departamento: form.departamento,
-        distrito: form.distrito,
-        telefono: form.telefono,
-        email: form.email,
-        // logoBase64 se actualiza por separado
-        // certificadoPem, certificadoPassword, solUsuario, solClave, clienteId, clientSecret → se configuran en otro lugar
+        razonSocial:     form.razonSocial,
+        nombreComercial: form.nombreComercial || null,
+        direccion:       form.direccion,
+        ubigeo:          form.ubigeo          || null,
+        provincia:       form.provincia,
+        departamento:    form.departamento,
+        distrito:        form.distrito,
+        telefono:        form.telefono        || null,
+        email:           form.email,
+        // null  → usuario quitó la imagen, backend borra logoBase64
+        // string → base64 puro de la imagen actual
+        logoBase64:      logoBase64Pure,
       };
 
-      const res = await fetch('http://localhost:5004/api/companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      showToast('Datos de empresa guardados correctamente', 'success');
-    } catch (err) {
+      await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload);
+      showToast('Datos de empresa actualizados correctamente', 'success');
+    } catch {
       showToast('Error al guardar los datos. Verifica tu conexión.', 'error');
     } finally {
       setSaving(false);
@@ -345,15 +396,9 @@ export default function ConfiguracionPage() {
 
   const handleSaveSeries = async () => {
     setSavingSeries(true);
-    try {
-      // Aquí puedes ajustar el endpoint cuando esté disponible para series
-      await new Promise((r) => setTimeout(r, 800));
-      showToast('Series guardadas correctamente', 'success');
-    } catch {
-      showToast('Error al guardar las series', 'error');
-    } finally {
-      setSavingSeries(false);
-    }
+    await new Promise((r) => setTimeout(r, 800));
+    showToast('Series guardadas correctamente', 'success');
+    setSavingSeries(false);
   };
 
   return (
@@ -361,72 +406,61 @@ export default function ConfiguracionPage() {
 
       {/* ── Datos de la Empresa ── */}
       <Card title="Datos de la Empresa" subtitle="Información que aparecerá en tus comprobantes electrónicos">
-        
-        <p>{user?.ruc}</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-          <LogoUploader logo={logo} onLogo={setLogo} />
-
-          {/* Identificación */}
-          <div className="md:col-span-2">
-            <SectionHeader icon={Building2} title="Identificación Tributaria" subtitle="Datos registrados en SUNAT" />
+        {loadingEmpresa ? (
+          <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Cargando datos de la empresa...</span>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          <Input
-            label="RUC"
-            value={form.ruc}
-            onChange={upd('ruc')}
-            required
-            placeholder="20xxxxxxxxx"
-            maxLength={11}
-            hint="Número de RUC de 11 dígitos registrado en SUNAT"
-          />
+            <LogoUploader
+              logoDataUrl={logoDataUrl}
+              uploading={uploadingLogo}
+              onFileSelected={handleFileSelected}
+              onLogoRemove={handleLogoRemove}
+            />
 
-         
+            <div className="md:col-span-2">
+              <SectionHeader icon={Building2} title="Identificación Tributaria" subtitle="Datos registrados en SUNAT" />
+            </div>
 
-          <Input label="Razón Social" value={form.razonSocial} onChange={upd('razonSocial')} required placeholder="Nombre legal de la empresa" />
-          <Input label="Nombre Comercial" value={form.nombreComercial} onChange={upd('nombreComercial')} placeholder="Nombre con el que opera (opcional)" />
+            <Input label="RUC" value={form.ruc} disabled hint="El RUC no puede modificarse" />
+            <Input label="Razón Social" value={form.razonSocial} onChange={upd('razonSocial')} required placeholder="Nombre legal de la empresa" />
+            <Input label="Nombre Comercial" value={form.nombreComercial} onChange={upd('nombreComercial')} placeholder="Nombre con el que opera (opcional)" />
 
-          {/* Representante Legal */}
-          <div className="md:col-span-2">
-            <SectionHeader icon={User} title="Representante Legal" subtitle="Datos del responsable de la empresa ante SUNAT" />
+            <div className="md:col-span-2">
+              <SectionHeader icon={MapPin} title="Ubicación y Domicilio Fiscal" subtitle="Dirección registrada en SUNAT para tus comprobantes" />
+            </div>
+
+            <Select
+              label="Departamento"
+              required
+              value={form.departamento}
+              onChange={upd('departamento')}
+              options={DEPARTAMENTOS.map((d) => ({ value: d, label: d }))}
+            />
+            <Input label="Provincia" value={form.provincia} onChange={upd('provincia')} required placeholder="Ej: Cajamarca" />
+            <Input label="Distrito"  value={form.distrito}  onChange={upd('distrito')}  required placeholder="Ej: Cajamarca" />
+            <Input label="Ubigeo" value={form.ubigeo} onChange={upd('ubigeo')} placeholder="Ej: 060101" maxLength={6} hint="Código de ubicación geográfica INEI (6 dígitos)" />
+
+            <div className="md:col-span-2">
+              <Input label="Dirección Fiscal" value={form.direccion} onChange={upd('direccion')} required placeholder="Av. / Jr. / Calle + número, referencia" hint="Dirección completa tal como aparece en SUNAT" />
+            </div>
+
+            <div className="md:col-span-2">
+              <SectionHeader icon={Phone} title="Datos de Contacto" subtitle="Información de comunicación de la empresa" />
+            </div>
+
+            <Input label="Teléfono" value={form.telefono} onChange={upd('telefono')} placeholder="Ej: 01 234 5678 / 999 123 456" type="tel" />
+            <Input label="Email" value={form.email} onChange={upd('email')} required placeholder="contacto@empresa.pe" type="email" hint="Se usará para notificaciones y envío de comprobantes" />
+
           </div>
-          <Input label="Nombre del Representante Legal" value={form.repLegal} onChange={upd('repLegal')} placeholder="Nombres y apellidos completos" />
-          <Input label="DNI del Representante Legal" value={form.repLegalDni} onChange={upd('repLegalDni')} placeholder="8 dígitos" maxLength={8} hint="Documento de identidad del representante" />
-
-          {/* Ubicación */}
-          <div className="md:col-span-2">
-            <SectionHeader icon={MapPin} title="Ubicación y Domicilio Fiscal" subtitle="Dirección registrada en SUNAT para tus comprobantes" />
-          </div>
-
-          <Select
-            label="Departamento"
-            required
-            value={form.departamento}
-            onChange={upd('departamento')}
-            options={DEPARTAMENTOS.map((d) => ({ value: d, label: d }))}
-          />
-          <Input label="Provincia" value={form.provincia} onChange={upd('provincia')} required placeholder="Ej: Lima" />
-          <Input label="Distrito" value={form.distrito} onChange={upd('distrito')} required placeholder="Ej: San Isidro" />
-          <Input label="Ubigeo" value={form.ubigeo} onChange={upd('ubigeo')} placeholder="Ej: 150131" maxLength={6} hint="Código de ubicación geográfica INEI (6 dígitos)" />
-          <Input label="Urbanización" value={form.urbanizacion} onChange={upd('urbanizacion')} placeholder="Ej: Urb. Los Jardines" />
-          <div className="md:col-span-2">
-            <Input label="Dirección Fiscal" value={form.direccion} onChange={upd('direccion')} required placeholder="Av. / Jr. / Calle + número, referencia" hint="Dirección completa tal como aparece en SUNAT" />
-          </div>
-
-          {/* Contacto */}
-          <div className="md:col-span-2">
-            <SectionHeader icon={Phone} title="Datos de Contacto" subtitle="Información de comunicación de la empresa" />
-          </div>
-
-          <Input label="Teléfono" value={form.telefono} onChange={upd('telefono')} required placeholder="Ej: 01 234 5678 / 999 123 456" type="tel" />
-          <Input label="Email" value={form.email} onChange={upd('email')} required placeholder="contacto@empresa.pe" type="email" hint="Se usará para notificaciones y envío de comprobantes" />
-
-        </div>
+        )}
 
         <div className="mt-8 flex justify-end">
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || loadingEmpresa || uploadingLogo}>
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {saving ? 'Guardando...' : 'Guardar Datos de Empresa'}
           </Button>
@@ -436,40 +470,17 @@ export default function ConfiguracionPage() {
       {/* ── Series de Comprobantes ── */}
       <Card title="Series de Comprobantes" subtitle="Configura la serie y el correlativo inicial para cada tipo de documento electrónico">
         <div className="space-y-5">
-          <SerieRow label="Factura" serieKey="serieFactura" correlativoKey="correlativoFactura" series={series} setSeries={setSeries} prefix="F" hint="F001" />
-          <SerieRow label="Boleta" serieKey="serieBoleta" correlativoKey="correlativoBoleta" series={series} setSeries={setSeries} prefix="B" hint="B001" />
-          <SerieRow label="Nota de Crédito" serieKey="serieNotaCredito" correlativoKey="correlativoNotaCredito" series={series} setSeries={setSeries} prefix="F" hint="FC01" />
-          <SerieRow label="Nota de Débito" serieKey="serieNotaDebito" correlativoKey="correlativoNotaDebito" series={series} setSeries={setSeries} prefix="F" hint="FD01" />
-          <SerieRow label="Guía de Remisión" serieKey="serieGuia" correlativoKey="correlativoGuia" series={series} setSeries={setSeries} prefix="T" hint="T001" />
+          <SerieRow label="Factura"          serieKey="serieFactura"     correlativoKey="correlativoFactura"     series={series} setSeries={setSeries} prefix="F" hint="F001" />
+          <SerieRow label="Boleta"           serieKey="serieBoleta"      correlativoKey="correlativoBoleta"      series={series} setSeries={setSeries} prefix="B" hint="B001" />
+          <SerieRow label="Nota de Crédito"  serieKey="serieNotaCredito" correlativoKey="correlativoNotaCredito" series={series} setSeries={setSeries} prefix="F" hint="FC01" />
+          <SerieRow label="Nota de Débito"   serieKey="serieNotaDebito"  correlativoKey="correlativoNotaDebito"  series={series} setSeries={setSeries} prefix="F" hint="FD01" />
+          <SerieRow label="Guía de Remisión" serieKey="serieGuia"        correlativoKey="correlativoGuia"        series={series} setSeries={setSeries} prefix="T" hint="T001" />
         </div>
         <div className="mt-6 flex justify-end">
           <Button type="button" variant="outline" disabled={savingSeries} onClick={handleSaveSeries}>
             {savingSeries && <Loader2 className="w-4 h-4 animate-spin" />}
             {savingSeries ? 'Guardando...' : 'Guardar Series'}
           </Button>
-        </div>
-      </Card>
-
-      {/* ── Impuestos ── */}
-      <Card title="Configuración de Impuestos" subtitle="Parámetros tributarios aplicados a tus comprobantes">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-            <div>
-              <p className="font-bold text-gray-900 text-sm">IGV — Impuesto General a las Ventas</p>
-              <p className="text-xs text-gray-500 mt-0.5">Tasa estándar aplicada a la mayoría de productos y servicios.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-brand-blue">18%</span>
-              <div className="w-10 h-5 bg-brand-blue rounded-full relative cursor-pointer" onClick={() => showToast('La tasa del IGV está bloqueada por normativa SUNAT', 'info')}>
-                <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" />
-              </div>
-            </div>
-          </div>
-
-          <Toggle checked={icbper} onChange={() => { setIcbper(!icbper); showToast(!icbper ? 'ICBPER activado' : 'ICBPER desactivado', !icbper ? 'success' : 'info'); }} label="ICBPER — Impuesto al Consumo de Bolsas Plásticas" desc="S/ 0.50 por cada bolsa plástica entregada al cliente." />
-          <Toggle checked={retencion} onChange={() => { setRetencion(!retencion); showToast(!retencion ? 'Retenciones activadas' : 'Retenciones desactivadas', !retencion ? 'success' : 'info'); }} label="Retenciones (3%)" desc="Aplica si eres Agente de Retención designado por SUNAT." />
-          <Toggle checked={percepcion} onChange={() => { setPercepcion(!percepcion); showToast(!percepcion ? 'Percepciones activadas' : 'Percepciones desactivadas', !percepcion ? 'success' : 'info'); }} label="Percepciones" desc="Aplica si eres Agente de Percepción designado por SUNAT." />
-          <Toggle checked={detraccion} onChange={() => { setDetraccion(!detraccion); showToast(!detraccion ? 'Detracciones activadas' : 'Detracciones desactivadas', !detraccion ? 'success' : 'info'); }} label="Detracciones (SPOT)" desc="Sistema de Pago de Obligaciones Tributarias para servicios o bienes sujetos." />
         </div>
       </Card>
 
