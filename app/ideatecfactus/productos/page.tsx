@@ -26,17 +26,18 @@ export default function ProductosPage() {
 
   const [editTarget, setEditTarget] = useState<Producto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   const [importFile, setImportFile] = useState<File | null>(null);
 
   const obtenerProductos = async () => {
     try {
-      const response = await axios.get<Producto[]>(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Producto`,
-      );
+      const response = await axios.get<Producto[]>(`${process.env.NEXT_PUBLIC_API_URL}/api/Producto`);
       setProductos(response.data);
     } catch (error) {
       console.error("Error cargando productos:", error);
+    }finally {
+      setLoading(false); // 🔥 importante
     }
   };
 
@@ -89,9 +90,7 @@ export default function ProductosPage() {
     if (!deleteTarget) return;
 
     try {
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${deleteTarget.productoId}`,
-      );
+      await axios.delete( `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${deleteTarget.productoId}`);
 
       setProductos((prev) =>
         prev.filter((p) => p.productoId !== deleteTarget.productoId),
@@ -159,13 +158,37 @@ export default function ProductosPage() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.length === 0 && (
+         {loading && (
+          Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse border border-gray-200 rounded-xl p-4 space-y-4"
+            >
+              <div className="h-3 bg-gray-200 rounded w-1/3" />
+              <div className="h-4 bg-gray-200 rounded w-2/3" />
+              <div className="h-3 bg-gray-200 rounded w-1/2" />
+
+              <div className="flex justify-between pt-4">
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded w-12" />
+                  <div className="h-5 bg-gray-200 rounded w-16" />
+                </div>
+                <div className="space-y-2 text-right">
+                  <div className="h-3 bg-gray-200 rounded w-20" />
+                  <div className="h-6 bg-gray-200 rounded w-24" />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+        {!loading && filtered.length === 0 && (
           <p className="text-gray-400 col-span-3 text-center py-12">
             No se encontraron productos.
           </p>
         )}
 
-        {filtered.map((prod) => (
+        {!loading && filtered.map((prod) => (
           <Card
             key={prod.productoId}
             className="group hover:border-brand-blue transition-all"
@@ -221,6 +244,9 @@ export default function ProductosPage() {
               </div>
 
               <div className="text-right">
+                <p className="text-xs text-gray-400 uppercase font-bold">
+                  {prod.tipoAfectacionIGV === "10" ? ("Gravado") : (prod.tipoAfectacionIGV === "20" ? "Exonerado" : "Inafecto") }
+                </p>
                 <p className="text-xs text-gray-400 uppercase font-bold">
                   {prod.tipoAfectacionIGV === "10" ? (prod.incluirIGV ? "Precio (Inc. IGV)" : "Precio (Sin. IGV)") : ("Precio (NA. IGV)")}
                 </p>
