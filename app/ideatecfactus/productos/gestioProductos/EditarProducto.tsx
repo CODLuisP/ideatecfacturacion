@@ -5,13 +5,13 @@ import axios from "axios";
 import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
-import { Producto, NuevoProducto, Categoria, EditProducto } from "./Producto";
+import { Categoria, EditProducto, NuevoProducto, ProductoSucursal } from "./Producto";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  producto: Producto | null;
-  onProductoEditado: (producto: Producto) => void;
+  producto: ProductoSucursal | null;
+  onProductoEditado: (producto: ProductoSucursal) => void;
   categorias: Categoria[];
 }
 
@@ -24,27 +24,28 @@ interface FormFieldsProps {
   categorias: Categoria[];
 }
 
+const emptyForm: NuevoProducto = {
+  codigo: "",
+  tipoProducto: "BIEN",
+  codigoSunat: "",
+  nomProducto: "",
+  unidadMedida: "NIU",
+  tipoAfectacionIGV: "10",
+  incluirIGV: true,
+  categoriaId: 0,
+  sucursalId: 1,
+  precioUnitario: 0,
+  stock: 0,
+};
+
 export default function EditarProducto({
   isOpen,
   onClose,
   producto,
   onProductoEditado,
-  categorias
+  categorias,
 }: Props) {
-  const [form, setForm] = React.useState<NuevoProducto>({
-    codigo: "",
-    tipoProducto: "BIEN",
-    codigoSunat: "",
-    descripcion: "",
-    unidadMedida: "NIU",
-    precioUnitario: 0,
-    tipoAfectacionIGV: "10",
-    incluirIGV: true,
-    stock: 0,
-    categoriaId: 0
-  });
-
-  // 🔥 estado SOLO para el input visual del precio
+  const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [precioInput, setPrecioInput] = React.useState("0.00");
 
   React.useEffect(() => {
@@ -54,91 +55,104 @@ export default function EditarProducto({
       codigo: producto.codigo,
       tipoProducto: producto.tipoProducto ?? "BIEN",
       codigoSunat: producto.codigoSunat ?? "",
-      descripcion: producto.descripcion,
+      nomProducto: producto.nomProducto,
       unidadMedida: producto.unidadMedida,
-      precioUnitario: producto.precioUnitario,
       tipoAfectacionIGV: producto.tipoAfectacionIGV,
       incluirIGV: producto.incluirIGV,
-      stock: producto.stock,
-      categoriaId: producto.categoria?.categoriaId ?? 0
+      categoriaId: producto.categoria?.categoriaId ?? 0,
+      sucursalId: 0, // solo para no romper inteface Nuevo Producto
+      precioUnitario: producto.sucursalProducto.precioUnitario,
+      stock: producto.sucursalProducto.stock,
     });
 
-    // 🔥 mostrar siempre con 2 decimales
-    setPrecioInput(producto.precioUnitario.toFixed(2));
+    setPrecioInput(producto.sucursalProducto.precioUnitario.toFixed(2));
   }, [producto]);
 
-  // 🔥 FIX categoriaId (lo tuyo se mantiene)
   const handleFormChange =
     (field: keyof NuevoProducto) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const target = e.target as HTMLInputElement;
 
-      let value: any;
+      let value: string | number | boolean;
 
       if (target.type === "checkbox") {
         value = target.checked;
-      } else if (target.type === "number") {
-        value = Number(target.value);
-      } else if (field === "categoriaId") {
+      } else if (target.type === "number" || field === "categoriaId" || field === "stock") {
         value = Number(target.value);
       } else {
         value = target.value;
       }
 
-      setForm((prev) => ({
-        ...prev,
-        [field]: value
-      }));
+      if (field === "tipoAfectacionIGV") {
+        const aplicaIGV = value === "10";
+        setForm((prev) => ({
+          ...prev,
+          tipoAfectacionIGV: value as string,
+          incluirIGV: aplicaIGV ? prev.incluirIGV : true,
+        }));
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, [field]: value }));
     };
 
   const handleEditar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!producto) return;
 
-    const categoriaSeleccionada = categorias.find(
-      (c) => c.categoriaId === form.categoriaId
+  const payload: EditProducto = {
+    productoId: producto.productoId,
+    codigo: form.codigo,
+    tipoProducto: form.tipoProducto,
+    codigoSunat: form.codigoSunat,
+    nomProducto: form.nomProducto,
+    unidadMedida: form.unidadMedida,
+    tipoAfectacionIGV: form.tipoAfectacionIGV,
+    incluirIGV: form.incluirIGV,
+    categoriaId: form.categoriaId,
+    sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+    precioUnitario: Number(precioInput || 0),
+    stock: form.stock
+  };
+
+  try {
+    await axios.put(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${producto.productoId}`,
+      payload
     );
 
-    if (!categoriaSeleccionada) {
-      console.error("Categoría no encontrada");
-      return;
-    }
+    const categoriaActualizada = categorias.find(
+      (c) => c.categoriaId === form.categoriaId
+    ) ?? producto.categoria;
 
-    const payload: EditProducto = {
-      ...form,
-      precioUnitario: Number(precioInput || 0), // 🔥 usa el valor visual
-      productoId: producto.productoId
+    const productoActualizado: ProductoSucursal = {
+      ...producto,
+      codigo: form.codigo,
+      tipoProducto: form.tipoProducto,
+      codigoSunat: form.codigoSunat,
+      nomProducto: form.nomProducto,
+      unidadMedida: form.unidadMedida,
+      tipoAfectacionIGV: form.tipoAfectacionIGV,
+      incluirIGV: form.incluirIGV,
+      categoria: categoriaActualizada,
+      sucursalProducto: {
+        sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+        precioUnitario: Number(precioInput || 0),
+        stock: form.stock,
+      },
     };
 
-    try {
-      await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${producto.productoId}`,
-        payload
-      );
-
-      const productoActualizado: Producto = {
-        ...producto,
-        ...form,
-        precioUnitario: Number(precioInput || 0),
-        categoria: categoriaSeleccionada
-      };
-
-      onProductoEditado(productoActualizado);
-      onClose();
-
-    } catch (error) {
-      console.error("Error editando producto:", error);
-    }
+    onProductoEditado(productoActualizado);
+    onClose();
+  } catch (error) {
+    console.error("Error editando producto:", error);
+  }
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Editar Producto"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Editar Producto">
       <form className="space-y-4" onSubmit={handleEditar}>
-        <FormEditarProducto 
+        <FormEditarProducto
           form={form}
           setForm={setForm}
           precioInput={precioInput}
@@ -148,11 +162,7 @@ export default function EditarProducto({
         />
 
         <div className="pt-4 flex justify-end gap-3">
-          <Button
-            variant="outline"
-            type="button"
-            onClick={onClose}
-          >
+          <Button variant="outline" type="button" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit">
@@ -169,17 +179,15 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
     <>
       <InputBase
         label="Nombre del Producto"
-        value={form.descripcion}
-        onChange={onChange("descripcion")}
+        value={form.nomProducto}
+        onChange={onChange("nomProducto")}
         placeholder='Ej: Monitor LED 24"'
         required
       />
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase">
-            Tipo Producto
-          </label>
+          <label className="text-xs font-bold text-gray-500 uppercase">Tipo Producto</label>
           <select
             value={form.tipoProducto}
             onChange={onChange("tipoProducto")}
@@ -191,17 +199,13 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase">
-            Categoría
-          </label>
-
+          <label className="text-xs font-bold text-gray-500 uppercase">Categoría</label>
           <select
             value={form.categoriaId}
             onChange={onChange("categoriaId")}
             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"
           >
             <option value={0}>Seleccione categoría</option>
-
             {categorias.map((cat) => (
               <option key={cat.categoriaId} value={cat.categoriaId}>
                 {cat.categoriaNombre}
@@ -213,9 +217,7 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase">
-            Tipo Afectación IGV
-          </label>
+          <label className="text-xs font-bold text-gray-500 uppercase">Tipo Afectación IGV</label>
           <select
             value={form.tipoAfectacionIGV}
             onChange={onChange("tipoAfectacionIGV")}
@@ -228,9 +230,7 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase">
-            Unidad de Medida
-          </label>
+          <label className="text-xs font-bold text-gray-500 uppercase">Unidad de Medida</label>
           <select
             value={form.unidadMedida}
             onChange={onChange("unidadMedida")}
@@ -245,20 +245,17 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          {/* 🔥 SOLO ESTE INPUT CAMBIÓ */}
           <InputBase
             label="Precio Unitario"
             type="text"
             value={precioInput}
             onChange={(e) => {
               const value = e.target.value;
-
               if (/^\d*\.?\d*$/.test(value)) {
                 setPrecioInput(value);
-
                 setForm((prev) => ({
                   ...prev,
-                  precioUnitario: value === "" ? 0 : parseFloat(value)
+                  precioUnitario: value === "" ? 0 : parseFloat(value),
                 }));
               }
             }}
@@ -269,7 +266,7 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
             placeholder="0.00"
           />
 
-          {(form.tipoAfectacionIGV === "10") && (
+          {form.tipoAfectacionIGV === "10" && (
             <div className="flex items-center gap-2 pl-1">
               <input
                 type="checkbox"
@@ -277,9 +274,8 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
                 onChange={onChange("incluirIGV")}
                 className="w-4 h-4 accent-brand-blue"
               />
-
               <label className="text-xs font-semibold text-gray-600">
-                Precio Inluye IGV
+                Precio Incluye IGV
               </label>
             </div>
           )}
@@ -304,7 +300,6 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
         />
         <InputBase
           label="Código"
-          labelOptional=""
           value={form.codigo}
           onChange={onChange("codigo")}
           placeholder="PROD-001"
