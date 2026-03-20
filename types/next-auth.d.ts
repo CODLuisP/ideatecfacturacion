@@ -5,6 +5,8 @@ declare module "next-auth" {
     username?: string;
     rol?: string;
     ruc?: string;
+    sucursalID?: string | null;
+    nombreSucursal?: string | null;
     razonSocial?: string;
     accessToken?: string;
     refreshToken?: string;
@@ -18,6 +20,8 @@ declare module "next-auth" {
       username?: string;
       rol?: string;
       ruc?: string;
+      sucursalID: string | null;
+      nombreSucursal: string | null;
     };
     accessToken?: string;
     refreshToken?: string;
@@ -31,6 +35,8 @@ declare module "next-auth/jwt" {
     username?: string;
     rol?: string;
     ruc?: string;
+    sucursalID?: string | null;
+    nombreSucursal?: string | null;
     razonSocial?: string;
     accessToken?: string;
     refreshToken?: string;

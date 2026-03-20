@@ -81,6 +81,10 @@ export default function Page() {
       alert("El RUC debe tener 11 dígitos.");
       return;
     }
+    if (!empresaData) {
+        showToast("El RUC no es válido o no fue encontrado en SUNAT.", "error");
+        return;
+    }
     setShowModal(true);
     setClave("");
     setClaveError("");
@@ -106,6 +110,8 @@ export default function Page() {
           password: "12345678",
           ruc: ruc,
           rol: "admin",
+          sucursalID: "1",
+          nombreSucursal: "Principal",
         },
       );
       showToast("Usuario registrado correctamente", "success");

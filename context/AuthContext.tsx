@@ -1,5 +1,11 @@
 "use client";
-import { createContext, useContext, ReactNode, useMemo, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  ReactNode,
+  useMemo,
+  useCallback,
+} from "react";
 import { useSession, signOut } from "next-auth/react";
 
 export interface AuthUser {
@@ -8,6 +14,8 @@ export interface AuthUser {
   email: string;
   rol: string;
   ruc: string;
+  sucursalID: string | null;
+  nombreSucursal: string | null;
 }
 
 interface AuthContextValue {
@@ -21,7 +29,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const { data: session, status } = useSession();
 
   const user: AuthUser | null = useMemo(() => {
@@ -32,6 +42,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: session.user.email ?? "",
       rol: session.user.rol ?? "",
       ruc: session.user.ruc ?? "",
+      sucursalID: session.user.sucursalID ?? null,
+      nombreSucursal: session.user.nombreSucursal ?? null,
     };
   }, [
     session?.user?.id,
@@ -39,24 +51,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     session?.user?.email,
     session?.user?.rol,
     session?.user?.ruc,
+    session?.user?.sucursalID,
+    session?.user?.nombreSucursal,
   ]);
 
   const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);
 
-  const value = useMemo(() => ({
-    user,
-    accessToken: session?.accessToken ?? null,
-    refreshToken: session?.refreshToken ?? null,
-    isAuthenticated: status === "authenticated",
-    isLoading: status === "loading",
-    logout,
-  }), [user, session?.accessToken, session?.refreshToken, status, logout]);
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      accessToken: session?.accessToken ?? null,
+      refreshToken: session?.refreshToken ?? null,
+      isAuthenticated: status === "authenticated",
+      isLoading: status === "loading",
+      logout,
+    }),
+    [user, session?.accessToken, session?.refreshToken, status, logout],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export function useAuth(): AuthContextValue {
