@@ -10,7 +10,7 @@ export const authOptions: AuthOptions = {
       name: "Credentials",
       credentials: {
         identifier: { label: "RUC o Email", type: "text" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.identifier || !credentials?.password) {
@@ -19,8 +19,8 @@ export const authOptions: AuthOptions = {
 
         try {
           const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/Auth/login`;
-          
-          console.log('🔵 Intentando conectar a:', apiUrl);
+
+          console.log("🔵 Intentando conectar a:", apiUrl);
 
           const response = await fetch(apiUrl, {
             method: "POST",
@@ -33,11 +33,16 @@ export const authOptions: AuthOptions = {
             }),
           });
 
-          const contentType = response.headers.get('content-type');
-          if (!contentType || !contentType.includes('application/json')) {
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
             const textResponse = await response.text();
-            console.error('❌ Respuesta no es JSON:', textResponse.substring(0, 200));
-            throw new Error(`El servidor no respondió con JSON. Status: ${response.status}`);
+            console.error(
+              "❌ Respuesta no es JSON:",
+              textResponse.substring(0, 200),
+            );
+            throw new Error(
+              `El servidor no respondió con JSON. Status: ${response.status}`,
+            );
           }
 
           const data = await response.json();
@@ -46,7 +51,7 @@ export const authOptions: AuthOptions = {
             throw new Error(data.message || "Credenciales inválidas");
           }
 
-          console.log('✅ Login exitoso');
+          console.log("✅ Login exitoso");
 
           return {
             id: data.user.usuarioID.toString(),
@@ -54,6 +59,8 @@ export const authOptions: AuthOptions = {
             username: data.user.username,
             rol: data.user.rol,
             ruc: data.user.ruc,
+            sucursalID: data.user.sucursalID ?? null,
+            nombreSucursal: data.user.nombreSucursal ?? null,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
           };
@@ -68,12 +75,14 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }) {
       // Al hacer login, guardar datos del usuario
       if (user) {
-        console.log('🆕 Nuevo login - Token válido por 24 horas');
+        console.log("🆕 Nuevo login - Token válido por 24 horas");
         token.id = user.id;
         token.email = user.email;
         token.username = user.username;
         token.rol = user.rol;
         token.ruc = user.ruc;
+        token.sucursalID = user.sucursalID;
+        token.nombreSucursal = user.nombreSucursal;
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
       }
@@ -86,10 +95,12 @@ export const authOptions: AuthOptions = {
         username: token.username as string,
         rol: token.rol as string,
         ruc: token.ruc as string,
+        sucursalID: token.sucursalID as string | null,
+        nombreSucursal: token.nombreSucursal as string | null,
       };
       session.accessToken = token.accessToken as string;
       session.refreshToken = token.refreshToken as string;
-      
+
       return session;
     },
   },
