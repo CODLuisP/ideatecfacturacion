@@ -6,6 +6,7 @@ import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { Categoria, NuevoProducto, ProductoBase, ProductoSucursal } from "./Producto";
+import { useToast } from "@/app/components/ui/Toast";
 
 interface Props {
   isOpen: boolean;
@@ -38,16 +39,19 @@ export default function AgregarProducto({
   productosBase,
   sucursalId,
 }: Props) {
+  const { showToast } = useToast();
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [productoExistente, setProductoExistente] = React.useState<ProductoBase | null>(null);
 
   // sugerencias del buscador
   const [sugerencias, setSugerencias] = React.useState<ProductoBase[]>([]);
   const [showSugerencias, setShowSugerencias] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
 
   React.useEffect(() => {
     if (isOpen) {
-      setForm({ ...emptyForm, sucursalId }); // 🔥 agregar esto
+      setForm({ ...emptyForm, sucursalId });
     } else {
       setForm({ ...emptyForm, sucursalId });
       setProductoExistente(null);
@@ -119,18 +123,36 @@ export default function AgregarProducto({
 
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return; // doble protección
+    setIsSubmitting(true);
+
     try {
-      console.log("producto enviado:", form);
       const response = await axios.post<ProductoSucursal>(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Producto`,
         form
       );
+      showToast("Producto guardado exitosamente.", "success");
       onProductoAgregado(response.data);
       setForm({ ...emptyForm, sucursalId });
       onClose();
     } catch (error) {
       console.error("Error guardando producto:", error);
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 409) {
+          showToast(error.response?.data?.mensaje, "info");
+        } else if (status === 400) {
+          showToast("Los datos ingresados no son válidos.", "error");
+        } else {
+          showToast("No se pudo registrar el producto. Intenta nuevamente.", "error");
+        }
+      } else {
+        showToast("Error inesperado. Intenta nuevamente.", "error");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
+
   };
 
   const soloSucursal = !!productoExistente; // si autocompletó, solo pide stock y precio
@@ -285,7 +307,9 @@ export default function AgregarProducto({
 
         <div className="pt-4 flex justify-end gap-3">
           <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-          <Button type="submit">Guardar Producto</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Guardando..." : "Guardar Producto"}
+          </Button>
         </div>
       </form>
     </Modal>

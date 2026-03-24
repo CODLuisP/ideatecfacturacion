@@ -14,6 +14,8 @@ import { AgregarCliente } from './gestionClientes/AgregarCliente';
 import { EditarClienteModal } from './gestionClientes/EditarCliente';
 import { EnviarCorreoCliente } from './gestionClientes/EnviarCorreoCliente';
 import { Direccion, Cliente } from './gestionClientes/Cliente';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/app/components/ui/Toast';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const formatDireccion = (direcciones: Direccion[]): string => {
@@ -36,6 +38,12 @@ const formatFecha = (fecha: string | null): string => {
 
 // ─── Page Principal ────────────────────────────────────────────────────────────
 export default function ClientesPage() {
+  const { showToast } = useToast();
+  const { user } = useAuth();
+  //  TODO: reemplazar con el empresaruc real del contexto/sesión
+  const EMPRESA_RUC = "20331066703";
+  const SUCURSAL_ID = 5;
+
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -49,6 +57,7 @@ export default function ClientesPage() {
 
   // ── Nuevo cliente form ──
   const nuevoClienteInicial = {
+    sucursalID: SUCURSAL_ID,
     tipoDocumentoId: '01',
     numeroDocumento: '',
     razonSocialNombre: '',
@@ -67,13 +76,14 @@ export default function ClientesPage() {
   const [nuevoCliente, setNuevoCliente] = useState(nuevoClienteInicial);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [lengthErrors, setLengthErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Cargar clientes desde la API ──
   useEffect(() => {
     const fetchClientes = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`); // reemplazar con tu URL real
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/ruc/${EMPRESA_RUC}`); // reemplazar con tu URL real
         setClientes(response.data);
       } catch (error) {
         console.error('Error al cargar clientes:', error);
@@ -139,24 +149,16 @@ export default function ClientesPage() {
   //N Crear Nuevo Cliente
   const handleNuevoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     // Si hay algún campo obligatorio vacío, no continuar
-    if (!validateAll()) return; 
-    
-    try {
-        if (nuevoCliente.tipoDocumentoId === "01" && nuevoCliente.numeroDocumento.length !== 8) {
-          alert("El DNI debe tener 8 dígitos");
-          return;
-        }
+    if (!validateAll() || isSubmitting) return; 
+    setIsSubmitting(true);
 
-        if (nuevoCliente.tipoDocumentoId === "06" && nuevoCliente.numeroDocumento.length !== 11) {
-          alert("El RUC debe tener 11 dígitos");
-          return;
-        }
+    try {
       let payload: any = {
         numeroDocumento: nuevoCliente.numeroDocumento,
         razonSocialNombre: nuevoCliente.razonSocialNombre,
-        tipoDocumentoId: nuevoCliente.tipoDocumentoId
+        tipoDocumentoId: nuevoCliente.tipoDocumentoId,
+        sucursalID: SUCURSAL_ID
       };
 
       // ── DNI ──
@@ -186,17 +188,28 @@ export default function ClientesPage() {
           }
         };
       }
-      //console.log("Payload enviado a API:", payload);
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`, payload);
+      showToast('Cliente guardado exitosamente', 'success');
       setClientes(prev => [response.data, ...prev]);
       setNuevoCliente(nuevoClienteInicial);
-      setErrors({}); // limpiar errores
+      setErrors({});
       setIsNuevoOpen(false);
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
-          alert(error.response.data.mensaje); 
-          // o si usas toast: toast.error(error.response.data.mensaje)
+      if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 409) {
+        showToast(error.response?.data?.mensaje, "info"); // este sí es útil para el usuario
+      } else if (status === 400) {
+        showToast("Los datos ingresados no son válidos.", "error");
+      } else {
+        showToast("No se pudo registrar el cliente. Intenta nuevamente.", "error");
       }
+      } else {
+        showToast("Error inesperado. Intenta nuevamente.", "error");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -210,9 +223,10 @@ export default function ClientesPage() {
   const handleEliminar = async (clienteId: number) => {
     try {
       await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/${clienteId}`); // reemplazar
+      showToast("Cliente eliminado correctamente.", "success");
       setClientes(prev => prev.filter(c => c.clienteId !== clienteId));
     } catch (error) {
-      console.error('Error al eliminar cliente:', error);
+      showToast("Error al eliminar cliente", "error");
     }
   };
 
@@ -435,6 +449,7 @@ export default function ClientesPage() {
         nuevoCliente={nuevoCliente}
         errors={errors}
         lengthErrors={lengthErrors}
+        isSubmitting={isSubmitting}
         setNuevoCliente={setNuevoCliente}
         setErrors={setErrors}
         setLengthErrors={setLengthErrors}
