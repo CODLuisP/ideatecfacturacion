@@ -17,7 +17,7 @@ export function Sidebar() {
               <User size={20} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{session.user.name}</p>
+              <p className="text-sm font-semibold truncate">{session.user.username}</p>
               <p className="text-xs text-gray-400 truncate">{session.user.rol}</p>
             </div>
           </div>
