@@ -17,6 +17,8 @@ import { Modal } from "@/app/components/ui/Modal";
 import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { EditarUsuarioModal } from "@/app/components/modalUsuarios/EditarUsuarioModal";
+import { EliminarUsuarioModal } from "@/app/components/modalUsuarios/EliminarUsuarioModal";
 
 export default function UsuariosPage() {
   const { showToast } = useToast();
@@ -31,6 +33,42 @@ export default function UsuariosPage() {
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(true);
+
+  const [modalEditar, setModalEditar] = useState<any | null>(null);
+  const [modalEliminar, setModalEliminar] = useState<any | null>(null);
+  const isSuperadmin = user?.rol === "superadmin";
+
+  const handleEditar = async (data: any) => {
+    try {
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/${data.usuarioID}`,
+        data,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      setModalEditar(null);
+      showToast("Usuario actualizado correctamente", "success");
+      fetchUsuarios();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Error al actualizar",
+        "error",
+      );
+    }
+  };
+
+  const handleEliminar = async (id: number) => {
+    try {
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/${id}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      setModalEliminar(null);
+      showToast("Usuario eliminado correctamente", "success");
+      fetchUsuarios();
+    } catch (error: any) {
+      showToast(error.response?.data?.message || "Error al eliminar", "error");
+    }
+  };
 
   const fetchUsuarios = async () => {
     setLoadingUsuarios(true);
@@ -80,12 +118,6 @@ export default function UsuariosPage() {
       );
     } finally {
       setLoadingCreate(false);
-    }
-  };
-
-  const handleDelete = (name: string) => {
-    if (confirm(`¿Estás seguro de eliminar al usuario ${name}?`)) {
-      showToast(`Usuario ${name} eliminado`, "success");
     }
   };
 
@@ -140,11 +172,14 @@ export default function UsuariosPage() {
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <button className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all">
+                    <button
+                      onClick={() => setModalEditar(u)}
+                      className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all"
+                    >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(u.username)}
+                      onClick={() => setModalEliminar(u)}
                       className="p-1.5 text-gray-300 hover:text-brand-red hover:bg-red-50 rounded-lg transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -232,6 +267,9 @@ export default function UsuariosPage() {
               <option value="vendedor">Vendedor</option>
               <option value="contador">Contador</option>
               <option value="soporte">Soporte</option>
+              {(isSuperadmin || user?.rol === "admin") && (
+                <option value="admin">Admin</option>
+              )}
             </select>
           </div>
           <div className="space-y-1.5">
@@ -266,6 +304,21 @@ export default function UsuariosPage() {
           </div>
         </form>
       </Modal>
+      {modalEditar && (
+        <EditarUsuarioModal
+          usuario={modalEditar}
+          onClose={() => setModalEditar(null)}
+          onSave={handleEditar}
+          isSuperadmin={isSuperadmin}
+        />
+      )}
+      {modalEliminar && (
+        <EliminarUsuarioModal
+          usuario={modalEliminar}
+          onClose={() => setModalEliminar(null)}
+          onConfirm={handleEliminar}
+        />
+      )}
     </div>
   );
 }
