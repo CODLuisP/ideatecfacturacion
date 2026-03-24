@@ -6,6 +6,7 @@ import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { Categoria, EditProducto, NuevoProducto, ProductoSucursal } from "./Producto";
+import { useToast } from "@/app/components/ui/Toast";
 
 interface Props {
   isOpen: boolean;
@@ -45,8 +46,10 @@ export default function EditarProducto({
   onProductoEditado,
   categorias,
 }: Props) {
+  const { showToast } = useToast();
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [precioInput, setPrecioInput] = React.useState("0.00");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
     if (!producto) return;
@@ -98,35 +101,27 @@ export default function EditarProducto({
 
   const handleEditar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!producto) return;
+    if (!producto || isSubmitting) return;
 
-  const payload: EditProducto = {
-    productoId: producto.productoId,
-    codigo: form.codigo,
-    tipoProducto: form.tipoProducto,
-    codigoSunat: form.codigoSunat,
-    nomProducto: form.nomProducto,
-    unidadMedida: form.unidadMedida,
-    tipoAfectacionIGV: form.tipoAfectacionIGV,
-    incluirIGV: form.incluirIGV,
-    categoriaId: form.categoriaId,
-    sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
-    precioUnitario: Number(precioInput || 0),
-    stock: form.stock
-  };
+    if (!form.nomProducto || form.nomProducto.trim() === "") {
+      showToast("El nombre del producto es obligatorio.", "info");
+      return;
+    }
 
-  try {
-    await axios.put(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${producto.productoId}`,
-      payload
-    );
+    if (Number(precioInput) <= 0) {
+      showToast("El precio debe ser mayor a 0.", "info");
+      return;
+    }
 
-    const categoriaActualizada = categorias.find(
-      (c) => c.categoriaId === form.categoriaId
-    ) ?? producto.categoria;
+    if (form.stock < 0) {
+      showToast("El stock no puede ser negativo.", "info");
+      return;
+    }
 
-    const productoActualizado: ProductoSucursal = {
-      ...producto,
+    setIsSubmitting(true);
+
+    const payload: EditProducto = {
+      productoId: producto.productoId,
       codigo: form.codigo,
       tipoProducto: form.tipoProducto,
       codigoSunat: form.codigoSunat,
@@ -134,19 +129,59 @@ export default function EditarProducto({
       unidadMedida: form.unidadMedida,
       tipoAfectacionIGV: form.tipoAfectacionIGV,
       incluirIGV: form.incluirIGV,
-      categoria: categoriaActualizada,
-      sucursalProducto: {
-        sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
-        precioUnitario: Number(precioInput || 0),
-        stock: form.stock,
-      },
+      categoriaId: form.categoriaId,
+      sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+      precioUnitario: Number(precioInput || 0),
+      stock: form.stock
     };
 
-    onProductoEditado(productoActualizado);
-    onClose();
-  } catch (error) {
-    console.error("Error editando producto:", error);
-  }
+    try {
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${producto.productoId}`,
+        payload
+      );
+
+      const categoriaActualizada = categorias.find(
+        (c) => c.categoriaId === form.categoriaId
+      ) ?? producto.categoria;
+
+      const productoActualizado: ProductoSucursal = {
+        ...producto,
+        codigo: form.codigo,
+        tipoProducto: form.tipoProducto,
+        codigoSunat: form.codigoSunat,
+        nomProducto: form.nomProducto,
+        unidadMedida: form.unidadMedida,
+        tipoAfectacionIGV: form.tipoAfectacionIGV,
+        incluirIGV: form.incluirIGV,
+        categoria: categoriaActualizada,
+        sucursalProducto: {
+          sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+          precioUnitario: Number(precioInput || 0),
+          stock: form.stock,
+        },
+      };
+
+      showToast("Producto actualizado correctamente.", "success");
+      onProductoEditado(productoActualizado);
+      onClose();
+    } catch (error) {
+      console.error("Error editando producto:", error);
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 404) {
+          showToast("No se encontró el producto a actualizar.", "error");
+        } else if (status === 400) {
+          showToast("Los datos ingresados no son válidos.", "error");
+        } else {
+          showToast("No se pudo actualizar el producto. Intenta nuevamente.", "error");
+        }
+      } else {
+        showToast("Error inesperado. Intenta nuevamente.", "error");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -165,8 +200,8 @@ export default function EditarProducto({
           <Button variant="outline" type="button" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit">
-            Guardar Cambios
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </div>
       </form>
