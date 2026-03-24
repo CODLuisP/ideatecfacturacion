@@ -264,6 +264,8 @@ export default function ConfiguracionPage() {
 
   const { user } = useAuth();
 
+  console.log( user);
+
   const [form, setForm] = useState<EmpresaForm>({
     ruc: '',
     razonSocial: '',
