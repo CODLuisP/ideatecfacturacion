@@ -61,6 +61,7 @@ export const authOptions: AuthOptions = {
             ruc: data.user.ruc,
             sucursalID: data.user.sucursalID ?? null,
             nombreSucursal: data.user.nombreSucursal ?? null,
+            nombreEmpresa: data.user.nombreEmpresa ?? null,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
           };
@@ -83,6 +84,7 @@ export const authOptions: AuthOptions = {
         token.ruc = user.ruc;
         token.sucursalID = user.sucursalID;
         token.nombreSucursal = user.nombreSucursal;
+        token.nombreEmpresa = user.nombreEmpresa;
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
       }
@@ -97,6 +99,7 @@ export const authOptions: AuthOptions = {
         ruc: token.ruc as string,
         sucursalID: token.sucursalID as string | null,
         nombreSucursal: token.nombreSucursal as string | null,
+        nombreEmpresa: token.nombreEmpresa as string | null,
       };
       session.accessToken = token.accessToken as string;
       session.refreshToken = token.refreshToken as string;

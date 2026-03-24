@@ -64,7 +64,6 @@ export default function UsuariosPage() {
           rol: formData.rol,
           ruc: user?.ruc,
           sucursalID: user?.sucursalID,
-          nombreSucursal: user?.nombreSucursal,
         },
         {
           headers: { Authorization: `Bearer ${accessToken}` },
