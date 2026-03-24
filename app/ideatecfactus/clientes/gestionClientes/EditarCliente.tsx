@@ -4,6 +4,7 @@ import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { Modal } from "@/app/components/ui/Modal";
 import { Cliente, Direccion } from "./Cliente";
+import { useToast } from "@/app/components/ui/Toast";
 
 interface Props {
   cliente: Cliente;
@@ -16,7 +17,9 @@ export const EditarClienteModal: React.FC<Props> = ({
   onClose,
   onSave,
 }) => {
+  const { showToast } = useToast();
   const [form, setForm] = useState<Cliente>({ ...cliente });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateForm = (campo: keyof Cliente, valor: any) => {
     setForm((f) => ({
@@ -41,6 +44,19 @@ export const EditarClienteModal: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    if (!form.razonSocialNombre || form.razonSocialNombre.trim() === "") {
+      showToast(
+        form.tipoDocumento.tipoDocumentoId === "06"
+          ? "La razón social es obligatoria."
+          : "El nombre completo es obligatorio.",
+        "info"
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const payloadCliente = {
@@ -73,11 +89,25 @@ export const EditarClienteModal: React.FC<Props> = ({
           payloadDireccion,
         );
       }
-
+      showToast("Cliente actualizado correctamente.", "success");
       onSave(form);
       onClose();
     } catch (error) {
-      console.error("Error al editar cliente:", error);
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+
+        if (status === 400) {
+          showToast("Los datos ingresados no son válidos.", "error");
+        } else if (status === 404) {
+          showToast("No se encontró el cliente a actualizar.", "error");
+        } else {
+          showToast("No se pudo actualizar el cliente. Intenta nuevamente.", "error");
+        }
+      } else {
+        showToast("Error inesperado. Intenta nuevamente.", "error");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -210,7 +240,9 @@ export const EditarClienteModal: React.FC<Props> = ({
             Cancelar
           </Button>
 
-          <Button type="submit">Guardar cambios</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Guardando..." : "Guardar cambios"}
+          </Button>
         </div>
       </form>
     </Modal>

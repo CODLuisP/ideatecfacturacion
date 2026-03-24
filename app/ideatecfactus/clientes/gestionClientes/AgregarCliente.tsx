@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
+import { useToast } from "@/app/components/ui/Toast";
 
 interface AgregarClienteProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface AgregarClienteProps {
   setLengthErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   handleNuevoSubmit: (e: React.FormEvent) => void;
   handleCancelarNuevo: () => void;
+  isSubmitting: boolean;
 }
 
 export const AgregarCliente: React.FC<AgregarClienteProps> = ({
@@ -27,10 +29,19 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
   setLengthErrors,
   handleNuevoSubmit,
   handleCancelarNuevo,
+  isSubmitting,
 }) => {
+  const { showToast } = useToast();
+  useEffect(() => {
+    setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: "" }));
+  }, [nuevoCliente.numeroDocumento]);
 
   const buscarDni = async () => {
-    if (nuevoCliente.numeroDocumento.length !== 8) return;
+      if (nuevoCliente.numeroDocumento.length !== 8) {
+        setLengthErrors(prev => ({ ...prev, numeroDocumento: "El DNI debe tener 8 dígitos" }));
+        return;
+      }
+      setLengthErrors(prev => ({ ...prev, numeroDocumento: "" })); // limpiar error si pasa la validación
     try {
       const res = await fetch(
         `https://dniruc.apisperu.com/api/v1/dni/${nuevoCliente.numeroDocumento}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
@@ -39,15 +50,21 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
       if (data.success) {
         const nombreCompleto = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`;
         setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: nombreCompleto }));
+      }else {
+        showToast("No se encontró el DNI, verifica el número o llénalo manualmente.", "info");
       }
     } catch (error) {
-      console.log("No se pudo consultar DNI, llenar manualmente");
+      showToast("Error al conectar con la API, llena los datos manualmente.", "error");
     }
   };
 
   const buscarRuc = async () => {
-    if (nuevoCliente.numeroDocumento.length !== 11) return;
+    if (nuevoCliente.numeroDocumento.length !== 11) {
+      setLengthErrors(prev => ({ ...prev, numeroDocumento: "El RUC debe tener 11 dígitos" }));
+      return;
+    }
 
+    setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));// limpiar error si pasa la validación
     try {
       const res = await fetch(
         `https://dniruc.apisperu.com/api/v1/ruc/${nuevoCliente.numeroDocumento}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
@@ -68,9 +85,11 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
             ubigeo: data.ubigeo || ""
           }
         }));
+      } else {
+        showToast("No se encontró el RUC, verifica el número o llénalo manualmente.", "info");
       }
     } catch (error) {
-      console.log("No se pudo consultar RUC, llenar manualmente");
+        showToast("Error al conectar con la API, llena los datos manualmente.", "error");
     }
   };
 
@@ -111,7 +130,7 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
             </select>
           </div>
           <div className="space-y-1.5">
-            <div className="flex gap-2 items-end">
+            <div className="flex gap-2 items-start">
               <div className="flex-1">
                 <InputBase
                   label="Número"
@@ -152,7 +171,7 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
                 <button
                   type="button"
                   onClick={buscarDocumento}
-                  className="h-10.5 px-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600"
+                  className="mt-6 h-10 px-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 shrink-0"
                 >
                   Buscar
                 </button>
@@ -299,7 +318,9 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
           <Button variant="outline" type="button" onClick={handleCancelarNuevo}>
             Cancelar
           </Button>
-          <Button type="submit">Guardar Cliente</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Guardando..." : "Guardar Cliente"}
+          </Button>
         </div>
       </form>
     </Modal>

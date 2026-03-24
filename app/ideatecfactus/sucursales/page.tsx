@@ -43,21 +43,29 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  blue:  { bg: "bg-blue-50",    text: "text-blue-700",    icon: "text-blue-500"    },
-  green: { bg: "bg-emerald-50", text: "text-emerald-700", icon: "text-emerald-500" },
-  amber: { bg: "bg-amber-50",   text: "text-amber-700",   icon: "text-amber-500"   },
-  slate: { bg: "bg-slate-50",   text: "text-slate-700",   icon: "text-slate-500"   },
+  blue: { bg: "bg-blue-50", text: "text-blue-700", icon: "text-blue-500" },
+  green: {
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    icon: "text-emerald-500",
+  },
+  amber: { bg: "bg-amber-50", text: "text-amber-700", icon: "text-amber-500" },
+  slate: { bg: "bg-slate-50", text: "text-slate-700", icon: "text-slate-500" },
 };
 
 function StatCard({ label, value, icon, color }: StatCardProps) {
   const c = colorMap[color];
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl ${c.bg} flex items-center justify-center flex-shrink-0 ${c.icon}`}>
+      <div
+        className={`w-11 h-11 rounded-xl ${c.bg} flex items-center justify-center shrink-0 ${c.icon}`}
+      >
         {icon}
       </div>
       <div>
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">{label}</p>
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">
+          {label}
+        </p>
         <p className={`text-2xl font-bold ${c.text}`}>{value}</p>
       </div>
     </div>
@@ -73,7 +81,9 @@ export default function SucursalesPage() {
 
   // Estado local de habilitado/inhabilitado por id (true = habilitado)
   // TODO: inicializar desde API cuando esté disponible
-  const [estadoSucursales, setEstadoSucursales] = useState<Record<string, boolean>>({});
+  const [estadoSucursales, setEstadoSucursales] = useState<
+    Record<string, boolean>
+  >({});
 
   const [modalNueva, setModalNueva] = useState(false);
   const [modalEditar, setModalEditar] = useState<Sucursal | null>(null);
@@ -81,6 +91,10 @@ export default function SucursalesPage() {
   const [modalEliminar, setModalEliminar] = useState<Sucursal | null>(null);
 
   const { accessToken, user } = useAuth();
+  useEffect(() => {
+  console.log('🔍 Contexto usuario:', user);
+  console.log('🔑 Access Token:', accessToken ? 'presente' : 'ausente');
+}, [user, accessToken]);
   const [loading, setLoading] = useState(true);
 
   const isSuperadmin = user?.rol === "superadmin";
@@ -96,11 +110,11 @@ export default function SucursalesPage() {
 
   const totalSeries = sucursales.reduce((acc, s) => {
     let count = 0;
-    if (s.serieFactura)     count++;
-    if (s.serieBoleta)      count++;
+    if (s.serieFactura) count++;
+    if (s.serieBoleta) count++;
     if (s.serieNotaCredito) count++;
-    if (s.serieNotaDebito)  count++;
-    if (s.serieGuia)        count++;
+    if (s.serieNotaDebito) count++;
+    if (s.serieGuia) count++;
     return acc + count;
   }, 0);
 
@@ -109,7 +123,13 @@ export default function SucursalesPage() {
     try {
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
+        {
+          params: {
+            ruc: user?.ruc,
+            sucursalID: user?.rol === "superadmin" ? null : user?.sucursalID,
+          },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
       );
       const data = res.data.map((s: any) => ({
         id: s.sucursalId.toString(),
@@ -137,7 +157,8 @@ export default function SucursalesPage() {
         });
         return next;
       });
-    } catch {6
+    } catch {
+      6;
       showToast("Error al cargar sucursales", "error");
     } finally {
       setLoading(false);
@@ -177,17 +198,22 @@ export default function SucursalesPage() {
       showToast(`Sucursal "${form.nombre}" creada correctamente`, "success");
       fetchSucursales();
     } catch (error: any) {
-      showToast(error.response?.data?.mensaje || "Error al crear sucursal", "error");
+      showToast(
+        error.response?.data?.mensaje || "Error al crear sucursal",
+        "error",
+      );
     }
   };
 
   const handleEditarSeries = async (id: string, data: any) => {
+    const sucursalId = isSuperadmin ? id : user?.sucursalID;
+
     try {
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
         {
           ...data,
-          sucursalId: parseInt(id),
+          sucursalId: user?.sucursalID,
           nombre: modalSeries?.nombre,
           direccion: modalSeries?.direccion,
         },
@@ -197,14 +223,19 @@ export default function SucursalesPage() {
       showToast("Series actualizadas correctamente", "success");
       fetchSucursales();
     } catch (error: any) {
-      showToast(error.response?.data?.mensaje || "Error al actualizar series", "error");
+      showToast(
+        error.response?.data?.mensaje || "Error al actualizar series",
+        "error",
+      );
     }
   };
 
   const handleEditar = async (id: string, data: EditSucursalForm) => {
+    const sucursalId = isSuperadmin ? id : user?.sucursalID;
+
     try {
       await axios.patch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
         { nombre: data.nombre, direccion: data.direccion },
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
@@ -212,7 +243,10 @@ export default function SucursalesPage() {
       showToast("Sucursal actualizada correctamente", "success");
       fetchSucursales();
     } catch (error: any) {
-      showToast(error.response?.data?.mensaje || "Error al actualizar sucursal", "error");
+      showToast(
+        error.response?.data?.mensaje || "Error al actualizar sucursal",
+        "error",
+      );
     }
   };
 
@@ -227,7 +261,10 @@ export default function SucursalesPage() {
       showToast(`Sucursal "${s?.nombre}" eliminada`, "error");
       fetchSucursales();
     } catch (error: any) {
-      showToast(error.response?.data?.mensaje || "Error al eliminar sucursal", "error");
+      showToast(
+        error.response?.data?.mensaje || "Error al eliminar sucursal",
+        "error",
+      );
     }
   };
 
@@ -254,10 +291,30 @@ export default function SucursalesPage() {
       {/* ── Stats (solo superadmin) ── */}
       {isSuperadmin && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard label="Total sucursales"  value={sucursales.length} icon={<Building2 className="w-5 h-5" />}    color="blue"  />
-          <StatCard label="Activas"           value={sucursales.length} icon={<CheckCircle2 className="w-5 h-5" />} color="green" />
-          <StatCard label="Inactivas"         value={0}                 icon={<XCircle className="w-5 h-5" />}     color="amber" />
-          <StatCard label="Series registradas"value={totalSeries}       icon={<BookOpen className="w-5 h-5" />}    color="slate" />
+          <StatCard
+            label="Total sucursales"
+            value={sucursales.length}
+            icon={<Building2 className="w-5 h-5" />}
+            color="blue"
+          />
+          <StatCard
+            label="Activas"
+            value={sucursales.length}
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            color="green"
+          />
+          <StatCard
+            label="Inactivas"
+            value={0}
+            icon={<XCircle className="w-5 h-5" />}
+            color="amber"
+          />
+          <StatCard
+            label="Series registradas"
+            value={totalSeries}
+            icon={<BookOpen className="w-5 h-5" />}
+            color="slate"
+          />
         </div>
       )}
 
@@ -282,7 +339,9 @@ export default function SucursalesPage() {
                 className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-white transition-colors text-gray-700 cursor-pointer"
               >
                 {[5, 10, 20, 50].map((n) => (
-                  <option key={n} value={n}>{n}</option>
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -316,7 +375,10 @@ export default function SucursalesPage() {
                 </tr>
               ) : displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-12 text-gray-400 text-sm">
+                  <td
+                    colSpan={4}
+                    className="text-center py-12 text-gray-400 text-sm"
+                  >
                     No se encontraron sucursales
                   </td>
                 </tr>
@@ -335,8 +397,12 @@ export default function SucursalesPage() {
                           {s.codigo}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-gray-800 font-medium">{s.nombre}</td>
-                      <td className="px-5 py-4 text-gray-500 text-sm">{s.direccion || "—"}</td>
+                      <td className="px-5 py-4 text-gray-800 font-medium">
+                        {s.nombre}
+                      </td>
+                      <td className="px-5 py-4 text-gray-500 text-sm">
+                        {s.direccion || "—"}
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
                           {/* Editar */}

@@ -17,11 +17,13 @@ import { useProductosSucursal } from "./gestioProductos/useProductosSucursal";
 import { useCategoriasLista } from "./gestioProductos/useCategoriasLista";
 import { useAuth } from "@/context/AuthContext";
 import { useProductosBaseDisponiblesLista } from "./gestioProductos/useProductosBaseDisponiblesLista";
+import { useToast } from "@/app/components/ui/Toast";
 
 // 🔥 TODO: reemplazar con el sucursalId real del contexto/sesión
-const SUCURSAL_ID = 3;
+const SUCURSAL_ID = 2;
 
 export default function ProductosPage() {
+  const { showToast } = useToast();
   const { user } = useAuth();
 
   const { productosBase } = useProductosBaseDisponiblesLista(SUCURSAL_ID);
@@ -70,13 +72,26 @@ export default function ProductosPage() {
     if (!deleteTarget) return;
     try {
       await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${deleteTarget.productoId}`);
+      showToast('Producto elimnado correctamente.', 'success');
       setProductosSucursal((prev) =>
         prev.filter((p) => p.productoId !== deleteTarget.productoId)
       );
       setDeleteTarget(null);
       setIsDeleteOpen(false);
     } catch (error) {
-      console.error("Error eliminando producto:", error);
+      console.error("Error al eliminar producto:", error); // para el dev
+
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+
+        if (status === 404) {
+          showToast("No se encontró el producto a eliminar.", "error");
+        } else {
+          showToast("No se pudo eliminar el producto. Intenta nuevamente.", "error");
+        }
+      } else {
+        showToast("Error inesperado. Intenta nuevamente.", "error");
+      }
     }
   };
 
