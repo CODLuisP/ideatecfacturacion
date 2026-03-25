@@ -28,7 +28,7 @@ export default function UsuariosPage() {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
-    rol: "vendedor",
+    rol: "facturador",
   });
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [usuarios, setUsuarios] = useState<any[]>([]);
@@ -109,7 +109,7 @@ export default function UsuariosPage() {
       );
       setIsModalOpen(false);
       showToast("Usuario creado correctamente", "success");
-      setFormData({ username: "", email: "", rol: "vendedor" });
+      setFormData({ username: "", email: "", rol: "facturador" });
       fetchUsuarios();
     } catch (error: any) {
       showToast(
@@ -264,9 +264,7 @@ export default function UsuariosPage() {
                 setFormData({ ...formData, rol: e.target.value })
               }
             >
-              <option value="vendedor">Vendedor</option>
-              <option value="contador">Contador</option>
-              <option value="soporte">Soporte</option>
+              <option value="facturador">Facturador</option>
               {(isSuperadmin || user?.rol === "admin") && (
                 <option value="admin">Admin</option>
               )}

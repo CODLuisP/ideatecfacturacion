@@ -116,14 +116,9 @@ export function EditarUsuarioModal({
                   onChange={(e) => setForm({ ...form, rol: e.target.value })}
                   className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-blue-500 bg-white"
                 >
-                  <option value="vendedor">Vendedor</option>
-                  <option value="contador">Contador</option>
-                  <option value="soporte">Soporte</option>
+                  <option value="facturador">Facturador</option>
                   {(isSuperadmin || usuario.rol === "admin") && (
                     <option value="admin">Admin</option>
-                  )}
-                  {usuario.rol === "superadmin" && (
-                    <option value="superadmin">Super Admin</option>
                   )}
                 </select>
               </div>
