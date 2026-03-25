@@ -10,8 +10,10 @@ import { useToast } from '@/app/components/ui/Toast';
 import { Button } from '@/app/components/ui/Button';
 import { Card } from '@/app/components/ui/Card';
 import { Badge } from '@/app/components/ui/Badge';
-import { Modal } from '@/app/components/ui/Modal';
 import { cn } from '@/app/utils/cn';
+import { CertificadoDigitalCard } from '@/app/components/sunartComponentes/Certificadodigitalcard';
+import { useAuth } from '@/context/AuthContext';
+import { EstadoConexionSunatCard } from '@/app/components/sunartComponentes/Estadoconexionsunatcard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Config {
@@ -122,59 +124,7 @@ interface FileDropProps {
   accept: string;
 }
 
-function FileDrop({ onFile, accept }: FileDropProps) {
-  const [dragging, setDragging] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const ref = useRef<HTMLInputElement>(null);
 
-  const handle = (file: File | undefined) => {
-    if (!file) return;
-    setFileName(file.name);
-    onFile(file);
-  };
-
-  return (
-    <div
-      className={cn(
-        'p-8 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center text-center space-y-3 cursor-pointer transition-colors bg-gray-50/50',
-        dragging ? 'border-brand-blue bg-blue-50/50' : 'border-gray-200 hover:border-brand-blue'
-      )}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
-      onClick={() => ref.current?.click()}
-    >
-      <input
-        ref={ref}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(e) => handle(e.target.files?.[0])}
-      />
-      {fileName ? (
-        <>
-          <div className="p-3 bg-emerald-50 rounded-xl shadow-sm">
-            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-emerald-700">{fileName}</p>
-            <p className="text-xs text-gray-500 mt-1">Clic para cambiar archivo</p>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="p-3 bg-white rounded-xl shadow-sm">
-            <FileJson className="w-8 h-8 text-brand-blue" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900">Selecciona tu archivo .pfx o .p12</p>
-            <p className="text-xs text-gray-500 mt-1">O arrastra y suelta el archivo aquí</p>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ─── Collapsible Section ──────────────────────────────────────────────────────
 interface CollapsibleProps {
@@ -230,6 +180,7 @@ function InfoBanner({ children, variant = 'info' }: { children: React.ReactNode;
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SunatPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const [config, setConfig] = useState<Config>({
     solUser: '',
@@ -266,11 +217,7 @@ export default function SunatPage() {
   const upd = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setConfig((c) => ({ ...c, [key]: e.target.value, saved: false }));
 
-  // ── Días restantes certificado ──
-  const daysLeft = Math.ceil((new Date(config.certExpiry).getTime() - Date.now()) / 86400000);
-  const certPct = Math.max(0, Math.min(100, (daysLeft / 365) * 100));
-  const certBadgeVariant: 'error' | 'info' | 'success' =
-    daysLeft < 7 ? 'error' : daysLeft < 30 ? 'info' : 'success';
+
 
   // ── Historial mock ──
   const history: CdrRow[] = [
@@ -281,18 +228,6 @@ export default function SunatPage() {
   ];
 
   // ── Handlers ──
-  const handleRefresh = async () => {
-    if (!config.solUser || !config.solPassword) {
-      showToast('Configura las Credenciales SOL antes de sincronizar', 'info');
-      return;
-    }
-    setSyncing(true);
-    showToast('Sincronizando con servidores de SUNAT...', 'info');
-    await new Promise((r) => setTimeout(r, 1800));
-    setStatus((s) => ({ ...s, connected: true, responseMs: Math.floor(Math.random() * 80 + 90) }));
-    setSyncing(false);
-    showToast('Sincronización completada', 'success');
-  };
 
   const handleTestSol = async () => {
     if (!config.solUser || !config.solPassword) {
@@ -324,19 +259,6 @@ export default function SunatPage() {
     showToast('Configuración guardada correctamente', 'success');
   };
 
-  const handleUploadCert = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!certFile) { showToast('Selecciona un archivo .pfx o .p12', 'error'); return; }
-    if (!certPasswordInput) { showToast('Ingresa la contraseña del certificado', 'error'); return; }
-    setSavingCert(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setSavingCert(false);
-    setConfig((c) => ({ ...c, certFile: certFile.name, certPassword: certPasswordInput }));
-    setIsModalOpen(false);
-    setCertPasswordInput('');
-    setCertFile(null);
-    showToast('Certificado digital actualizado correctamente', 'success');
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -346,106 +268,12 @@ export default function SunatPage() {
 
       {/* Estado conexión + certificado */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2" title="Estado de Conexión SUNAT" subtitle="Monitoreo de servicios OSE/PSE">
-          <div className={cn(
-            'flex items-center gap-8 p-4 rounded-2xl border',
-            status.connected ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'
-          )}>
-            <div className={cn('p-4 rounded-full text-white shadow-lg', status.connected ? 'bg-emerald-500 shadow-emerald-200' : 'bg-red-500 shadow-red-200')}>
-              {status.connected ? <Zap className="w-8 h-8" /> : <WifiOff className="w-8 h-8" />}
-            </div>
-            <div className="space-y-1">
-              <h4 className={cn('text-lg font-bold', status.connected ? 'text-emerald-900' : 'text-red-900')}>
-                {status.connected ? 'Servicio Operativo' : 'Sin Conexión'}
-              </h4>
-              <p className={cn('text-sm', status.connected ? 'text-emerald-700' : 'text-red-700')}>
-                {status.connected
-                  ? `La conexión con los servidores de SUNAT es estable. Tiempo de respuesta: ${status.responseMs}ms.`
-                  : 'No se puede conectar con los servidores de SUNAT. Verifica tus credenciales.'}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-            {[
-              { label: 'CDR Recibidos', value: status.cdrCount.toLocaleString(), icon: CheckCircle2, color: 'text-emerald-600' },
-              { label: 'XML Generados', value: status.xmlCount.toLocaleString(), icon: FileJson, color: 'text-blue-600' },
-              { label: 'Errores Envío', value: status.errors.toString(), icon: AlertCircle, color: status.errors > 0 ? 'text-red-500' : 'text-gray-400' },
-            ].map((stat, i) => (
-              <div key={i} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50">
-                <stat.icon className={cn('w-5 h-5 mb-2', stat.color)} />
-                <p className="text-xs font-bold text-gray-500 uppercase">{stat.label}</p>
-                <p className="text-xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
+      <EstadoConexionSunatCard  className="lg:col-span-2" />
+
 
         {/* Certificado Digital */}
 
-     <Card title="Certificado Digital (PSF)" subtitle="Validación y vigencia">
-  <div className="space-y-6">
-    <div className={cn(
-      'p-4 rounded-xl border space-y-3',
-      !config.certFile
-        ? 'border-gray-100 bg-gray-50/50'
-        : daysLeft < 30 ? 'border-amber-100 bg-amber-50/50' : 'border-emerald-100 bg-emerald-50/50'
-    )}>
-      <div className="flex justify-between items-center">
-        <span className={cn(
-          'text-xs font-bold uppercase',
-          !config.certFile ? 'text-gray-400' : daysLeft < 30 ? 'text-amber-800' : 'text-emerald-800'
-        )}>Vigencia</span>
-        <Badge variant={!config.certFile ? 'default' : certBadgeVariant}>
-          {!config.certFile ? 'Sin certificado' : daysLeft < 7 ? 'Por vencer' : daysLeft < 30 ? 'Próximo a vencer' : 'Vigente'}
-        </Badge>
-      </div>
-      <div className={cn(
-        'h-2 rounded-full overflow-hidden',
-        !config.certFile ? 'bg-gray-200' : daysLeft < 30 ? 'bg-amber-100' : 'bg-emerald-200'
-      )}>
-        <div
-          className={cn(
-            'h-full rounded-full transition-all',
-            !config.certFile ? 'bg-gray-300' : daysLeft < 30 ? 'bg-amber-500' : 'bg-emerald-500'
-          )}
-          style={{ width: !config.certFile ? '0%' : `${certPct}%` }}
-        />
-      </div>
-      <p className={cn('text-xs', !config.certFile ? 'text-gray-400' : daysLeft < 30 ? 'text-amber-700' : 'text-emerald-700')}>
-        {!config.certFile
-          ? 'Cargue un certificado para determinar la cantidad de días.'
-          : <>Expira el <strong>{new Date(config.certExpiry).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> (en {daysLeft} días).</>
-        }
-      </p>
-    </div>
-
-    <div className="space-y-2">
-      <p className="text-xs font-bold text-gray-500 uppercase">Detalles del Certificado</p>
-      <div className="text-sm space-y-1">
-        {[
-          ['Emisor', config.certFile ? config.certIssuer : '—'],
-          ['RUC', config.certFile ? config.certRuc : '—'],
-          ['Tipo', config.certFile ? 'PFX / P12' : '—'],
-          ['Archivo', config.certFile ?? 'No cargado'],
-        ].map(([k, v]) => (
-          <div key={k} className="flex justify-between">
-            <span className="text-gray-500">{k}:</span>
-            <span className={cn(
-              'font-medium',
-              !config.certFile && k === 'Archivo' ? 'text-red-500' : config.certFile ? 'text-gray-900' : 'text-gray-400'
-            )}>{v}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    <Button variant="outline" className="w-full" onClick={() => setIsModalOpen(true)}>
-      <Upload className="w-4 h-4" />
-      {config.certFile ? 'Actualizar Certificado' : 'Subir Certificado'}
-    </Button>
-  </div>
-</Card>
-
+      <CertificadoDigitalCard ruc={user?.ruc ?? ""} />
       </div>
 
       {/* ── Configuración ── */}
@@ -584,44 +412,6 @@ export default function SunatPage() {
         </div>
       </form>
 
-      {/* ── Modal Certificado ── */}
-      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setCertPasswordInput(''); setCertFile(null); }} title="Actualizar Certificado Digital">
-        <form className="space-y-4" onSubmit={handleUploadCert}>
-          <InfoBanner variant="warning">
-            El certificado digital firma electrónicamente todos tus comprobantes. Asegúrate de que sea válido y emitido por una entidad certificadora autorizada por SUNAT.
-          </InfoBanner>
-
-          <FileDrop accept=".pfx,.p12" onFile={setCertFile} />
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">Contraseña del Certificado</label>
-            <div className="relative">
-              <input
-                type="password"
-                placeholder="Ingresa la clave del certificado"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm pr-10"
-                value={certPasswordInput}
-                onChange={(e) => setCertPasswordInput(e.target.value)}
-                required
-              />
-              <ShieldCheck className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1 italic">
-              Esta contraseña es necesaria para firmar digitalmente tus comprobantes.
-            </p>
-          </div>
-
-          <div className="pt-4 flex justify-end gap-3">
-            <Button variant="outline" type="button" onClick={() => { setIsModalOpen(false); setCertPasswordInput(''); setCertFile(null); }}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={savingCert}>
-              {savingCert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {savingCert ? 'Validando...' : 'Cargar Certificado'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* ── Historial CDR ── */}
       <Card title="Historial de Envíos (CDR)" subtitle="Últimos documentos procesados por SUNAT">
