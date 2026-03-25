@@ -20,7 +20,7 @@ import { useProductosBaseDisponiblesLista } from "./gestioProductos/useProductos
 import { useToast } from "@/app/components/ui/Toast";
 
 // 🔥 TODO: reemplazar con el sucursalId real del contexto/sesión
-const SUCURSAL_ID = 2;
+const SUCURSAL_ID = 1;
 
 export default function ProductosPage() {
   const { showToast } = useToast();
