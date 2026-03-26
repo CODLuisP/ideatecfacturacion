@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
-const PROD_URL = "https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService";
+const BETA_URL = "https://e-beta.sunat.gob.pe/ol-ti-itcpfegem/billService";
 
-// 👇 SOAP seguro (NO envía comprobantes)
-const SOAP_STATUS = `<?xml version="1.0" encoding="UTF-8"?>
+const SOAP_PRUEBA = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope
   xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
   xmlns:ser="http://service.sunat.gob.pe/"
@@ -11,15 +10,16 @@ const SOAP_STATUS = `<?xml version="1.0" encoding="UTF-8"?>
   <soapenv:Header>
     <wsse:Security>
       <wsse:UsernameToken>
-        <wsse:Username>TU_RUC + USUARIO_SOL</wsse:Username>
-        <wsse:Password>TU_CLAVE_SOL</wsse:Password>
+        <wsse:Username>20000000001MODDATOS</wsse:Username>
+        <wsse:Password>moddatos</wsse:Password>
       </wsse:UsernameToken>
     </wsse:Security>
   </soapenv:Header>
   <soapenv:Body>
-    <ser:getStatus>
-      <ticket>123456</ticket>
-    </ser:getStatus>
+    <ser:sendBill>
+      <fileName>20000000001-01-F001-00000001.zip</fileName>
+      <contentFile>UEsDBAoAAAAAAA==</contentFile>
+    </ser:sendBill>
   </soapenv:Body>
 </soapenv:Envelope>`;
 
@@ -27,28 +27,27 @@ export async function GET() {
   const start = Date.now();
 
   try {
-    const res = await fetch(PROD_URL, {
+    const res = await fetch(BETA_URL, {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "getStatus",
+        "SOAPAction": "sendBill",
       },
-      body: SOAP_STATUS,
+      body: SOAP_PRUEBA,
       signal: AbortSignal.timeout(7000),
     });
 
     const sunatMs = Date.now() - start;
 
     return NextResponse.json({
-      alive: true,          // ✅ respondió
-      sunatMs,              // ⚡ latencia real
-      status: res.status,   // debug
-      env: "prod",
+      alive: true,
+      sunatMs,
+      status: res.status,
     });
 
-  } catch {
+  } catch (error) {
     return NextResponse.json({
-      alive: false,         // ❌ caído
+      alive: false,
       sunatMs: 0,
       error: "timeout o red",
     });

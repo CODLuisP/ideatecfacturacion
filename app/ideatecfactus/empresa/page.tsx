@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, MapPin, Phone, Upload, X, ChevronDown, Loader2 } from 'lucide-react';
+import { Building2, MapPin, Phone, Upload, X, ChevronDown, Loader2, Store, Hash } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '@/app/components/ui/Toast';
 import { Card } from '@/app/components/ui/Card';
@@ -24,7 +24,12 @@ interface EmpresaForm {
   email: string;
 }
 
-interface SeriesForm {
+interface Sucursal {
+  sucursalId: number;
+  empresaRuc: string;
+  codEstablecimiento: string;
+  nombre: string;
+  direccion: string;
   serieFactura: string;
   correlativoFactura: number;
   serieBoleta: string;
@@ -33,8 +38,11 @@ interface SeriesForm {
   correlativoNotaCredito: number;
   serieNotaDebito: string;
   correlativoNotaDebito: number;
-  serieGuia: string;
-  correlativoGuia: number;
+  serieGuiaRemision: string;
+  correlativoGuiaRemision: number;
+  serieGuiaTransportista: string;
+  correlativoGuiaTransportista: number;
+  estado: boolean;
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -207,28 +215,42 @@ function LogoUploader({ logoDataUrl, uploading, onFileSelected, onLogoRemove }: 
   );
 }
 
-// ─── Serie Row ────────────────────────────────────────────────────────────────
-function SerieRow({
-  label, serieKey, correlativoKey, series, setSeries, prefix, hint,
+// ─── Sucursal Series Row ──────────────────────────────────────────────────────
+function SucursalSerieRow({
+  label,
+  serie,
+  correlativo,
+  onSerieChange,
+  onCorrelativoChange,
+  prefix,
+  hint,
+  readOnly,
 }: {
   label: string;
-  serieKey: keyof SeriesForm;
-  correlativoKey: keyof SeriesForm;
-  series: SeriesForm;
-  setSeries: React.Dispatch<React.SetStateAction<SeriesForm>>;
+  serie: string;
+  correlativo: number;
+  onSerieChange: (val: string) => void;
+  onCorrelativoChange: (val: number) => void;
   prefix: string;
   hint: string;
+  readOnly?: boolean;
 }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="flex-1 space-y-1.5">
         <FieldLabel>{label} — Serie</FieldLabel>
         <input
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-brand-blue bg-white transition-colors"
-          value={series[serieKey] as string}
-          onChange={(e) => setSeries((s) => ({ ...s, [serieKey]: e.target.value }))}
+          className={cn(
+            'w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm transition-colors',
+            readOnly
+              ? 'bg-gray-50 text-gray-500 cursor-not-allowed'
+              : 'focus:border-brand-blue bg-white'
+          )}
+          value={serie}
+          onChange={(e) => !readOnly && onSerieChange(e.target.value)}
           placeholder={hint}
           maxLength={4}
+          readOnly={readOnly}
         />
         <p className="text-[10px] text-gray-400 italic">Empieza con "{prefix}" — máx. 4 caracteres</p>
       </div>
@@ -237,14 +259,150 @@ function SerieRow({
         <input
           type="number"
           min={1}
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-brand-blue bg-white transition-colors"
-          value={series[correlativoKey] as number}
+          className={cn(
+            'w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm transition-colors',
+            readOnly
+              ? 'bg-gray-50 text-gray-500 cursor-not-allowed'
+              : 'focus:border-brand-blue bg-white'
+          )}
+          value={correlativo}
           onChange={(e) =>
-            setSeries((s) => ({ ...s, [correlativoKey]: Math.max(1, parseInt(e.target.value) || 1) }))
+            !readOnly && onCorrelativoChange(Math.max(1, parseInt(e.target.value) || 1))
           }
+          readOnly={readOnly}
         />
         <p className="text-[10px] text-gray-400 italic">Por defecto: 1</p>
       </div>
+    </div>
+  );
+}
+
+// ─── Sucursal Card ────────────────────────────────────────────────────────────
+function SucursalCard({
+  sucursal,
+  onChange,
+  onSave,
+  saving,
+  readOnly,
+}: {
+  sucursal: Sucursal;
+  onChange: (updated: Sucursal) => void;
+  onSave: (s: Sucursal) => void;
+  saving: boolean;
+  readOnly?: boolean;
+}) {
+  const upd = (field: keyof Sucursal) => (val: string | number) =>
+    onChange({ ...sucursal, [field]: val });
+
+  return (
+    <div className="border border-gray-200 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 bg-gray-50 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 rounded-lg bg-blue-50 border border-blue-100">
+            <Store className="w-4 h-4 text-brand-blue" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">{sucursal.nombre}</p>
+            <p className="text-xs text-gray-500">{sucursal.direccion}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 uppercase tracking-wide">
+            Cod. {sucursal.codEstablecimiento}
+          </span>
+          <span
+            className={cn(
+              'text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide',
+              sucursal.estado
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                : 'bg-rose-50 text-rose-500 border border-rose-100'
+            )}
+          >
+            {sucursal.estado ? 'Activo' : 'Inactivo'}
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-5 space-y-4">
+        <SucursalSerieRow
+          label="Factura"
+          serie={sucursal.serieFactura}
+          correlativo={sucursal.correlativoFactura}
+          onSerieChange={(v) => upd('serieFactura')(v)}
+          onCorrelativoChange={(v) => upd('correlativoFactura')(v)}
+          prefix="F"
+          hint="F001"
+          readOnly={readOnly}
+        />
+        <SucursalSerieRow
+          label="Boleta"
+          serie={sucursal.serieBoleta}
+          correlativo={sucursal.correlativoBoleta}
+          onSerieChange={(v) => upd('serieBoleta')(v)}
+          onCorrelativoChange={(v) => upd('correlativoBoleta')(v)}
+          prefix="B"
+          hint="B001"
+          readOnly={readOnly}
+        />
+        <SucursalSerieRow
+          label="Nota de Crédito"
+          serie={sucursal.serieNotaCredito}
+          correlativo={sucursal.correlativoNotaCredito}
+          onSerieChange={(v) => upd('serieNotaCredito')(v)}
+          onCorrelativoChange={(v) => upd('correlativoNotaCredito')(v)}
+          prefix="F"
+          hint="FC01"
+          readOnly={readOnly}
+        />
+        <SucursalSerieRow
+          label="Nota de Débito"
+          serie={sucursal.serieNotaDebito}
+          correlativo={sucursal.correlativoNotaDebito}
+          onSerieChange={(v) => upd('serieNotaDebito')(v)}
+          onCorrelativoChange={(v) => upd('correlativoNotaDebito')(v)}
+          prefix="F"
+          hint="FD01"
+          readOnly={readOnly}
+        />
+        <SucursalSerieRow
+          label="Guía de Remisión"
+          serie={sucursal.serieGuiaRemision}
+          correlativo={sucursal.correlativoGuiaRemision}
+          onSerieChange={(v) => upd('serieGuiaRemision')(v)}
+          onCorrelativoChange={(v) => upd('correlativoGuiaRemision')(v)}
+          prefix="T"
+          hint="T001"
+          readOnly={readOnly}
+        />
+        <SucursalSerieRow
+          label="Guía Transportista"
+          serie={sucursal.serieGuiaTransportista}
+          correlativo={sucursal.correlativoGuiaTransportista}
+          onSerieChange={(v) => upd('serieGuiaTransportista')(v)}
+          onCorrelativoChange={(v) => upd('correlativoGuiaTransportista')(v)}
+          prefix="V"
+          hint="V001"
+          readOnly={readOnly}
+        />
+      </div>
+
+      {/* Footer */}
+      {!readOnly && (
+        <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 text-xs"
+            disabled={saving}
+            onClick={() => onSave(sucursal)}
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Hash className="w-3.5 h-3.5" />}
+            {saving ? 'Guardando...' : 'Guardar Series'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -253,18 +411,19 @@ function SerieRow({
 export default function ConfiguracionPage() {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [savingSeries, setSavingSeries] = useState(false);
   const [loadingEmpresa, setLoadingEmpresa] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  // logoDataUrl    → data-URL para mostrar en <img>
-  // logoBase64Pure → base64 puro para el PUT (null si se quitó)
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
+  const [savingSucursalId, setSavingSucursalId] = useState<number | null>(null);
+
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [logoBase64Pure, setLogoBase64Pure] = useState<string | null>(null);
 
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
 
-  console.log( user);
+  const isSuperAdmin = user?.username === 'superAdminOpen';
 
   const [form, setForm] = useState<EmpresaForm>({
     ruc: '',
@@ -279,20 +438,7 @@ export default function ConfiguracionPage() {
     email: '',
   });
 
-  const [series, setSeries] = useState<SeriesForm>({
-    serieFactura: 'F001',
-    correlativoFactura: 1,
-    serieBoleta: 'B001',
-    correlativoBoleta: 1,
-    serieNotaCredito: 'FC01',
-    correlativoNotaCredito: 1,
-    serieNotaDebito: 'FD01',
-    correlativoNotaDebito: 1,
-    serieGuia: 'T001',
-    correlativoGuia: 1,
-  });
-
-  // ── GET ───────────────────────────────────────────────────────────────────
+  // ── GET empresa ───────────────────────────────────────────────────────────
   useEffect(() => {
     const ruc = user?.ruc;
     if (!ruc) return;
@@ -314,26 +460,47 @@ export default function ConfiguracionPage() {
           telefono:        d.telefono        ?? '',
           email:           d.email           ?? '',
         });
-
         if (d.logoBase64) {
           setLogoBase64Pure(d.logoBase64);
           setLogoDataUrl(toDataUrl(d.logoBase64));
         }
       })
-      .catch(() => {
-        showToast('No se pudo cargar los datos de la empresa', 'error');
-      })
-      .finally(() => {
-        setLoadingEmpresa(false);
-      });
+      .catch(() => showToast('No se pudo cargar los datos de la empresa', 'error'))
+      .finally(() => setLoadingEmpresa(false));
   }, [user?.ruc]);
 
-  // ── Subir logo (multipart/form-data) ─────────────────────────────────────
+  // ── GET sucursales ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const ruc = user?.ruc;
+    if (!ruc) return;
+
+    setLoadingSucursales(true);
+
+    if (isSuperAdmin) {
+      axios
+        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}`)
+        .then((res) => setSucursales(res.data ?? []))
+        .catch(() => showToast('No se pudieron cargar las sucursales', 'error'))
+        .finally(() => setLoadingSucursales(false));
+    } else {
+      const sucursalId = user?.sucursalID;
+      if (!sucursalId) {
+        setLoadingSucursales(false);
+        return;
+      }
+      axios
+        .get(`${BASE_URL}/api/Sucursal/${sucursalId}`)
+        .then((res) => setSucursales([res.data]))
+        .catch(() => showToast('No se pudo cargar la sucursal', 'error'))
+        .finally(() => setLoadingSucursales(false));
+    }
+  }, [user?.ruc, user?.sucursalID, isSuperAdmin]);
+
+  // ── Subir logo ────────────────────────────────────────────────────────────
   const handleFileSelected = async (file: File, previewDataUrl: string) => {
     setLogoDataUrl(previewDataUrl);
     setLogoBase64Pure(stripDataUrlPrefix(previewDataUrl));
     setUploadingLogo(true);
-
     try {
       const formData = new FormData();
       formData.append('File', file);
@@ -350,8 +517,6 @@ export default function ConfiguracionPage() {
     }
   };
 
-  // ── Quitar logo ───────────────────────────────────────────────────────────
-  // null explícito → el backend borra logoBase64 de la DB
   const handleLogoRemove = () => {
     setLogoDataUrl('');
     setLogoBase64Pure(null);
@@ -362,8 +527,7 @@ export default function ConfiguracionPage() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  // ── PUT parcial: solo mandamos los campos que gestiona este form ──────────
-  // El backend mantiene el resto de campos intactos (certificados, SOL, etc.)
+  // ── PUT empresa ───────────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.ruc || !form.razonSocial || !form.direccion || !form.email) {
@@ -382,11 +546,8 @@ export default function ConfiguracionPage() {
         distrito:        form.distrito,
         telefono:        form.telefono        || null,
         email:           form.email,
-        // null  → usuario quitó la imagen, backend borra logoBase64
-        // string → base64 puro de la imagen actual
         logoBase64:      logoBase64Pure,
       };
-
       await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload);
       showToast('Datos de empresa actualizados correctamente', 'success');
     } catch {
@@ -396,11 +557,51 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const handleSaveSeries = async () => {
-    setSavingSeries(true);
-    await new Promise((r) => setTimeout(r, 800));
-    showToast('Series guardadas correctamente', 'success');
-    setSavingSeries(false);
+  // ── PUT sucursal — con Bearer token y payload exacto de la API ────────────
+  const handleSaveSucursal = async (sucursal: Sucursal) => {
+    setSavingSucursalId(sucursal.sucursalId);
+    try {
+      const payload = {
+        sucursalId:                   sucursal.sucursalId,
+        nombre:                       sucursal.nombre,
+        direccion:                    sucursal.direccion,
+        serieFactura:                 sucursal.serieFactura,
+        correlativoFactura:           sucursal.correlativoFactura,
+        serieBoleta:                  sucursal.serieBoleta,
+        correlativoBoleta:            sucursal.correlativoBoleta,
+        serieNotaCredito:             sucursal.serieNotaCredito,
+        correlativoNotaCredito:       sucursal.correlativoNotaCredito,
+        serieNotaDebito:              sucursal.serieNotaDebito,
+        correlativoNotaDebito:        sucursal.correlativoNotaDebito,
+        serieGuiaRemision:            sucursal.serieGuiaRemision,
+        correlativoGuiaRemision:      sucursal.correlativoGuiaRemision,
+        serieGuiaTransportista:       sucursal.serieGuiaTransportista,
+        correlativoGuiaTransportista: sucursal.correlativoGuiaTransportista,
+      };
+
+      await axios.put(
+        `${BASE_URL}/api/Sucursal/${sucursal.sucursalId}`,
+        payload,
+        {
+          headers: {
+            Authorization:  `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      showToast(`Series de "${sucursal.nombre}" guardadas correctamente`, 'success');
+    } catch {
+      showToast(`Error al guardar la sucursal "${sucursal.nombre}"`, 'error');
+    } finally {
+      setSavingSucursalId(null);
+    }
+  };
+
+  const handleSucursalChange = (updated: Sucursal) => {
+    setSucursales((prev) =>
+      prev.map((s) => (s.sucursalId === updated.sucursalId ? updated : s))
+    );
   };
 
   return (
@@ -408,7 +609,6 @@ export default function ConfiguracionPage() {
 
       {/* ── Datos de la Empresa ── */}
       <Card title="Datos de la Empresa" subtitle="Información que aparecerá en tus comprobantes electrónicos">
-
         {loadingEmpresa ? (
           <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -416,7 +616,6 @@ export default function ConfiguracionPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
             <LogoUploader
               logoDataUrl={logoDataUrl}
               uploading={uploadingLogo}
@@ -457,7 +656,6 @@ export default function ConfiguracionPage() {
 
             <Input label="Teléfono" value={form.telefono} onChange={upd('telefono')} placeholder="Ej: 01 234 5678 / 999 123 456" type="tel" />
             <Input label="Email" value={form.email} onChange={upd('email')} required placeholder="contacto@empresa.pe" type="email" hint="Se usará para notificaciones y envío de comprobantes" />
-
           </div>
         )}
 
@@ -470,20 +668,38 @@ export default function ConfiguracionPage() {
       </Card>
 
       {/* ── Series de Comprobantes ── */}
-      <Card title="Series de Comprobantes" subtitle="Configura la serie y el correlativo inicial para cada tipo de documento electrónico">
-        <div className="space-y-5">
-          <SerieRow label="Factura"          serieKey="serieFactura"     correlativoKey="correlativoFactura"     series={series} setSeries={setSeries} prefix="F" hint="F001" />
-          <SerieRow label="Boleta"           serieKey="serieBoleta"      correlativoKey="correlativoBoleta"      series={series} setSeries={setSeries} prefix="B" hint="B001" />
-          <SerieRow label="Nota de Crédito"  serieKey="serieNotaCredito" correlativoKey="correlativoNotaCredito" series={series} setSeries={setSeries} prefix="F" hint="FC01" />
-          <SerieRow label="Nota de Débito"   serieKey="serieNotaDebito"  correlativoKey="correlativoNotaDebito"  series={series} setSeries={setSeries} prefix="F" hint="FD01" />
-          <SerieRow label="Guía de Remisión" serieKey="serieGuia"        correlativoKey="correlativoGuia"        series={series} setSeries={setSeries} prefix="T" hint="T001" />
-        </div>
-        <div className="mt-6 flex justify-end">
-          <Button type="button" variant="outline" disabled={savingSeries} onClick={handleSaveSeries}>
-            {savingSeries && <Loader2 className="w-4 h-4 animate-spin" />}
-            {savingSeries ? 'Guardando...' : 'Guardar Series'}
-          </Button>
-        </div>
+      <Card
+        title="Series de Comprobantes"
+        subtitle={
+          isSuperAdmin
+            ? 'Configura las series y correlativos de cada sucursal'
+            : 'Consulta las series y correlativos de tu sucursal'
+        }
+      >
+        {loadingSucursales ? (
+          <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Cargando sucursales...</span>
+          </div>
+        ) : sucursales.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+            <Store className="w-8 h-8 text-gray-300" />
+            <p className="text-sm">No se encontraron sucursales</p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {sucursales.map((sucursal) => (
+              <SucursalCard
+                key={sucursal.sucursalId}
+                sucursal={sucursal}
+                onChange={handleSucursalChange}
+                onSave={handleSaveSucursal}
+                saving={savingSucursalId === sucursal.sucursalId}
+                readOnly={false}
+              />
+            ))}
+          </div>
+        )}
       </Card>
 
     </form>
