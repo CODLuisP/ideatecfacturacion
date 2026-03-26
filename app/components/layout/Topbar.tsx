@@ -58,6 +58,7 @@ export const Topbar = ({
 }: TopbarProps) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [logoSrc, setLogoSrc] = useState<string>("/user.png");
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
@@ -65,6 +66,32 @@ export const Topbar = ({
   const { user } = useAuth();
   const isSuperAdmin = user?.username === "superAdminOpen";
   const isBeta = user?.environment === "beta";
+
+  // ── Fetch logo desde la API usando el RUC del usuario ──
+  useEffect(() => {
+    if (!user?.ruc) return;
+
+    const fetchLogo = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5004/api/companies/${user.ruc}`
+        );
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        if (data?.logoBase64) {
+          // La API devuelve base64 puro; construimos el data URL
+          setLogoSrc(`data:image/png;base64,${data.logoBase64}`);
+        }
+        // Si logoBase64 es null o undefined, se mantiene "/user.png"
+      } catch {
+        // Error de red u otro → se mantiene "/user.png"
+      }
+    };
+
+    fetchLogo();
+  }, [user?.ruc]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -277,10 +304,11 @@ export const Topbar = ({
                 }`}
               >
                 <img
-                  src="https://picsum.photos/seed/user/100/100"
+                  src={logoSrc}
                   alt="Avatar"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  onError={() => setLogoSrc("/user.png")}
                 />
               </div>
               <ChevronRight
