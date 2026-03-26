@@ -98,6 +98,7 @@ export interface Boleta {
   horaEmision: string
   fechaVencimiento: string
   tipoMoneda: string
+  tipoCambio?: number
   tipoPago: string
   cliente: BoletaCliente
   company: BoletaCompany

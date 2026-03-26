@@ -41,7 +41,7 @@ export default function ClientesPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
   //  TODO: reemplazar con el empresaruc real del contexto/sesión
-  const EMPRESA_RUC = "20331066703";
+  const EMPRESA_RUC = "20601737583";
   const SUCURSAL_ID = 5;
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
