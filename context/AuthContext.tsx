@@ -20,6 +20,7 @@ export interface AuthUser {
   nombreSucursal: string | null;
   nombreEmpresa: string | null;
   environment: string | null;
+  logoBase64: string | null;
 }
 
 interface AuthContextValue {
@@ -41,6 +42,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   // Override que persiste el environment real (no el de la sesión de login)
   const [environmentOverride, setEnvironmentOverride] = useState<string | null>(null);
+  const [logoOverride, setLogoOverride] = useState<string | null>(null);  
 
   // Al autenticarse, fetch del environment real desde el backend
   // Esto corrige el bug: la sesión next-auth guarda el environment del momento
@@ -52,9 +54,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     fetch(`http://localhost:5004/api/companies/${ruc}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data?.environment) {
-          setEnvironmentOverride(data.environment);
-        }
+        if (data?.environment) setEnvironmentOverride(data.environment);
+        if (data?.logoBase64) setLogoOverride(data.logoBase64); 
       })
       .catch(() => {
         // Si falla, se usa el valor de la sesión como fallback silencioso
@@ -74,6 +75,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       nombreEmpresa: session.user.nombreEmpresa ?? null,
       // environmentOverride (del backend) tiene prioridad sobre la sesión
       environment: environmentOverride ?? session.user.environment ?? null,
+      logoBase64: logoOverride ?? null,  // 👈
     };
   }, [
     session?.user?.id,
@@ -84,6 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     session?.user?.sucursalID,
     session?.user?.environment,
     environmentOverride,
+    logoOverride
   ]);
 
   const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);

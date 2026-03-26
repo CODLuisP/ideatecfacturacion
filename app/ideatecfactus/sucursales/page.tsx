@@ -91,10 +91,12 @@ export default function SucursalesPage() {
   const [modalEliminar, setModalEliminar] = useState<Sucursal | null>(null);
 
   const { accessToken, user } = useAuth();
+
   useEffect(() => {
-  console.log('🔍 Contexto usuario:', user);
-  console.log('🔑 Access Token:', accessToken ? 'presente' : 'ausente');
-}, [user, accessToken]);
+    console.log("🔍 Contexto usuario:", user);
+    console.log("🔑 Access Token:", accessToken ? "presente" : "ausente");
+  }, [user, accessToken]);
+
   const [loading, setLoading] = useState(true);
 
   const isSuperadmin = user?.rol === "superadmin";
