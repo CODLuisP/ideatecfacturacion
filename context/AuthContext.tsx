@@ -17,6 +17,7 @@ export interface AuthUser {
   sucursalID: string | null;
   nombreSucursal: string | null;
   nombreEmpresa: string | null;
+  environment: string | null;
 }
 
 interface AuthContextValue {
@@ -46,6 +47,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       sucursalID: session.user.sucursalID ?? null,
       nombreSucursal: session.user.nombreSucursal ?? null,
       nombreEmpresa: session.user.nombreEmpresa ?? null,
+      environment: session.user.environment ?? null
     };
   }, [
     session?.user?.id,
@@ -54,6 +56,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     session?.user?.rol,
     session?.user?.ruc,
     session?.user?.sucursalID,
+    session?.user?.environment
   ]);
 
   const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);
