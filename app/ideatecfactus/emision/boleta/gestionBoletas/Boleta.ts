@@ -24,8 +24,8 @@ export interface BoletaCompany {
 }
 
 export interface BoletaDetalle {
-  detalleId: number
-  comprobanteId: number
+  //detalleId: number
+  //comprobanteId: number
   item: number
   productoId: number
   codigo: string
@@ -48,7 +48,7 @@ export interface BoletaDetalle {
 }
 
 export interface BoletaPago {
-  comprobanteId: number
+  //comprobanteId: number
   medioPago: string
   monto: number
   fechaPago: string
@@ -58,7 +58,7 @@ export interface BoletaPago {
 }
 
 export interface BoletaCuota {
-  comprobanteId: number
+  //comprobanteId: number
   numeroCuota: string
   monto: number
   fechaVencimiento: string
@@ -73,13 +73,13 @@ export interface BoletaLegend {
 }
 
 export interface BoletaGuia {
-  comprobanteId: number
+  //comprobanteId: number
   guiaNumeroCompleto: string
   guiaTipoDoc: string
 }
 
 export interface BoletaDetraccion {
-  comprobanteID: number
+  //comprobanteID: number
   codigoBienDetraccion: string
   codigoMedioPago: string
   cuentaBancoDetraccion: string
@@ -123,4 +123,25 @@ export interface Boleta {
   legends: BoletaLegend[]
   guias: BoletaGuia[]
   detracciones: BoletaDetraccion[]
+}
+
+export interface Sucursal {
+  sucursalId: number
+  empresaRuc: string
+  codEstablecimiento: string
+  nombre: string
+  direccion: string
+  serieFactura: string
+  correlativoFactura: number
+  serieBoleta: string
+  correlativoBoleta: number
+  serieNotaCredito: string
+  correlativoNotaCredito: number
+  serieNotaDebito: string
+  correlativoNotaDebito: number
+  serieGuiaRemision: string
+  correlativoGuiaRemision: number
+  serieGuiaTransportista: string
+  correlativoGuiaTransportista: number
+  estado: boolean
 }
