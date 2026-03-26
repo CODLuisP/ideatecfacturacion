@@ -148,9 +148,11 @@ export default function UsuariosPage() {
           />
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <UserPlus className="w-4 h-4" /> Nuevo Usuario
-        </Button>
+        {user?.rol !== "facturador" && (
+          <Button onClick={() => setIsModalOpen(true)}>
+            <UserPlus className="w-4 h-4" /> Nuevo Usuario
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -185,20 +187,22 @@ export default function UsuariosPage() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setModalEditar(u)}
-                      className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setModalEliminar(u)}
-                      className="p-1.5 text-gray-300 hover:text-brand-red hover:bg-red-50 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {user?.rol !== "facturador" && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setModalEditar(u)}
+                        className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setModalEliminar(u)}
+                        className="p-1.5 text-gray-300 hover:text-brand-red hover:bg-red-50 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 space-y-3">
