@@ -8,6 +8,8 @@ import {
   UserPlus,
   Trash2,
   Edit2,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/app/components/ui/Toast";
 import { Button } from "@/app/components/ui/Button";
@@ -29,6 +31,7 @@ export default function UsuariosPage() {
     username: "",
     email: "",
     rol: "facturador",
+    password: "",
   });
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [usuarios, setUsuarios] = useState<any[]>([]);
@@ -36,6 +39,7 @@ export default function UsuariosPage() {
 
   const [modalEditar, setModalEditar] = useState<any | null>(null);
   const [modalEliminar, setModalEliminar] = useState<any | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const isSuperadmin = user?.rol === "superadmin";
 
   const handleEditar = async (data: any) => {
@@ -91,6 +95,16 @@ export default function UsuariosPage() {
 
   const handleCrearUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      showToast(
+        "La contraseña debe tener mínimo 8 caracteres con letras y números",
+        "error",
+      );
+      return;
+    }
+
     setLoadingCreate(true);
     try {
       await axios.post(
@@ -98,7 +112,7 @@ export default function UsuariosPage() {
         {
           username: formData.username,
           email: formData.email,
-          password: "12345678",
+          password: formData.password,
           rol: formData.rol,
           ruc: user?.ruc,
           sucursalID: user?.sucursalID,
@@ -109,7 +123,7 @@ export default function UsuariosPage() {
       );
       setIsModalOpen(false);
       showToast("Usuario creado correctamente", "success");
-      setFormData({ username: "", email: "", rol: "facturador" });
+      setFormData({ username: "", email: "", rol: "facturador", password: "" });
       fetchUsuarios();
     } catch (error: any) {
       showToast(
@@ -134,9 +148,11 @@ export default function UsuariosPage() {
           />
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <UserPlus className="w-4 h-4" /> Nuevo Usuario
-        </Button>
+        {user?.rol !== "facturador" && (
+          <Button onClick={() => setIsModalOpen(true)}>
+            <UserPlus className="w-4 h-4" /> Nuevo Usuario
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -171,20 +187,22 @@ export default function UsuariosPage() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setModalEditar(u)}
-                      className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setModalEliminar(u)}
-                      className="p-1.5 text-gray-300 hover:text-brand-red hover:bg-red-50 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {user?.rol !== "facturador" && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setModalEditar(u)}
+                        className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setModalEliminar(u)}
+                        className="p-1.5 text-gray-300 hover:text-brand-red hover:bg-red-50 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 space-y-3">
@@ -272,20 +290,33 @@ export default function UsuariosPage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
-              Contraseña Temporal
+              Contraseña
             </label>
             <div className="relative">
               <input
-                type="password"
-                value="Factura2024*"
-                disabled
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl outline-none text-gray-500"
+                type={showPassword ? "text" : "password"}
+                required
+                placeholder="Mín. 8 caracteres con letras y números"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue pr-10"
               />
-              <Lock className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
             <p className="text-[10px] text-gray-400 mt-1 italic">
-              El usuario deberá cambiar su contraseña al primer inicio de
-              sesión.
+              Mínimo 8 caracteres, debe incluir letras y números.
             </p>
           </div>
           <div className="pt-4 flex justify-end gap-3">

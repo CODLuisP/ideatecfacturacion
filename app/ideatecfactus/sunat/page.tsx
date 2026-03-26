@@ -1,14 +1,13 @@
 "use client";
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Zap, CheckCircle2, FileJson, AlertCircle, ShieldCheck,
-  Eye, EyeOff, Upload, RefreshCw, Download, X, ChevronDown,
-  Wifi, WifiOff, Clock, User, Lock, Key, Globe, Info,
-  FileText, AlertTriangle, CheckCheck, Loader2
+  ShieldCheck,
+  Eye, EyeOff, ChevronDown,
+  Info, AlertTriangle, Loader2
 } from 'lucide-react';
+import axios from 'axios';
 import { useToast } from '@/app/components/ui/Toast';
 import { Button } from '@/app/components/ui/Button';
-import { Card } from '@/app/components/ui/Card';
 import { Badge } from '@/app/components/ui/Badge';
 import { cn } from '@/app/utils/cn';
 import { CertificadoDigitalCard } from '@/app/components/sunartComponentes/Certificadodigitalcard';
@@ -22,28 +21,13 @@ interface Config {
   clientId: string;
   clientSecret: string;
   environment: 'produccion' | 'beta';
-  certFile: string | null;
-  certPassword: string;
-  certExpiry: string;
-  certIssuer: string;
-  certRuc: string;
   saved: boolean;
 }
 
-interface ConnectionStatus {
-  connected: boolean;
-  responseMs: number;
-  cdrCount: number;
-  xmlCount: number;
-  errors: number;
-}
-
-interface CdrRow {
-  id: string;
-  date: string;
-  ticket: string;
-  status: 'Aceptado' | 'Rechazado';
-  type: string;
+export interface CompanyData {
+  certificadoPem: string | null;
+  certificadoPassword: string | null;
+  environment: string;
 }
 
 // ─── SecretInput ──────────────────────────────────────────────────────────────
@@ -118,14 +102,6 @@ function TextInput({ label, placeholder, value, onChange, required, hint, disabl
   );
 }
 
-// ─── FileDrop ─────────────────────────────────────────────────────────────────
-interface FileDropProps {
-  onFile: (file: File) => void;
-  accept: string;
-}
-
-
-
 // ─── Collapsible Section ──────────────────────────────────────────────────────
 interface CollapsibleProps {
   title: string;
@@ -180,7 +156,7 @@ function InfoBanner({ children, variant = 'info' }: { children: React.ReactNode;
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SunatPage() {
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { user, setEnvironment } = useAuth(); // 👈 desestructura setEnvironment
 
   const [config, setConfig] = useState<Config>({
     solUser: '',
@@ -188,105 +164,114 @@ export default function SunatPage() {
     clientId: '',
     clientSecret: '',
     environment: 'produccion',
-    certFile: null,
-    certPassword: '',
-    certExpiry: '2024-06-05',
-    certIssuer: 'Llama.pe SAC',
-    certRuc: '20601234567',
     saved: false,
   });
 
-  const [status, setStatus] = useState<ConnectionStatus>({
-    connected: true,
-    responseMs: 120,
-    cdrCount: 1245,
-    xmlCount: 1245,
-    errors: 0,
-  });
-
-  const [syncing, setSyncing] = useState(false);
-  const [testingSol, setTestingSol] = useState(false);
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+  const [loadingCompany, setLoadingCompany] = useState(true);
   const [savingConfig, setSavingConfig] = useState(false);
-  const [savingCert, setSavingCert] = useState(false);
-
-  // Modal certificado
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [certFile, setCertFile] = useState<File | null>(null);
-  const [certPasswordInput, setCertPasswordInput] = useState('');
 
   const upd = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setConfig((c) => ({ ...c, [key]: e.target.value, saved: false }));
 
+  // ── Fetch inicial ──
+  useEffect(() => {
+    if (!user?.ruc) return;
 
+    const fetchCompany = async () => {
+      setLoadingCompany(true);
+      try {
+        const res = await axios.get(`http://localhost:5004/api/companies/${user.ruc}`);
+        const data = res.data;
 
-  // ── Historial mock ──
-  const history: CdrRow[] = [
-    { id: 'F001-0000123', date: '20/05/2024 14:20', ticket: '2024052012345', status: 'Aceptado', type: 'Factura' },
-    { id: 'F001-0000122', date: '20/05/2024 12:15', ticket: '2024052012344', status: 'Aceptado', type: 'Factura' },
-    { id: 'B001-0000456', date: '19/05/2024 18:30', ticket: '2024051998765', status: 'Aceptado', type: 'Boleta' },
-    { id: 'T001-0000089', date: '19/05/2024 10:00', ticket: '2024051998000', status: 'Rechazado', type: 'Guía' },
-  ];
+        setCompanyData({
+          certificadoPem: data.certificadoPem ?? null,
+          certificadoPassword: data.certificadoPassword ?? null,
+          environment: data.environment ?? 'produccion',
+        });
 
-  // ── Handlers ──
+        setConfig({
+          solUser:      data.solUsuario    ?? '',
+          solPassword:  data.solClave      ?? '',
+          clientId:     data.clientId      ?? '',
+          clientSecret: data.clientSecret  ?? '',
+          environment: (data.environment === 'beta' ? 'beta' : 'produccion'),
+          saved: !!(data.solUsuario && data.solClave),
+        });
+      } catch {
+        showToast('Error al cargar la configuración de SUNAT', 'error');
+      } finally {
+        setLoadingCompany(false);
+      }
+    };
 
-  const handleTestSol = async () => {
-    if (!config.solUser || !config.solPassword) {
-      showToast('Completa el usuario y clave SOL', 'info');
-      return;
-    }
-    setTestingSol(true);
-    showToast('Validando credenciales SOL con SUNAT...', 'info');
-    await new Promise((r) => setTimeout(r, 2000));
-    setTestingSol(false);
-    if (config.solUser.length >= 3) {
-      showToast('Credenciales SOL verificadas correctamente ✓', 'success');
-    } else {
-      showToast('Error: Credenciales SOL incorrectas', 'error');
-    }
-  };
+    fetchCompany();
+  }, [user?.ruc]);
 
-
+  // ── Guardar ──
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!config.solUser || !config.solPassword) {
-      showToast('Las credenciales SOL son obligatorias', 'error');
-      return;
-    }
     setSavingConfig(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setSavingConfig(false);
-    setConfig((c) => ({ ...c, saved: true }));
-    showToast('Configuración guardada correctamente', 'success');
+    try {
+      const body = {
+        solUsuario:   config.solUser     || null,
+        solClave:     config.solPassword || null,
+        environment:  config.environment,
+        clientId:     config.clientId     || null,
+        clientSecret: config.clientSecret || null,
+      };
+
+      await axios.put(`http://localhost:5004/api/companies/${user!.ruc}`, body);
+
+      // 👇 Actualiza el environment en el contexto global → Topbar reacciona al instante
+      setEnvironment(config.environment);
+
+      setConfig((c) => ({ ...c, saved: true }));
+      showToast('Configuración guardada correctamente', 'success');
+    } catch {
+      showToast('Error al guardar la configuración', 'error');
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
+  // ── Limpiar ──
+  const handleClear = () => {
+    setConfig((c) => ({
+      ...c,
+      solUser: '',
+      solPassword: '',
+      clientId: '',
+      clientSecret: '',
+      saved: false,
+    }));
+    showToast('Configuración limpiada', 'info');
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      {/* Header actions */}
-
-
-      {/* Estado conexión + certificado */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <EstadoConexionSunatCard  className="lg:col-span-2" />
-
-
-        {/* Certificado Digital */}
-
-      <CertificadoDigitalCard ruc={user?.ruc ?? ""} />
+        <EstadoConexionSunatCard className="lg:col-span-2" />
+        <CertificadoDigitalCard
+          ruc={user?.ruc ?? ''}
+          initialData={companyData}
+          loadingInitial={loadingCompany}
+        />
       </div>
 
-      {/* ── Configuración ── */}
       <form onSubmit={handleSaveConfig} className="space-y-4">
 
         {/* Entorno */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <p className="text-sm font-bold text-gray-900 mb-1">Entorno de Operación</p>
-          <p className="text-xs text-gray-500 mb-4">Define si trabajas en producción real o en pruebas con SUNAT</p>
+          <p className="text-xs text-gray-500 mb-4">
+            Define si trabajas en producción real o en pruebas con SUNAT
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {([
-              { key: 'produccion', label: 'Producción', desc: 'Comprobantes reales enviados a SUNAT', accent: 'emerald' },
-              { key: 'beta', label: 'Beta / Homologación', desc: 'Ambiente de pruebas de SUNAT', accent: 'amber' },
+              { key: 'produccion', label: 'Producción',          desc: 'Comprobantes reales enviados a SUNAT',  accent: 'emerald' },
+              { key: 'beta',       label: 'Beta / Homologación', desc: 'Ambiente de pruebas de SUNAT',         accent: 'amber'   },
             ] as const).map((env) => (
               <label
                 key={env.key}
@@ -316,7 +301,7 @@ export default function SunatPage() {
           </div>
         </div>
 
-        {/* Credenciales SOL — obligatorio */}
+        {/* Credenciales SOL */}
         <CollapsibleSection
           defaultOpen
           title="Credenciales SOL"
@@ -328,38 +313,40 @@ export default function SunatPage() {
           }
         >
           <div className="space-y-4">
-            <InfoBanner variant="info">
-              Las credenciales SOL son necesarias para autenticarse con SUNAT y enviar Facturas, Boletas y Notas de Crédito/Débito.
-              Obtenlas en <strong>sunat.gob.pe → Operaciones en Línea (SOL)</strong>.
-            </InfoBanner>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextInput
-                label="Usuario SOL"
-                placeholder="Ej: 20601234567ADMIN"
-                value={config.solUser}
-                onChange={upd('solUser')}
-                required
-                hint="Formato: RUC + nombre de usuario SOL registrado en SUNAT"
-              />
-              <SecretInput
-                label="Clave SOL"
-                placeholder="••••••••"
-                value={config.solPassword}
-                onChange={upd('solPassword')}
-                required
-                hint="Clave de acceso a los servicios en línea de SUNAT"
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" onClick={handleTestSol} disabled={testingSol}>
-                {testingSol ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                {testingSol ? 'Validando...' : 'Probar Credenciales SOL'}
-              </Button>
-            </div>
+            {loadingCompany ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-10 bg-gray-100 rounded-xl" />
+                <div className="h-10 bg-gray-100 rounded-xl" />
+              </div>
+            ) : (
+              <>
+                <InfoBanner variant="info">
+                  Las credenciales SOL son necesarias para autenticarse con SUNAT y enviar Facturas,
+                  Boletas y Notas de Crédito/Débito. Obtenlas en{' '}
+                  <strong>sunat.gob.pe → Operaciones en Línea (SOL)</strong>.
+                </InfoBanner>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TextInput
+                    label="Usuario SOL"
+                    placeholder="Ej: 20601234567ADMIN"
+                    value={config.solUser}
+                    onChange={upd('solUser')}
+                    hint="Formato: RUC + nombre de usuario SOL registrado en SUNAT"
+                  />
+                  <SecretInput
+                    label="Clave SOL"
+                    placeholder="••••••••"
+                    value={config.solPassword}
+                    onChange={upd('solPassword')}
+                    hint="Clave de acceso a los servicios en línea de SUNAT"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </CollapsibleSection>
 
-        {/* Guía de Remisión Electrónica */}
+        {/* Guía de Remisión */}
         <CollapsibleSection
           title="Guía de Remisión Electrónica"
           subtitle="Client ID y Client Secret requeridos solo para emitir Guías de Remisión Electrónicas"
@@ -370,114 +357,56 @@ export default function SunatPage() {
           }
         >
           <div className="space-y-4">
-            <InfoBanner variant="info">
-              Las Guías de Remisión Electrónicas requieren credenciales adicionales proporcionadas por SUNAT.
-              No se requieren para Facturas ni Boletas.
-            </InfoBanner>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextInput
-                label="Client ID"
-                placeholder="Tu Client ID de SUNAT"
-                value={config.clientId}
-                onChange={upd('clientId')}
-                hint="ID de cliente proporcionado por SUNAT para guías de remisión"
-              />
-              <SecretInput
-                label="Client Secret"
-                placeholder="••••••••••••••••"
-                value={config.clientSecret}
-                onChange={upd('clientSecret')}
-                hint="Secreto de cliente proporcionado por SUNAT para guías de remisión"
-              />
-            </div>
+            {loadingCompany ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-10 bg-gray-100 rounded-xl" />
+                <div className="h-10 bg-gray-100 rounded-xl" />
+              </div>
+            ) : (
+              <>
+                <InfoBanner variant="info">
+                  Las Guías de Remisión Electrónicas requieren credenciales adicionales proporcionadas
+                  por SUNAT. No se requieren para Facturas ni Boletas.
+                </InfoBanner>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TextInput
+                    label="Client ID"
+                    placeholder="Tu Client ID de SUNAT"
+                    value={config.clientId}
+                    onChange={upd('clientId')}
+                    hint="ID de cliente proporcionado por SUNAT para guías de remisión"
+                  />
+                  <SecretInput
+                    label="Client Secret"
+                    placeholder="••••••••••••••••"
+                    value={config.clientSecret}
+                    onChange={upd('clientSecret')}
+                    hint="Secreto de cliente proporcionado por SUNAT para guías de remisión"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </CollapsibleSection>
 
-        {/* Guardar */}
+        {/* Botones */}
         <div className="flex justify-end gap-3 pt-2">
           <Button
             type="button"
             variant="outline"
-            onClick={() => {
-              setConfig((c) => ({ ...c, solUser: '', solPassword: '', clientId: '', clientSecret: '', saved: false }));
-              showToast('Configuración limpiada', 'info');
-            }}
+            onClick={handleClear}
+            disabled={loadingCompany}
           >
             Limpiar
           </Button>
-          <Button type="submit" disabled={savingConfig}>
-            {savingConfig ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+          <Button type="submit" disabled={savingConfig || loadingCompany}>
+            {savingConfig
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <ShieldCheck className="w-4 h-4" />}
             {savingConfig ? 'Guardando...' : 'Guardar Configuración'}
           </Button>
         </div>
       </form>
-
-
-      {/* ── Historial CDR ── */}
-      <Card title="Historial de Envíos (CDR)" subtitle="Últimos documentos procesados por SUNAT">
-        <div className="overflow-x-auto -mx-6">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50">
-                {['Documento', 'Tipo', 'Fecha Envío', 'Ticket SUNAT', 'Estado CDR', 'XML / CDR'].map((h) => (
-                  <th key={h} className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {history.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-brand-blue">{row.id}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{row.type}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{row.date}</td>
-                  <td className="px-6 py-4 text-sm font-mono text-gray-400">{row.ticket}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant={row.status === 'Aceptado' ? 'success' : 'error'}>
-                      {row.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Descargar XML"
-                        onClick={() => showToast(`Descargando XML de ${row.id}...`, 'info')}
-                      >
-                        <FileJson className="w-4 h-4" />
-                      </button>
-                      <button
-                        className={cn(
-                          'p-1.5 rounded-lg transition-colors',
-                          row.status === 'Aceptado'
-                            ? 'text-emerald-600 hover:bg-emerald-50'
-                            : 'text-gray-300 cursor-not-allowed'
-                        )}
-                        title={row.status === 'Aceptado' ? 'Descargar CDR' : 'No hay CDR para documentos rechazados'}
-                        onClick={() =>
-                          row.status === 'Aceptado'
-                            ? showToast(`Descargando CDR de ${row.id}...`, 'info')
-                            : showToast('No hay CDR disponible para documentos rechazados', 'info')
-                        }
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Descargar PDF"
-                        onClick={() => showToast(`Descargando PDF de ${row.id}...`, 'info')}
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   );
 }

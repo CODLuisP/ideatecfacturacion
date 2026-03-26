@@ -10,9 +10,13 @@ import {
   Check,
   AlertCircle,
   Info,
+  Globe,
+  MapPin,
+  FlaskConical,
 } from "lucide-react";
 import { View } from "@/app/types";
 import { signOut } from "next-auth/react";
+import { useAuth } from "@/context/AuthContext";
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -54,11 +58,41 @@ export const Topbar = ({
 }: TopbarProps) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [logoSrc, setLogoSrc] = useState<string>("/user.png");
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns on outside click
+  const { user } = useAuth();
+  const isSuperAdmin = user?.username === "superAdminOpen";
+  const isBeta = user?.environment === "beta";
+
+  // ── Fetch logo desde la API usando el RUC del usuario ──
+  useEffect(() => {
+    if (!user?.ruc) return;
+
+    const fetchLogo = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5004/api/companies/${user.ruc}`
+        );
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        if (data?.logoBase64) {
+          // La API devuelve base64 puro; construimos el data URL
+          setLogoSrc(`data:image/png;base64,${data.logoBase64}`);
+        }
+        // Si logoBase64 es null o undefined, se mantiene "/user.png"
+      } catch {
+        // Error de red u otro → se mantiene "/user.png"
+      }
+    };
+
+    fetchLogo();
+  }, [user?.ruc]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node))
@@ -73,173 +107,264 @@ export const Topbar = ({
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   return (
-    <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40">
-      {/* Left */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={toggleSidebar}
-          className="p-2 hover:bg-gray-50 rounded-lg text-gray-500 transition-colors"
-        >
-          {isSidebarOpen ? (
-            <Menu className="w-5 h-5" />
-          ) : (
-            <ChevronRight className="w-5 h-5" />
-          )}
-        </button>
-        <div className="hidden md:flex items-center gap-2 text-sm text-gray-400">
-          <span className="hover:text-gray-600 cursor-pointer">Sistema</span>
-          <ChevronRight className="w-3 h-3" />
-          <span className="font-semibold text-gray-900 capitalize">
-            {activeView}
-          </span>
-        </div>
-      </div>
-
-      {/* Right */}
-      <div className="flex items-center gap-4">
-        {/* SUNAT badge */}
-        <div className="flex items-center gap-2.5 pl-3 border-l-2 border-blue-800">
-          <div className="flex flex-col leading-none gap-0.5">
-            <span className="text-[9px] font-semibold text-gray-800 uppercase tracking-widest">
-              Empresa
+    <>
+      {/* ── Header principal ── */}
+      <header
+        className={`h-16 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 border-b transition-colors ${
+          isBeta
+            ? "bg-amber-50 border-amber-300"
+            : "bg-white border-gray-100"
+        }`}
+      >
+        {/* Left */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleSidebar}
+            className={`p-2 rounded-lg transition-colors ${
+              isBeta
+                ? "hover:bg-amber-100 text-amber-600"
+                : "hover:bg-gray-50 text-gray-400"
+            }`}
+          >
+            {isSidebarOpen ? (
+              <Menu className="w-5 h-5" />
+            ) : (
+              <ChevronRight className="w-5 h-5" />
+            )}
+          </button>
+          <div className="hidden md:flex items-center gap-1.5 text-sm text-gray-400">
+            <span className="hover:text-gray-600 cursor-pointer transition-colors">
+              Sistema
             </span>
-            <span className="text-xs font-black text-blue-900 uppercase tracking-wide">
-              VELSAT S.A.C.
+            <ChevronRight className="w-3 h-3" />
+            <span className="font-semibold text-gray-800 capitalize">
+              {activeView}
             </span>
           </div>
         </div>
 
-        {/* Notification Bell */}
-        <div className="relative" ref={notifRef}>
-          <button
-            onClick={() => {
-              setNotifOpen((v) => !v);
-              setUserOpen(false);
-            }}
-            className="p-2.5 hover:bg-gray-50 rounded-xl text-gray-400 relative group transition-all"
-          >
-            <Bell className="w-5 h-5 group-hover:text-blue-600 transition-colors" />
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-            )}
-          </button>
+        {/* Right */}
+        <div className="flex items-center gap-3">
 
-          {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <span className="text-sm font-bold text-gray-900">
-                  Notificaciones
-                </span>
-                {unreadCount > 0 && (
-                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                    {unreadCount} nuevas
+          {/* ── Context badge ── */}
+          <div className="flex items-center gap-2 px-3 py-2">
+            {/* Empresa */}
+            <div className="flex flex-col leading-none">
+              <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">
+                Empresa
+              </span>
+              <span
+                className={`text-xs font-black uppercase tracking-wide mt-0.5 ${
+                  isBeta ? "text-amber-800" : "text-blue-900"
+                }`}
+              >
+                {user?.nombreEmpresa}
+              </span>
+            </div>
+
+            {/* Sucursal (usuario normal) */}
+            {!isSuperAdmin && user?.nombreSucursal && (
+              <>
+                <div className="w-px h-7 bg-gray-200 mx-1" />
+                <MapPin
+                  className={`w-4 h-4 shrink-0 ${
+                    isBeta ? "text-amber-600" : "text-blue-700"
+                  }`}
+                />
+                <div className="flex flex-col leading-none">
+                  <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Sucursal
                   </span>
-                )}
-              </div>
+                  <span className="text-xs font-bold text-gray-800 mt-0.5 truncate">
+                    {user.nombreSucursal}
+                  </span>
+                </div>
+              </>
+            )}
 
-              {/* List */}
-              <ul className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-                {notifications.map((n) => (
-                  <li
-                    key={n.id}
-                    className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${n.unread ? "bg-blue-50/30" : ""}`}
-                  >
-                    <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
-                      {n.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 leading-tight">
-                        {n.title}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">
-                        {n.desc}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                        {n.time}
-                      </p>
-                    </div>
-                    {n.unread && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
-                    )}
-                  </li>
-                ))}
-              </ul>
+            {/* Acceso global (superAdmin) */}
+            {isSuperAdmin && (
+              <>
+                <div className="w-px h-7 bg-gray-200 mx-1" />
+                <Globe className="w-3 h-3 text-emerald-500 shrink-0" />
+                <div className="flex flex-col leading-none">
+                  <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">
+                    Acceso
+                  </span>
+                  <span className="text-xs font-bold text-emerald-600 mt-0.5">
+                    Global
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
 
-              {/* Footer */}
-              <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
-                <button className="w-full text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors text-center">
-                  Ver todas las notificaciones
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="h-8 w-px bg-gray-100 mx-1" />
-
-        {/* User Dropdown */}
-        <div className="relative" ref={userRef}>
-          <button
-            onClick={() => {
-              setUserOpen((v) => !v);
-              setNotifOpen(false);
-            }}
-            className="flex items-center gap-3 pl-2 hover:bg-gray-50 rounded-xl px-2 py-1.5 transition-all group"
-          >
-            <div className="text-right hidden md:block">
-              <p className="text-sm font-bold text-gray-900 leading-none">
-                Admin Usuario
-              </p>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                Administrador
-              </p>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden group-hover:ring-2 group-hover:ring-blue-200 transition-all">
-              <img
-                src="https://picsum.photos/seed/user/100/100"
-                alt="Avatar"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
+          {/* Notification Bell */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => {
+                setNotifOpen((v) => !v);
+                setUserOpen(false);
+              }}
+              className={`p-2.5 rounded-xl relative group transition-all ${
+                isBeta
+                  ? "hover:bg-amber-100 text-amber-500"
+                  : "hover:bg-gray-50 text-gray-400"
+              }`}
+            >
+              <Bell
+                className={`w-5 h-5 transition-colors ${
+                  isBeta
+                    ? "group-hover:text-amber-700"
+                    : "group-hover:text-blue-600"
+                }`}
               />
-            </div>
-            <ChevronRight
-              className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${userOpen ? "rotate-90" : ""}`}
-            />
-          </button>
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+              )}
+            </button>
 
-          {userOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
-              {/* User info */}
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                <p className="text-sm font-bold text-gray-900">Admin Usuario</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  admin@empresa.com
+            {notifOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <span className="text-sm font-bold text-gray-900">
+                    Notificaciones
+                  </span>
+                  {unreadCount > 0 && (
+                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                      {unreadCount} nuevas
+                    </span>
+                  )}
+                </div>
+                <ul className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                  {notifications.map((n) => (
+                    <li
+                      key={n.id}
+                      className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${n.unread ? "bg-blue-50/30" : ""}`}
+                    >
+                      <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
+                        {n.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 leading-tight">
+                          {n.title}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {n.desc}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                          {n.time}
+                        </p>
+                      </div>
+                      {n.unread && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
+                  <button className="w-full text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors text-center">
+                    Ver todas las notificaciones
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="h-7 w-px bg-gray-100" />
+
+          {/* User Dropdown */}
+          <div className="relative" ref={userRef}>
+            <button
+              onClick={() => {
+                setUserOpen((v) => !v);
+                setNotifOpen(false);
+              }}
+              className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-all group ${
+                isBeta ? "hover:bg-amber-100" : "hover:bg-gray-50"
+              }`}
+            >
+              <div className="text-right hidden md:block">
+                <p className="text-sm font-bold text-gray-900 leading-none">
+                  {user?.username}
+                </p>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5">
+                  {isSuperAdmin
+                    ? "Super Admin"
+                    : user?.rol === "admin"
+                      ? "Administrador"
+                      : user?.rol}
                 </p>
               </div>
+              <div
+                className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 ${
+                  isBeta
+                    ? "border-amber-300 group-hover:border-amber-400"
+                    : "border-gray-200 group-hover:border-gray-300"
+                }`}
+              >
+                <img
+                  src={logoSrc}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={() => setLogoSrc("/user.png")}
+                />
+              </div>
+              <ChevronRight
+                className={`w-3 h-3 text-gray-700 transition-transform duration-200 ${userOpen ? "rotate-90" : ""}`}
+              />
+            </button>
 
-              {/* Options */}
-              <ul className="py-1.5">
-                <li>
-                  <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                    <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
-                      <User className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                    <span className="font-medium">Mi perfil</span>
-                  </button>
-                </li>
-                <li>
-                  <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                    <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
-                      <Settings className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
-                    </div>
-                    <span className="font-medium">Configuración</span>
-                  </button>
-                </li>
-              </ul>
+            {userOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
+                {/* User info */}
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <p className="text-sm font-bold text-gray-900">
+                    {user?.username}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
+                  {!isSuperAdmin && user?.nombreSucursal && (
+                    <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                      <MapPin className="w-2.5 h-2.5" />
+                      {user.nombreSucursal}
+                    </span>
+                  )}
+                  {isSuperAdmin && (
+                    <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                      <Globe className="w-2.5 h-2.5" />
+                      Acceso Global
+                    </span>
+                  )}
+                  {isBeta && (
+                    <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      <FlaskConical className="w-2.5 h-2.5" />
+                      Entorno Beta
+                    </span>
+                  )}
+                </div>
 
-              <div className="border-t border-gray-100 py-1.5">
-                <li className="list-none">
+                {/* Options */}
+                <ul className="py-1.5">
+                  <li>
+                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
+                      <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
+                        <User className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
+                      </div>
+                      <span className="font-medium">Mi perfil</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
+                      <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
+                        <Settings className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
+                      </div>
+                      <span className="font-medium">Configuración</span>
+                    </button>
+                  </li>
+                </ul>
+
+                <div className="border-t border-gray-100 py-1.5">
                   <button
                     onClick={() => signOut({ callbackUrl: "/login" })}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors group"
@@ -249,28 +374,37 @@ export const Topbar = ({
                     </div>
                     <span className="font-medium">Cerrar sesión</span>
                   </button>
-                </li>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* ── Banner de advertencia Beta ── */}
+      {isBeta && (
+        <div className="sticky top-16 z-30 bg-amber-400 border-b border-amber-500 px-6 py-2 flex items-center gap-3">
+          <FlaskConical className="w-4 h-4 text-amber-900 shrink-0" />
+          <span className="bg-amber-800 text-amber-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
+            Beta
+          </span>
+          <p className="text-amber-900 text-xs font-medium">
+            Estás en el entorno de pruebas —{" "}
+            <strong className="font-bold">
+              No emitas comprobantes reales a SUNAT.
+            </strong>{" "}
+            Los documentos generados aquí no tienen validez tributaria.
+          </p>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(-6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in {
-          animation: fade-in 0.15s ease-out both;
-        }
+        .animate-fade-in { animation: fade-in 0.15s ease-out both; }
       `}</style>
-    </header>
+    </>
   );
 };

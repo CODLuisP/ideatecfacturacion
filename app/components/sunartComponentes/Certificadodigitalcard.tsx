@@ -1,60 +1,62 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { Upload, CheckCircle2, FileJson, ShieldCheck, Loader2, AlertTriangle, Eye, EyeOff } from "lucide-react";
-import { Button } from "@/app/components/ui/Button";
-import { Badge } from "@/app/components/ui/Badge";
-import { Card } from "@/app/components/ui/Card";
-import { Modal } from "@/app/components/ui/Modal";
-import { cn } from "@/app/utils/cn";
-import { useToast } from "@/app/components/ui/Toast";
+import {
+  Upload, CheckCircle2, FileJson, ShieldCheck,
+  Loader2, AlertTriangle, Eye, EyeOff,
+} from "lucide-react";
 import axios from "axios";
+import { Button }  from "@/app/components/ui/Button";
+import { Card }    from "@/app/components/ui/Card";
+import { Modal }   from "@/app/components/ui/Modal";
+import { cn }      from "@/app/utils/cn";
+import { useToast } from "@/app/components/ui/Toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface CompanyData {
+export interface CompanyData {
   certificadoPem: string | null;
   certificadoPassword: string | null;
   environment: string;
 }
 
+interface CertificadoDigitalCardProps {
+  ruc: string;
+  /** Datos ya cargados por el padre (SunatPage). Si se pasan, no se hace fetch propio. */
+  initialData?: CompanyData | null;
+  /** Estado de carga del padre. Se usa para mostrar el skeleton mientras el padre carga. */
+  loadingInitial?: boolean;
+}
 
 // ─── Parse cert expiry from PEM base64 ────────────────────────────────────────
 function parseCertExpiry(pemBase64: string): { notBefore: Date | null; notAfter: Date | null } {
   try {
-    // Decode base64 → text, then extract the -----BEGIN CERTIFICATE----- block
-    const clean = pemBase64.replace(/\s/g, "");
+    const clean  = pemBase64.replace(/\s/g, "");
     const binary = atob(clean);
-    const bytes = new Uint8Array(binary.length);
+    const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const pemText = new TextDecoder("utf-8").decode(bytes);
 
-    // Extract base64 body of first certificate block
     const certMatch = pemText.match(/-----BEGIN CERTIFICATE-----([\s\S]+?)-----END CERTIFICATE-----/);
     if (!certMatch) return { notBefore: null, notAfter: null };
 
     const derB64 = certMatch[1].replace(/\s/g, "");
     const derBin = atob(derB64);
-    const der = new Uint8Array(derBin.length);
+    const der    = new Uint8Array(derBin.length);
     for (let i = 0; i < derBin.length; i++) der[i] = derBin.charCodeAt(i);
 
-    // Walk DER ASN.1 to find UTCTime / GeneralizedTime validity fields
-    // TBSCertificate → Validity → notBefore, notAfter
     const parseDerDate = (bytes: Uint8Array, offset: number): Date | null => {
       const tag = bytes[offset];
       const len = bytes[offset + 1];
       const str = String.fromCharCode(...bytes.slice(offset + 2, offset + 2 + len));
-      // UTCTime: YYMMDDHHMMSSZ  GeneralizedTime: YYYYMMDDHHMMSSZ
-      if (tag === 0x17) { // UTCTime
-        const yy = parseInt(str.slice(0, 2));
+      if (tag === 0x17) {
+        const yy   = parseInt(str.slice(0, 2));
         const year = yy >= 50 ? 1900 + yy : 2000 + yy;
         return new Date(`${year}-${str.slice(2,4)}-${str.slice(4,6)}T${str.slice(6,8)}:${str.slice(8,10)}:${str.slice(10,12)}Z`);
-      } else if (tag === 0x18) { // GeneralizedTime
+      } else if (tag === 0x18) {
         return new Date(`${str.slice(0,4)}-${str.slice(4,6)}-${str.slice(6,8)}T${str.slice(8,10)}:${str.slice(10,12)}:${str.slice(12,14)}Z`);
       }
       return null;
     };
 
-    // Simple DER traversal: find SEQUENCE tag 0x30, skip to Validity SEQUENCE
-    // Validity is typically at a fixed depth — we scan for two consecutive date tags
     let i = 0;
     const dates: Date[] = [];
     while (i < der.length - 2 && dates.length < 2) {
@@ -64,22 +66,16 @@ function parseCertExpiry(pemBase64: string): { notBefore: Date | null; notAfter:
         if (d) dates.push(d);
         i += 2 + der[i + 1];
       } else if (tag === 0x30 || tag === 0xa0 || tag === 0xa3) {
-        // constructed — step into it
         const lenByte = der[i + 1];
-        if (lenByte & 0x80) {
-          const numBytes = lenByte & 0x7f;
-          i += 2 + numBytes;
-        } else {
-          i += 2;
-        }
+        if (lenByte & 0x80) { const n = lenByte & 0x7f; i += 2 + n; }
+        else                 { i += 2; }
       } else {
-        // skip this TLV
         const lenByte = der[i + 1];
         if (lenByte & 0x80) {
-          const numBytes = lenByte & 0x7f;
+          const n = lenByte & 0x7f;
           let len = 0;
-          for (let b = 0; b < numBytes; b++) len = (len << 8) | der[i + 2 + b];
-          i += 2 + numBytes + len;
+          for (let b = 0; b < n; b++) len = (len << 8) | der[i + 2 + b];
+          i += 2 + n + len;
         } else {
           i += 2 + lenByte;
         }
@@ -103,8 +99,8 @@ function daysUntil(d: Date | null): number | null {
 
 // ─── FileDrop ─────────────────────────────────────────────────────────────────
 function FileDrop({ onFile, accept }: { onFile: (file: File) => void; accept: string }) {
-  const [dragging, setDragging] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [dragging, setDragging]   = useState(false);
+  const [fileName, setFileName]   = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
 
   const handle = (file: File | undefined) => {
@@ -121,10 +117,16 @@ function FileDrop({ onFile, accept }: { onFile: (file: File) => void; accept: st
       )}
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
+      onDrop={(e)    => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
       onClick={() => ref.current?.click()}
     >
-      <input ref={ref} type="file" accept={accept} className="hidden" onChange={(e) => handle(e.target.files?.[0])} />
+      <input
+        ref={ref}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => handle(e.target.files?.[0])}
+      />
       {fileName ? (
         <>
           <div className="p-3 bg-emerald-50 rounded-xl shadow-sm">
@@ -160,14 +162,12 @@ function PemDisplay({ pem }: { pem: string }) {
           <CheckCircle2 className="w-3 h-3" /> Válido
         </span>
       </div>
-      <div className="relative">
-        <textarea
-          readOnly
-          value={pem}
-          rows={6}
-          className="w-full px-3 py-2.5 bg-gray-900 text-emerald-400 font-mono text-[10px] border border-gray-700 rounded-xl outline-none resize-none leading-relaxed"
-        />
-      </div>
+      <textarea
+        readOnly
+        value={pem}
+        rows={6}
+        className="w-full px-3 py-2.5 bg-gray-900 text-emerald-400 font-mono text-[10px] border border-gray-700 rounded-xl outline-none resize-none leading-relaxed"
+      />
       <p className="text-[10px] text-gray-400 italic">
         Este PEM se guardará junto con tu certificado para firmar comprobantes.
       </p>
@@ -176,26 +176,46 @@ function PemDisplay({ pem }: { pem: string }) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
+export function CertificadoDigitalCard({
+  ruc,
+  initialData,
+  loadingInitial,
+}: CertificadoDigitalCardProps) {
   const { showToast } = useToast();
 
-  const [company, setCompany] = useState<CompanyData | null>(null);
-  const [loadingCompany, setLoadingCompany] = useState(true);
+  // Si el padre nos pasa datos usamos esos; si no, los pedimos nosotros
+  const [company, setCompany]               = useState<CompanyData | null>(initialData ?? null);
+  const [loadingCompany, setLoadingCompany] = useState(
+    initialData !== undefined ? (loadingInitial ?? false) : true,
+  );
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [certFile, setCertFile] = useState<File | null>(null);
+  // Modal / form states
+  const [isModalOpen, setIsModalOpen]             = useState(false);
+  const [certFile, setCertFile]                   = useState<File | null>(null);
   const [certPasswordInput, setCertPasswordInput] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword]           = useState(false);
+  const [saving, setSaving]                       = useState(false);
 
-  // Estados del flujo de conversión
-  const [step, setStep] = useState<"idle" | "uploading" | "converting" | "saving" | "done" | "error">("idle");
+  // Flujo de conversión
+  type Step = "idle" | "uploading" | "converting" | "saving" | "done" | "error";
+  const [step, setStep]           = useState<Step>("idle");
   const [pemResult, setPemResult] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
 
-  // ── Fetch company data ──
+  // ── Sincronizar cuando el padre actualiza initialData / loadingInitial ──
   useEffect(() => {
+    if (initialData !== undefined) {
+      setCompany(initialData);
+      setLoadingCompany(loadingInitial ?? false);
+    }
+  }, [initialData, loadingInitial]);
+
+  // ── Fetch propio — solo cuando se usa el componente sin datos del padre ──
+  useEffect(() => {
+    // Si initialData fue proporcionado (incluso null), no hacemos fetch propio
+    if (initialData !== undefined) return;
     if (!ruc) return;
+
     const fetchCompany = async () => {
       setLoadingCompany(true);
       try {
@@ -208,14 +228,47 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
       }
     };
     fetchCompany();
-  }, [ruc]);
+  }, [ruc]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Nota: initialData no va en deps porque ese efecto solo corre cuando initialData === undefined
 
-  const hasCert = !!(company?.certificadoPem && company?.certificadoPassword);
-  const certExpiry = hasCert ? parseCertExpiry(company!.certificadoPem!) : { notBefore: null, notAfter: null };
-  const daysLeft = daysUntil(certExpiry.notAfter);
+  // ── Derived ──
+  const hasCert       = !!(company?.certificadoPem && company?.certificadoPassword);
+  const certExpiry    = hasCert ? parseCertExpiry(company!.certificadoPem!) : { notBefore: null, notAfter: null };
+  const daysLeft      = daysUntil(certExpiry.notAfter);
   const isExpiringSoon = daysLeft !== null && daysLeft <= 30 && daysLeft > 0;
-  const isExpired = daysLeft !== null && daysLeft <= 0;
+  const isExpired     = daysLeft !== null && daysLeft <= 0;
 
+  // ── Vigencia bar ──
+  const totalDays  = certExpiry.notBefore && certExpiry.notAfter
+    ? Math.ceil((certExpiry.notAfter.getTime() - certExpiry.notBefore.getTime()) / 86400000)
+    : 0;
+  const elapsedDays = certExpiry.notBefore && daysLeft !== null ? totalDays - daysLeft : 0;
+  const barPct      = totalDays > 0 ? Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100)) : 0;
+  const barColor    = isExpired ? "bg-rose-500" : isExpiringSoon ? "bg-amber-400" : barPct > 75 ? "bg-orange-400" : "bg-emerald-500";
+
+  const statusLabel = !hasCert
+    ? "Sin certificado"
+    : isExpired
+    ? "Vencido"
+    : isExpiringSoon
+    ? `Vence en ${daysLeft} días`
+    : `${daysLeft} días restantes`;
+
+  const statusColor = !hasCert
+    ? "text-gray-400"
+    : isExpired
+    ? "text-rose-600"
+    : isExpiringSoon
+    ? "text-amber-600"
+    : "text-emerald-600";
+
+  const details = [
+    ["RUC",    ruc],
+    ["Tipo",   hasCert ? "PFX / P12"   : "—"],
+    ["Archivo", hasCert ? "Cargado"    : "No cargado"],
+  ];
+
+  // ── Cerrar modal y limpiar estado ──
   const closeModal = () => {
     setIsModalOpen(false);
     setCertFile(null);
@@ -226,12 +279,11 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
     setStepError(null);
   };
 
-  // ── Paso 1: subir archivo → base64 ──
-  // Respuesta: { fileName, contentType, base64, sizeBytes }
+  // ── Paso 1: archivo → base64 ──
   const uploadToBase64 = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await axios.post<{ fileName: string; contentType: string; base64: string; sizeBytes: number }>(
+    const res = await axios.post<{ base64: string }>(
       "http://localhost:5004/api/companies/file/base64",
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
@@ -240,8 +292,6 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
   };
 
   // ── Paso 2: base64 + contraseña → PEM ──
-  // Body: { cert: string, certPass: string }
-  // Respuesta: { pem: string, cer: string } — solo usamos pem
   const convertToPem = async (certBase64: string, password: string): Promise<string> => {
     const res = await axios.post<{ pem: string; cer: string }>(
       "http://localhost:5004/api/companies/certificate",
@@ -250,42 +300,48 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
     return res.data.pem;
   };
 
+  // ── Submit del modal ──
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!certFile) { showToast("Selecciona un archivo .pfx o .p12", "error"); return; }
-    if (!certPasswordInput) { showToast("Ingresa la contraseña del certificado", "error"); return; }
+    if (!certFile)         { showToast("Selecciona un archivo .pfx o .p12", "error"); return; }
+    if (!certPasswordInput){ showToast("Ingresa la contraseña del certificado", "error"); return; }
 
     setSaving(true);
     setStepError(null);
     setPemResult(null);
 
     try {
-      // ── Step 1: subir archivo a base64 ──
+      // Paso 1 — subir
       setStep("uploading");
       const base64 = await uploadToBase64(certFile);
       if (!base64) throw new Error("No se pudo obtener el base64 del archivo");
 
-      // ── Step 2: convertir a PEM ──
+      // Paso 2 — convertir
       setStep("converting");
       const pem = await convertToPem(base64, certPasswordInput);
       if (!pem) throw new Error("No se pudo obtener el PEM del certificado");
 
-      // ── Step 3: guardar en la empresa ──
-      setStep("saving" as typeof step);
+      // Paso 3 — guardar
+      setStep("saving");
       await axios.put(`http://localhost:5004/api/companies/${ruc}`, {
-        certificadoPem: pem,
+        certificadoPem:      pem,
         certificadoPassword: certPasswordInput,
       });
 
+      // Actualizar estado local para reflejar el nuevo certificado sin recargar la página
+      setCompany((prev) =>
+        prev
+          ? { ...prev, certificadoPem: pem, certificadoPassword: certPasswordInput }
+          : { certificadoPem: pem, certificadoPassword: certPasswordInput, environment: "produccion" },
+      );
+
       setPemResult(pem);
-      setCompany((prev) => prev ? { ...prev, certificadoPem: pem, certificadoPassword: certPasswordInput } : prev);
       setStep("done");
       showToast(hasCert ? "Certificado actualizado correctamente" : "Certificado cargado correctamente", "success");
     } catch (err: unknown) {
-      const msg =
-        axios.isAxiosError(err)
-          ? (err.response?.data?.message ?? err.response?.data ?? err.message)
-          : (err instanceof Error ? err.message : "Error desconocido");
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? err.response?.data ?? err.message)
+        : (err instanceof Error ? err.message : "Error desconocido");
       setStepError(typeof msg === "string" ? msg : JSON.stringify(msg));
       setStep("error");
       showToast("Error al procesar el certificado", "error");
@@ -294,70 +350,48 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
     }
   };
 
-  const details = [
-    ["RUC", ruc],
-    ["Tipo", hasCert ? "PFX / P12" : "—"],
-    ["Archivo", hasCert ? "Cargado" : "No cargado"],
-  ];
-
-  // ── Etiqueta del botón de submit según estado ──
+  // ── Etiqueta del botón submit ──
   const submitLabel = () => {
-    if (step === "uploading") return "Subiendo archivo...";
+    if (step === "uploading")  return "Subiendo archivo...";
     if (step === "converting") return "Convirtiendo a PEM...";
-    if (step === "saving") return "Guardando certificado...";
+    if (step === "saving")     return "Guardando certificado...";
     return hasCert ? "Actualizar Certificado" : "Cargar Certificado";
   };
 
-  // ── Vigencia bar helpers ──
-  const totalDays = (certExpiry.notBefore && certExpiry.notAfter)
-    ? Math.ceil((certExpiry.notAfter.getTime() - certExpiry.notBefore.getTime()) / 86400000)
-    : 0;
-  const elapsedDays = (certExpiry.notBefore && daysLeft !== null)
-    ? totalDays - daysLeft
-    : 0;
-  const barPct = totalDays > 0 ? Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100)) : 0;
-  const barColor = isExpired
-    ? "bg-rose-500"
-    : isExpiringSoon
-    ? "bg-amber-400"
-    : barPct > 75
-    ? "bg-orange-400"
-    : "bg-emerald-500";
-  const statusLabel = !hasCert
-    ? "Sin certificado"
-    : isExpired
-    ? "Vencido"
-    : isExpiringSoon
-    ? `Vence en ${daysLeft} días`
-    : `${daysLeft} días restantes`;
-  const statusColor = !hasCert
-    ? "text-gray-400"
-    : isExpired
-    ? "text-rose-600"
-    : isExpiringSoon
-    ? "text-amber-600"
-    : "text-emerald-600";
-
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <>
       <Card title="Certificado Digital (.pfx o .p12)" subtitle="Validación y vigencia">
         <div className="space-y-4">
-
           {loadingCompany ? (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+            /* Skeleton */
+            <div className="space-y-4 animate-pulse">
+              <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-3">
+                <div className="flex justify-between">
+                  <div className="h-3 w-16 bg-gray-200 rounded" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
+                </div>
+                <div className="h-2 w-full bg-gray-200 rounded-full" />
+                <div className="h-3 w-40 bg-gray-100 rounded" />
+              </div>
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex justify-between">
+                    <div className="h-3 w-12 bg-gray-100 rounded" />
+                    <div className="h-3 w-20 bg-gray-100 rounded" />
+                  </div>
+                ))}
+              </div>
+              <div className="h-9 bg-gray-100 rounded-xl" />
             </div>
           ) : (
             <>
-              {/* ── Barra de vigencia ── */}
+              {/* Barra de vigencia */}
               <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Vigencia</span>
-                  <span className={cn("text-xs font-semibold", statusColor)}>
-                    {statusLabel}
-                  </span>
+                  <span className={cn("text-xs font-semibold", statusColor)}>{statusLabel}</span>
                 </div>
-                {/* bar track */}
                 <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className={cn("h-full rounded-full transition-all duration-500", hasCert ? barColor : "bg-gray-200")}
@@ -371,17 +405,19 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
                 </p>
                 {isExpired && (
                   <div className="flex items-center gap-1.5 text-xs text-rose-600 font-semibold">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Este certificado ha vencido. Renuévalo para seguir emitiendo comprobantes.
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    Este certificado ha vencido. Renuévalo para seguir emitiendo comprobantes.
                   </div>
                 )}
                 {isExpiringSoon && !isExpired && (
                   <div className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Renueva tu certificado pronto para evitar interrupciones.
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    Renueva tu certificado pronto para evitar interrupciones.
                   </div>
                 )}
               </div>
 
-              {/* ── Detalles ── */}
+              {/* Detalles */}
               <div className="space-y-2">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Detalles del Certificado</p>
                 <div className="space-y-1.5">
@@ -396,7 +432,7 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
                 </div>
               </div>
 
-              {/* ── Botón ── */}
+              {/* Botón abrir modal */}
               <Button variant="outline" className="w-full" onClick={() => setIsModalOpen(true)}>
                 <Upload className="w-4 h-4" />
                 {hasCert ? "Actualizar Certificado" : "Subir Certificado"}
@@ -406,7 +442,7 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
         </div>
       </Card>
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
@@ -423,6 +459,7 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
 
           <FileDrop accept=".pfx,.p12" onFile={setCertFile} />
 
+          {/* Contraseña */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">Contraseña del Certificado</label>
             <div className="relative">
@@ -451,26 +488,26 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
             </p>
           </div>
 
-          {/* ── Indicador de progreso de pasos ── */}
+          {/* Indicador de pasos */}
           {(step === "uploading" || step === "converting" || step === "saving") && (
             <div className="p-3 rounded-xl border border-blue-100 bg-blue-50/60 flex items-center gap-3 text-xs text-blue-700">
               <Loader2 className="w-4 h-4 animate-spin shrink-0" />
               <div>
                 <p className="font-semibold">
-                  {step === "uploading" ? "Paso 1/3 — Subiendo archivo..." : step === "converting" ? "Paso 2/3 — Convirtiendo a PEM..." : "Paso 3/3 — Guardando certificado..."}
+                  {step === "uploading"  ? "Paso 1/3 — Subiendo archivo..."      :
+                   step === "converting" ? "Paso 2/3 — Convirtiendo a PEM..."    :
+                                          "Paso 3/3 — Guardando certificado..."}
                 </p>
                 <p className="text-blue-500 mt-0.5">
-                  {step === "uploading"
-                    ? "Enviando el archivo .pfx al servidor."
-                    : step === "converting"
-                    ? "Extrayendo certificado en formato PEM."
-                    : "Guardando el certificado en tu empresa."}
+                  {step === "uploading"  ? "Enviando el archivo .pfx al servidor."     :
+                   step === "converting" ? "Extrayendo certificado en formato PEM."    :
+                                          "Guardando el certificado en tu empresa."}
                 </p>
               </div>
             </div>
           )}
 
-          {/* ── Error ── */}
+          {/* Error */}
           {step === "error" && stepError && (
             <div className="p-3 rounded-xl border border-rose-100 bg-rose-50 flex gap-2 text-xs text-rose-700">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -481,19 +518,15 @@ export function CertificadoDigitalCard({ ruc }: { ruc: string }) {
             </div>
           )}
 
-          {/* ── PEM resultado ── */}
-          {step === "done" && pemResult && (
-            <PemDisplay pem={pemResult} />
-          )}
+          {/* PEM resultado */}
+          {step === "done" && pemResult && <PemDisplay pem={pemResult} />}
 
           <div className="pt-4 flex justify-end gap-3">
             <Button variant="outline" type="button" onClick={closeModal}>
               Cancelar
             </Button>
             <Button type="submit" disabled={saving || step === "done"}>
-              {saving
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Upload className="w-4 h-4" />}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {submitLabel()}
             </Button>
           </div>
