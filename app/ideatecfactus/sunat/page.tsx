@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import {
-  Zap, ShieldCheck,
+  ShieldCheck,
   Eye, EyeOff, ChevronDown,
   Info, AlertTriangle, Loader2
 } from 'lucide-react';
@@ -156,7 +156,7 @@ function InfoBanner({ children, variant = 'info' }: { children: React.ReactNode;
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SunatPage() {
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { user, setEnvironment } = useAuth(); // 👈 desestructura setEnvironment
 
   const [config, setConfig] = useState<Config>({
     solUser: '',
@@ -167,17 +167,14 @@ export default function SunatPage() {
     saved: false,
   });
 
-  // ── Datos de la empresa para CertificadoDigitalCard ──
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [loadingCompany, setLoadingCompany] = useState(true);
-
-  const [testingSol, setTestingSol] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
 
   const upd = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setConfig((c) => ({ ...c, [key]: e.target.value, saved: false }));
 
-  // ── Fetch único al montar: carga datos y autorellena el form ──
+  // ── Fetch inicial ──
   useEffect(() => {
     if (!user?.ruc) return;
 
@@ -187,14 +184,12 @@ export default function SunatPage() {
         const res = await axios.get(`http://localhost:5004/api/companies/${user.ruc}`);
         const data = res.data;
 
-        // Datos para CertificadoDigitalCard (evita doble fetch)
         setCompanyData({
           certificadoPem: data.certificadoPem ?? null,
           certificadoPassword: data.certificadoPassword ?? null,
           environment: data.environment ?? 'produccion',
         });
 
-        // Autorrellenar form si ya hay credenciales guardadas
         setConfig({
           solUser:      data.solUsuario    ?? '',
           solPassword:  data.solClave      ?? '',
@@ -213,13 +208,11 @@ export default function SunatPage() {
     fetchCompany();
   }, [user?.ruc]);
 
-
-  // ── Guardar: PUT solo con los campos del form ──
+  // ── Guardar ──
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingConfig(true);
     try {
-      // Campos vacíos se envían como null para limpiarlos en el backend
       const body = {
         solUsuario:   config.solUser     || null,
         solClave:     config.solPassword || null,
@@ -230,6 +223,9 @@ export default function SunatPage() {
 
       await axios.put(`http://localhost:5004/api/companies/${user!.ruc}`, body);
 
+      // 👇 Actualiza el environment en el contexto global → Topbar reacciona al instante
+      setEnvironment(config.environment);
+
       setConfig((c) => ({ ...c, saved: true }));
       showToast('Configuración guardada correctamente', 'success');
     } catch {
@@ -239,7 +235,7 @@ export default function SunatPage() {
     }
   };
 
-  // ── Limpiar form ──
+  // ── Limpiar ──
   const handleClear = () => {
     setConfig((c) => ({
       ...c,
@@ -255,11 +251,8 @@ export default function SunatPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      {/* Estado conexión + certificado */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <EstadoConexionSunatCard className="lg:col-span-2" />
-
-        {/* Certificado Digital — recibe datos ya cargados, no hace fetch propio */}
         <CertificadoDigitalCard
           ruc={user?.ruc ?? ''}
           initialData={companyData}
@@ -267,7 +260,6 @@ export default function SunatPage() {
         />
       </div>
 
-      {/* ── Formulario de configuración ── */}
       <form onSubmit={handleSaveConfig} className="space-y-4">
 
         {/* Entorno */}
@@ -309,7 +301,7 @@ export default function SunatPage() {
           </div>
         </div>
 
-        {/* Credenciales SOL — obligatorio */}
+        {/* Credenciales SOL */}
         <CollapsibleSection
           defaultOpen
           title="Credenciales SOL"
@@ -321,7 +313,6 @@ export default function SunatPage() {
           }
         >
           <div className="space-y-4">
-            {/* Skeleton mientras carga */}
             {loadingCompany ? (
               <div className="space-y-3 animate-pulse">
                 <div className="h-10 bg-gray-100 rounded-xl" />
@@ -350,13 +341,12 @@ export default function SunatPage() {
                     hint="Clave de acceso a los servicios en línea de SUNAT"
                   />
                 </div>
-          
               </>
             )}
           </div>
         </CollapsibleSection>
 
-        {/* Guía de Remisión Electrónica — opcional */}
+        {/* Guía de Remisión */}
         <CollapsibleSection
           title="Guía de Remisión Electrónica"
           subtitle="Client ID y Client Secret requeridos solo para emitir Guías de Remisión Electrónicas"
@@ -399,7 +389,7 @@ export default function SunatPage() {
           </div>
         </CollapsibleSection>
 
-        {/* Botones guardar */}
+        {/* Botones */}
         <div className="flex justify-end gap-3 pt-2">
           <Button
             type="button"

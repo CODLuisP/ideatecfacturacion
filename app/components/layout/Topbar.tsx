@@ -12,6 +12,7 @@ import {
   Info,
   Globe,
   MapPin,
+  FlaskConical,
 } from "lucide-react";
 import { View } from "@/app/types";
 import { signOut } from "next-auth/react";
@@ -63,6 +64,7 @@ export const Topbar = ({
 
   const { user } = useAuth();
   const isSuperAdmin = user?.username === "superAdminOpen";
+  const isBeta = user?.environment === "beta";
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -79,12 +81,23 @@ export const Topbar = ({
 
   return (
     <>
-      <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40">
+      {/* ── Header principal ── */}
+      <header
+        className={`h-16 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 border-b transition-colors ${
+          isBeta
+            ? "bg-amber-50 border-amber-300"
+            : "bg-white border-gray-100"
+        }`}
+      >
         {/* Left */}
         <div className="flex items-center gap-3">
           <button
             onClick={toggleSidebar}
-            className="p-2 hover:bg-gray-50 rounded-lg text-gray-400 transition-colors"
+            className={`p-2 rounded-lg transition-colors ${
+              isBeta
+                ? "hover:bg-amber-100 text-amber-600"
+                : "hover:bg-gray-50 text-gray-400"
+            }`}
           >
             {isSidebarOpen ? (
               <Menu className="w-5 h-5" />
@@ -107,13 +120,17 @@ export const Topbar = ({
         <div className="flex items-center gap-3">
 
           {/* ── Context badge ── */}
-          <div className="flex items-center gap-2 px-3 py-2 ">
+          <div className="flex items-center gap-2 px-3 py-2">
             {/* Empresa */}
             <div className="flex flex-col leading-none">
               <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">
                 Empresa
               </span>
-              <span className="text-xs font-black text-blue-900 uppercase tracking-wide mt-0.5">
+              <span
+                className={`text-xs font-black uppercase tracking-wide mt-0.5 ${
+                  isBeta ? "text-amber-800" : "text-blue-900"
+                }`}
+              >
                 {user?.nombreEmpresa}
               </span>
             </div>
@@ -122,12 +139,16 @@ export const Topbar = ({
             {!isSuperAdmin && user?.nombreSucursal && (
               <>
                 <div className="w-px h-7 bg-gray-200 mx-1" />
-                <MapPin className="w-4 h-4 text-blue-700 shrink-0" />
+                <MapPin
+                  className={`w-4 h-4 shrink-0 ${
+                    isBeta ? "text-amber-600" : "text-blue-700"
+                  }`}
+                />
                 <div className="flex flex-col leading-none">
                   <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">
                     Sucursal
                   </span>
-                  <span className="text-xs font-bold text-gray-800 mt-0.5  truncate">
+                  <span className="text-xs font-bold text-gray-800 mt-0.5 truncate">
                     {user.nombreSucursal}
                   </span>
                 </div>
@@ -158,9 +179,19 @@ export const Topbar = ({
                 setNotifOpen((v) => !v);
                 setUserOpen(false);
               }}
-              className="p-2.5 hover:bg-gray-50 rounded-xl text-gray-400 relative group transition-all"
+              className={`p-2.5 rounded-xl relative group transition-all ${
+                isBeta
+                  ? "hover:bg-amber-100 text-amber-500"
+                  : "hover:bg-gray-50 text-gray-400"
+              }`}
             >
-              <Bell className="w-5 h-5 group-hover:text-blue-600 transition-colors" />
+              <Bell
+                className={`w-5 h-5 transition-colors ${
+                  isBeta
+                    ? "group-hover:text-amber-700"
+                    : "group-hover:text-blue-600"
+                }`}
+              />
               {unreadCount > 0 && (
                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
               )}
@@ -222,7 +253,9 @@ export const Topbar = ({
                 setUserOpen((v) => !v);
                 setNotifOpen(false);
               }}
-              className="flex items-center gap-2.5 hover:bg-gray-50 rounded-xl px-2 py-1.5 transition-all group"
+              className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-all group ${
+                isBeta ? "hover:bg-amber-100" : "hover:bg-gray-50"
+              }`}
             >
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-gray-900 leading-none">
@@ -236,7 +269,13 @@ export const Topbar = ({
                       : user?.rol}
                 </p>
               </div>
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-gray-200 group-hover:border-gray-300 transition-colors shrink-0">
+              <div
+                className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 ${
+                  isBeta
+                    ? "border-amber-300 group-hover:border-amber-400"
+                    : "border-gray-200 group-hover:border-gray-300"
+                }`}
+              >
                 <img
                   src="https://picsum.photos/seed/user/100/100"
                   alt="Avatar"
@@ -267,6 +306,12 @@ export const Topbar = ({
                     <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
                       <Globe className="w-2.5 h-2.5" />
                       Acceso Global
+                    </span>
+                  )}
+                  {isBeta && (
+                    <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      <FlaskConical className="w-2.5 h-2.5" />
+                      Entorno Beta
                     </span>
                   )}
                 </div>
@@ -307,6 +352,23 @@ export const Topbar = ({
           </div>
         </div>
       </header>
+
+      {/* ── Banner de advertencia Beta ── */}
+      {isBeta && (
+        <div className="sticky top-16 z-30 bg-amber-400 border-b border-amber-500 px-6 py-2 flex items-center gap-3">
+          <FlaskConical className="w-4 h-4 text-amber-900 shrink-0" />
+          <span className="bg-amber-800 text-amber-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
+            Beta
+          </span>
+          <p className="text-amber-900 text-xs font-medium">
+            Estás en el entorno de pruebas —{" "}
+            <strong className="font-bold">
+              No emitas comprobantes reales a SUNAT.
+            </strong>{" "}
+            Los documentos generados aquí no tienen validez tributaria.
+          </p>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes fade-in {
