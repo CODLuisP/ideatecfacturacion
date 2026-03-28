@@ -43,28 +43,32 @@ export default function AgregarProducto({
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [productoExistente, setProductoExistente] = React.useState<ProductoBase | null>(null);
 
-  // sugerencias del buscador
   const [sugerencias, setSugerencias] = React.useState<ProductoBase[]>([]);
   const [showSugerencias, setShowSugerencias] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  // ─── NUEVO: estado de errores ─────────────────────────────
+  const [errors, setErrors] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     if (isOpen) {
       setForm({ ...emptyForm, sucursalId });
+      setErrors({});
     } else {
       setForm({ ...emptyForm, sucursalId });
       setProductoExistente(null);
       setSugerencias([]);
       setShowSugerencias(false);
+      setErrors({});
     }
   }, [isOpen, sucursalId]);
 
-  // ─── Búsqueda en productosBase mientras escribe ───────────
   const handleNomProductoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setForm((prev) => ({ ...prev, nomProducto: value }));
-    setProductoExistente(null); // limpiar autocompletado si edita
+    setProductoExistente(null);
+    // ─── limpiar error ───
+    if (errors.nomProducto) setErrors((prev) => ({ ...prev, nomProducto: false }));
 
     if (value.trim().length === 0) {
       setSugerencias([]);
@@ -79,7 +83,6 @@ export default function AgregarProducto({
     setShowSugerencias(matches.length > 0);
   };
 
-  // ─── Al seleccionar una sugerencia: autocompletar ─────────
   const handleSeleccionarSugerencia = (prod: ProductoBase) => {
     setProductoExistente(prod);
     setForm((prev) => ({
@@ -92,7 +95,6 @@ export default function AgregarProducto({
       tipoAfectacionIGV: prod.tipoAfectacionIGV,
       incluirIGV: prod.incluirIGV,
       categoriaId: prod.categoria?.categoriaId ?? 0,
-      // stock y precioUnitario se mantienen en 0 para que el usuario los ingrese
     }));
     setSugerencias([]);
     setShowSugerencias(false);
@@ -118,14 +120,46 @@ export default function AgregarProducto({
         }));
         return;
       }
+      if (field === "tipoProducto") {
+        setForm((prev) => ({
+          ...prev,
+          tipoProducto: value as string,
+          stock: value === "SERVICIO" ? null : prev.stock ?? 0,
+        }));
+        return;
+      }
+      // ─── limpiar error al escribir ───
+      if (errors[field]) setErrors((prev) => ({ ...prev, [field]: false }));
+
       setForm((prev) => ({ ...prev, [field]: value }));
     };
 
+  // ─── NUEVO: función de validación ────────────────────────
+  const validar = (): boolean => {
+    const newErrors: Record<string, boolean> = {};
+    const soloSucursal = !!productoExistente;
+
+    if (!form.nomProducto.trim()) newErrors.nomProducto = true;
+    if (form.precioUnitario <= 0) newErrors.precioUnitario = true;
+
+    if (!soloSucursal) {
+      if (!form.codigo.trim()) newErrors.codigo = true;
+      if (form.categoriaId === 0) newErrors.categoriaId = true;
+    }
+
+    if (form.tipoProducto !== "SERVICIO" && (form.stock == null || form.stock < 0))
+      newErrors.stock = true;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return; // doble protección
+    if (!validar()) return; // ─── NUEVO: corta si hay errores
+    if (isSubmitting) return;
     setIsSubmitting(true);
-
+    console.log("producto a enviar: ", form);
     try {
       const response = await axios.post<ProductoSucursal>(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Producto`,
@@ -152,10 +186,9 @@ export default function AgregarProducto({
     } finally {
       setIsSubmitting(false);
     }
-
   };
 
-  const soloSucursal = !!productoExistente; // si autocompletó, solo pide stock y precio
+  const soloSucursal = !!productoExistente;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Registrar Nuevo Producto">
@@ -167,8 +200,8 @@ export default function AgregarProducto({
             label="Nombre del Producto"
             value={form.nomProducto}
             onChange={handleNomProductoChange}
-            placeholder='Buscar o escribir nombre...'
-            required
+            placeholder="Buscar o escribir nombre..."
+            showError={!!errors.nomProducto}
           />
           {showSugerencias && (
             <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
@@ -191,7 +224,7 @@ export default function AgregarProducto({
           )}
         </div>
 
-        {/* ── Campos base (ocultos si ya existe en tabla base) ── */}
+        {/* ── Campos base ── */}
         {!soloSucursal && (
           <>
             <div className="grid grid-cols-2 gap-4">
@@ -207,12 +240,20 @@ export default function AgregarProducto({
                 </select>
               </div>
 
+              {/* ── Categoría con error ── */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase">Categoría</label>
+                <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                  Categoría <span className="text-rose-500">*</span>
+                </label>
                 <select
                   value={form.categoriaId}
-                  onChange={handleFormChange("categoriaId")}
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"
+                  onChange={(e) => {
+                    handleFormChange("categoriaId")(e);
+                    if (errors.categoriaId) setErrors((prev) => ({ ...prev, categoriaId: false }));
+                  }}
+                  className={`w-full px-4 py-2 bg-gray-50 border rounded-xl outline-none focus:border-brand-blue ${
+                    errors.categoriaId ? "border-rose-400" : "border-gray-200"
+                  }`}
                 >
                   <option value={0}>Seleccione categoría</option>
                   {categorias.map((cat) => (
@@ -221,6 +262,9 @@ export default function AgregarProducto({
                     </option>
                   ))}
                 </select>
+                {errors.categoriaId && (
+                  <p className="text-xs text-rose-500 font-medium">Campo obligatorio</p>
+                )}
               </div>
             </div>
 
@@ -263,25 +307,34 @@ export default function AgregarProducto({
               <InputBase
                 label="Código"
                 value={form.codigo}
-                onChange={handleFormChange("codigo")}
+                onChange={(e) => {
+                  handleFormChange("codigo")(e);
+                  if (errors.codigo) setErrors((prev) => ({ ...prev, codigo: false }));
+                }}
                 placeholder="PROD-001"
+                showError={!!errors.codigo}
               />
             </div>
           </>
         )}
 
-        {/* ── Stock y Precio (siempre visibles) ── */}
+        {/* ── Stock y Precio ── */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <InputBase
               label="Precio Unitario"
               type="number"
               value={String(form.precioUnitario)}
-              onChange={handleFormChange("precioUnitario")}
+              onChange={(e) => {
+                handleFormChange("precioUnitario")(e);
+                if (errors.precioUnitario) setErrors((prev) => ({ ...prev, precioUnitario: false }));
+              }}
               placeholder="0.00"
               step="0.01"
+              showError={!!errors.precioUnitario}
+              errorMessage="Debe ser mayor a 0"
             />
-            {(form.tipoAfectacionIGV === "10") && (
+            {form.tipoAfectacionIGV === "10" && (
               <div className="flex items-center gap-2 pl-1">
                 <input
                   type="checkbox"
@@ -296,13 +349,19 @@ export default function AgregarProducto({
             )}
           </div>
 
-          <InputBase
-            label="Stock"
-            type="number"
-            value={String(form.stock)}
-            onChange={handleFormChange("stock")}
-            placeholder="0"
-          />
+          {form.tipoProducto !== "SERVICIO" && (
+            <InputBase
+              label="Stock"
+              type="number"
+              value={String(form.stock ?? 0)}
+              onChange={(e) => {
+                handleFormChange("stock")(e);
+                if (errors.stock) setErrors((prev) => ({ ...prev, stock: false }));
+              }}
+              placeholder="0"
+              showError={!!errors.stock}
+            />
+          )}
         </div>
 
         <div className="pt-4 flex justify-end gap-3">

@@ -14,7 +14,7 @@ export function useClienteBoleta() {
 
     try {
       // 2. Si no está en BD, buscar en API SUNAT según tipo doc
-      if (tipoDoc === '1') {
+      if (tipoDoc === '01') {
         // DNI
         const res = await fetch(
           `https://dniruc.apisperu.com/api/v1/dni/${numeroDoc}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
@@ -22,7 +22,7 @@ export function useClienteBoleta() {
         const data = await res.json()
         if (data.success) {
           setCliente({
-            clienteId: 0,
+            clienteId: null,
             tipoDocumento: tipoDoc,
             numeroDocumento: numeroDoc,
             razonSocial: `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`,
@@ -33,7 +33,7 @@ export function useClienteBoleta() {
             distrito: '',
           })
         }
-      } else if (tipoDoc === '6') {
+      } else if (tipoDoc === '06') {
         // RUC
         const res = await fetch(
           `https://dniruc.apisperu.com/api/v1/ruc/${numeroDoc}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
@@ -41,7 +41,7 @@ export function useClienteBoleta() {
         const data = await res.json()
         if (data.ruc) {
           setCliente({
-            clienteId: 0,
+            clienteId: null,
             tipoDocumento: tipoDoc,
             numeroDocumento: numeroDoc,
             razonSocial: data.razonSocial ?? '',

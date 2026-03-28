@@ -1,5 +1,5 @@
 export interface BoletaCliente {
-  clienteId: number
+  clienteId: number | null 
   tipoDocumento: string
   numeroDocumento: string
   razonSocial: string
@@ -27,8 +27,8 @@ export interface BoletaDetalle {
   //detalleId: number
   //comprobanteId: number
   item: number
-  productoId: number
-  codigo: string
+  productoId: number | null
+  codigo: string | null
   descripcion: string
   cantidad: number
   unidadMedida: string
@@ -62,9 +62,9 @@ export interface BoletaCuota {
   numeroCuota: string
   monto: number
   fechaVencimiento: string
-  montoPagado: string
-  fechaPago: string
-  estado: string
+  //montoPagado: string
+  //fechaPago: string
+  //estado: string
 }
 
 export interface BoletaLegend {
