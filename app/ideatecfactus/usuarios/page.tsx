@@ -4,7 +4,6 @@ import {
   Shield,
   Mail,
   Search,
-  Lock,
   UserPlus,
   Trash2,
   Edit2,
@@ -179,6 +178,11 @@ export default function UsuariosPage() {
                       <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors">
                         {u.username}
                       </h4>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {u.rol === "superadmin"
+                          ? "Global"
+                          : `Sucursal: ${u.nombreSucursal ?? "Sin sucursal"}`}
+                      </p>
                       <Badge
                         variant={u.rol === "admin" ? "default" : "info"}
                         className="mt-1"
