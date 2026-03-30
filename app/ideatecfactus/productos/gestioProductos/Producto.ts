@@ -8,7 +8,7 @@ export interface Categoria {
 export interface SucursalProducto {
   sucursalProductoId: number;
   precioUnitario: number;
-  stock: number;
+  stock: number | null;
 }
 
 // ─── Producto Base (sin datos de sucursal) ───────────────────
@@ -43,7 +43,7 @@ export interface NuevoProducto {
   categoriaId: number;
   sucursalId: number;
   precioUnitario: number;
-  stock: number;
+  stock: number | null;
 }
 
 // ─── Para editar producto (PUT) ───────────────────────────────
@@ -59,5 +59,5 @@ export interface EditProducto {
   categoriaId: number;
   sucursalProductoId: number;
   precioUnitario: number;
-  stock: number;
+  stock: number | null;
 }

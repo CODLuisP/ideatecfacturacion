@@ -18,11 +18,16 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-const formatDireccion = (direcciones: Direccion[]): string => {
+const formatDireccion = (direcciones: Direccion[], tipoDocumentoId: string): string => {
   if (!direcciones || direcciones.length === 0) return 'Sin dirección';
   const d = direcciones[0];
+
+  if (tipoDocumentoId === "06") {
+    return d.direccionLineal || 'Sin dirección';
+  }
+
   const partes = [d.direccionLineal, d.distrito, d.provincia, d.departamento].filter(Boolean);
-  return partes.length > 0 ? partes.join(' - ') : 'Sin dirección';
+  return partes.length > 0 ? partes.join('  ') : 'Sin dirección';
 };
 
 const formatFecha = (fecha: string | null): string => {
@@ -41,8 +46,8 @@ export default function ClientesPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
   //  TODO: reemplazar con el empresaruc real del contexto/sesión
-  const EMPRESA_RUC = "20331066703";
-  const SUCURSAL_ID = 5;
+  const EMPRESA_RUC = "20601737583";
+  const SUCURSAL_ID = 1;
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,6 +174,18 @@ export default function ClientesPage() {
         if (nuevoCliente.telefono) {
           payload.telefono = nuevoCliente.telefono;
         }
+        const d = nuevoCliente.direccion;
+        const tieneDireccion = d.direccionLineal || d.distrito || d.provincia || d.departamento || d.ubigeo;
+        if (tieneDireccion) {
+          payload.direccion = {
+            ubigeo: d.ubigeo,
+            direccionLineal: d.direccionLineal,
+            departamento: d.departamento,
+            provincia: d.provincia,
+            distrito: d.distrito,
+            tipoDireccion: d.tipoDireccion
+          };
+        }
       }
 
       // ── RUC ──
@@ -188,6 +205,7 @@ export default function ClientesPage() {
           }
         };
       }
+      console.log("payload a enviar:", JSON.stringify(payload, null, 2));
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`, payload);
       showToast('Cliente guardado exitosamente', 'success');
       setClientes(prev => [response.data, ...prev]);
@@ -400,8 +418,8 @@ export default function ClientesPage() {
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-900">{client.razonSocialNombre}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{client.nombreComercial ?? '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 " title={formatDireccion(client.direccion)}>
-                    {formatDireccion(client.direccion)}
+                  <td className="px-6 py-4 text-sm text-gray-600" title={formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}>
+                    {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{client.correo ?? '-'}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{client.telefono ?? '-'}</td>

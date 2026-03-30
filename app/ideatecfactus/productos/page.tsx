@@ -209,10 +209,15 @@ export default function ProductosPage() {
             <div className="mt-6 flex items-end justify-between">
               <div>
                 <p className="text-xs text-gray-400 uppercase font-bold">Stock</p>
-                {/*prod.sucursalProducto.stock */}
                 <p className={cn("text-lg font-bold", prod.sucursalProducto.stock === 0 ? "text-rose-500" : "text-gray-900")}>
-                  {prod.sucursalProducto.stock}{" "}
-                  <span className="text-xs font-normal text-gray-400">unid.</span>
+                  {prod.tipoProducto === "SERVICIO" || prod.sucursalProducto.stock === null ? (
+                    "N/A"
+                  ) : (
+                    <>
+                      {prod.sucursalProducto.stock}{" "}
+                      <span className="text-xs font-normal text-gray-400">unid.</span>
+                    </>
+                  )}
                 </p>
               </div>
 

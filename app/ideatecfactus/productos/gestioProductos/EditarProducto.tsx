@@ -96,6 +96,15 @@ export default function EditarProducto({
         return;
       }
 
+      if (field === "tipoProducto") {
+        setForm((prev) => ({
+          ...prev,
+          tipoProducto: value as string,
+          stock: value === "SERVICIO" ? null : prev.stock ?? 0,
+        }));
+        return;
+      }
+
       setForm((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -113,7 +122,7 @@ export default function EditarProducto({
       return;
     }
 
-    if (form.stock < 0) {
+    if (form.tipoProducto !== "SERVICIO" && (form.stock ?? 0) < 0) {
       showToast("El stock no puede ser negativo.", "info");
       return;
     }
@@ -316,13 +325,15 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
           )}
         </div>
 
-        <InputBase
-          label="Stock"
-          type="number"
-          value={String(form.stock)}
-          onChange={onChange("stock")}
-          placeholder="0"
-        />
+        {form.tipoProducto !== "SERVICIO" && (
+          <InputBase
+            label="Stock"
+            type="number"
+            value={String(form.stock ?? 0)}
+            onChange={onChange("stock")}
+            placeholder="0"
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
