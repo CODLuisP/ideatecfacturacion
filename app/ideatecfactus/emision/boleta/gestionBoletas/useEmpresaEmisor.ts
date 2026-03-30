@@ -1,23 +1,26 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { BoletaCompany } from './Boleta'
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/app/components/ui/Toast';
 
-export function useEmpresaEmisor(ruc: string | undefined) {
+export function useEmpresaEmisor() {
+  const { showToast } = useToast();
+  const { accessToken, user } = useAuth();
   const [empresa, setEmpresa] = useState<BoletaCompany | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loadingEmpresa, setLoadingEmpresa] = useState(false)
 
-  useEffect(() => {
-    if (!ruc) return
-
-    const fetchEmpresa = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/${ruc}`)
-        const data = response.data
-
-        const empresaFiltrada: BoletaCompany = {
+  const fetchEmpresa = async () => {
+    setLoadingEmpresa(true)
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/companies/${user?.ruc}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      )
+      const data = res.data
+      setEmpresa({
         empresaId: data.id,
         numeroDocumento: data.ruc,
         razonSocial: data.razonSocial,
@@ -28,19 +31,17 @@ export function useEmpresaEmisor(ruc: string | undefined) {
         departamento: data.departamento,
         distrito: data.distrito,
         establecimientoAnexo: "0000"
-        }
-
-        setEmpresa(empresaFiltrada)
-      } catch (err) {
-        setError('Error al obtener los datos de la empresa')
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+      })
+    } catch {
+      showToast("Error al obtener los datos de la empresa", "error");
+    } finally {
+      setLoadingEmpresa(false)
     }
+  }
 
-    fetchEmpresa()
-  }, [ruc])
+  useEffect(() => {
+    if (accessToken) fetchEmpresa()
+  }, [accessToken])
 
-  return { empresa, loading, error }
+  return { empresa, loadingEmpresa }
 }

@@ -6,6 +6,7 @@ import { Modal } from "@/app/components/ui/Modal";
 import { Cliente, Direccion } from "./Cliente";
 import { useToast } from "@/app/components/ui/Toast";
 import { ChevronDown } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   cliente: Cliente;
@@ -19,6 +20,7 @@ export const EditarClienteModal: React.FC<Props> = ({
   onSave,
 }) => {
   const { showToast } = useToast();
+  const { accessToken, user } = useAuth();
   const [form, setForm] = useState<Cliente>({ ...cliente });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mostrarDireccion, setMostrarDireccion] = useState(
@@ -80,7 +82,10 @@ export const EditarClienteModal: React.FC<Props> = ({
 
       await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/${form.clienteId}`,
-        payloadCliente
+        payloadCliente,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
       );
 
       // ─── Dirección para cualquier tipo de documento ───
@@ -103,13 +108,17 @@ export const EditarClienteModal: React.FC<Props> = ({
             // ya existe → PUT
             await axios.put(
               `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion/${d.direccionId}`,
-              { ...payloadDireccion, direccionId: d.direccionId }
-            );
+              { ...payloadDireccion, direccionId: d.direccionId },
+              { headers: { Authorization: `Bearer ${accessToken}` } 
+            }
+          );
           } else {
             // nueva dirección → POST
             await axios.post(
               `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion`,
-              { ...payloadDireccion, clienteId: form.clienteId }
+                { ...payloadDireccion, clienteId: form.clienteId },
+                { headers: { Authorization: `Bearer ${accessToken}` } 
+              }
             );
           }
         }

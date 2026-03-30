@@ -7,6 +7,7 @@ import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { Categoria, NuevoProducto, ProductoBase, ProductoSucursal } from "./Producto";
 import { useToast } from "@/app/components/ui/Toast";
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export default function AgregarProducto({
   sucursalId,
 }: Props) {
   const { showToast } = useToast();
+  const { accessToken, user } = useAuth();
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [productoExistente, setProductoExistente] = React.useState<ProductoBase | null>(null);
 
@@ -95,6 +97,7 @@ export default function AgregarProducto({
       tipoAfectacionIGV: prod.tipoAfectacionIGV,
       incluirIGV: prod.incluirIGV,
       categoriaId: prod.categoria?.categoriaId ?? 0,
+      stock: prod.tipoProducto === "SERVICIO" ? null : 0,
     }));
     setSugerencias([]);
     setShowSugerencias(false);
@@ -162,8 +165,11 @@ export default function AgregarProducto({
     console.log("producto a enviar: ", form);
     try {
       const response = await axios.post<ProductoSucursal>(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Producto`,
-        form
+        `${process.env.NEXT_PUBLIC_API_URL}/api/productos`,
+        form, 
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
       );
       showToast("Producto guardado exitosamente.", "success");
       onProductoAgregado(response.data);

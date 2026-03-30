@@ -24,10 +24,10 @@ const SUCURSAL_ID = 1;
 
 export default function ProductosPage() {
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
 
-  const { productosBase } = useProductosBaseDisponiblesLista(SUCURSAL_ID);
-  const { productosSucursal, loadingSucursal, setProductosSucursal } = useProductosSucursal(SUCURSAL_ID);
+  const { productosBase } = useProductosBaseDisponiblesLista();
+  const { productosSucursal, loadingSucursal, setProductosSucursal } = useProductosSucursal();
 
   const { categorias } = useCategoriasLista()
 
@@ -71,24 +71,34 @@ export default function ProductosPage() {
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${deleteTarget.productoId}`);
-      showToast('Producto elimnado correctamente.', 'success');
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/${deleteTarget.productoId}`,  
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      showToast('Producto eliminado correctamente.', 'success');
       setProductosSucursal((prev) =>
         prev.filter((p) => p.productoId !== deleteTarget.productoId)
       );
       setDeleteTarget(null);
       setIsDeleteOpen(false);
     } catch (error) {
-      console.error("Error al eliminar producto:", error); // para el dev
+      console.error("Error al eliminar producto:", error);
 
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status;
-
+    if (axios.isAxiosError(error)) {
+      if (!error.response) {
+        // Sin conexión o API no responde
+        showToast("Sin conexión. Verifica tu internet e intenta nuevamente.", "error");
+      } else {
+        const status = error.response.status;
         if (status === 404) {
           showToast("No se encontró el producto a eliminar.", "error");
+        } else if (status === 403) {
+          showToast("No tienes permisos para eliminar este producto.", "error");
         } else {
           showToast("No se pudo eliminar el producto. Intenta nuevamente.", "error");
         }
+      }
       } else {
         showToast("Error inesperado. Intenta nuevamente.", "error");
       }
