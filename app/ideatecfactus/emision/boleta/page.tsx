@@ -8,7 +8,6 @@ import { useEmpresaEmisor } from './gestionBoletas/useEmpresaEmisor';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Boleta, BoletaCliente, BoletaDetalle, BoletaPago, BoletaCuota, BoletaGuia } from './gestionBoletas/Boleta';
 import { useClienteBoleta } from './gestionBoletas/useClienteBoleta';
-import { useClientesLista } from './gestionBoletas/useClientesLista';
 import { Cliente } from '../../clientes/gestionClientes/Cliente';
 import { useSucursal } from './gestionBoletas/useSucursal';
 import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
@@ -17,11 +16,15 @@ import { useProductosSucursal } from '../../productos/gestioProductos/useProduct
 import axios from 'axios';
 import { numeroALetras } from '@/app/components/ui/numeroALetras';
 import { useToast } from '@/app/components/ui/Toast';
+import { useClientesRuc } from '../../clientes/gestionClientes/useClientesRuc';
 
 interface DetalleLocal extends Partial<BoletaDetalle> {
   _incluirIGV?: boolean
   _precioBase?: number
   _precioVentaConIGV?: number // precio con IGV que se muestra y edita
+  _sucursalProductoId?: number
+  _tipoProducto?: string | null
+  _stockDisponible?: number | null
 }
 
 interface PagoLocal {
@@ -35,17 +38,15 @@ interface PagoLocal {
 export default function BoletaPage() {
   const { showToast } = useToast();
   const router = useRouter();
-  const { user } = useAuth();
-  const RUC = "20601737583";
-  const SUCURSAL_ID = 1;
-  const IGV_DEFAULT = 10.5 
+  const { accessToken, user } = useAuth();
+  const IGV_DEFAULT = 18 
 
-  const { empresa } = useEmpresaEmisor(RUC ?? '');
+  const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } = useClienteBoleta();
-  const { clientes, loadingLista } = useClientesLista(RUC ?? "");
-  const { sucursal } = useSucursal(SUCURSAL_ID);
+    const { clientes, setClientes, loadingClientes } = useClientesRuc();
+  const { sucursal } = useSucursal();
   const [correlativoActual, setCorrelativoActual] = useState<number | null>(null);
-  const { productosSucursal } = useProductosSucursal(SUCURSAL_ID);
+  const { productosSucursal } = useProductosSucursal();
 
   const { fecha, fechaHora } = formatoFechaActual();
 
@@ -60,18 +61,31 @@ export default function BoletaPage() {
   const [errorEmision, setErrorEmision] = useState<string | null>(null)
 
   const emitirComprobante = async () => {
-  // ✅ validaciones antes de emitir
-  if (!detalles.length) {
-    showToast('Debe agregar al menos un ítem', 'error')
-    return
-  }
+    // validaciones existentes
+    if (!detalles.length) {
+      showToast('Debe agregar al menos un ítem', 'error')
+      return
+    }
+
+    // ✅ validar cliente
+    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) {
+      showToast('Debe seleccionar o ingresar un cliente', 'error')
+      return
+    }
+
+    // ✅ validar que todos los ítems tengan descripción
+    const itemSinDescripcion = detalles.findIndex(d => !d.descripcion || d.descripcion.trim() === '')
+    if (itemSinDescripcion !== -1) {
+      showToast(`El ítem ${itemSinDescripcion + 1} no tiene descripción o producto`, 'error')
+      return
+    }
   setEmitiendo(true)
   setErrorEmision(null)
   try {
     const boletaFinal = prepararBoleta()
-    const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal)
+    const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } })
     const comprobanteId = resBoleta.data.comprobanteId;
-    const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`)
+    const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } })
     const respuesta = resSunat.data
 
     // ✅ toast según respuesta SUNAT
@@ -82,8 +96,34 @@ export default function BoletaPage() {
         showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, 'error')
     }
 
+    // ✅ actualizar stock — solo productos tipo BIEN con productoId
+    const itemsParaStock = detalles.filter(d => 
+      d.productoId && 
+      d.productoId !== 0 && 
+      d._sucursalProductoId &&
+      d._tipoProducto === 'BIEN' // o como venga en tu interfaz
+    )
+
+    if (itemsParaStock.length > 0) {
+      const body = itemsParaStock.map(d => ({
+        sucursalProductoId: d._sucursalProductoId,
+        cantidad: d.cantidad ?? 1
+      }))
+      
+      try {
+        console.log("Body actulizar stock: ", body)
+        await axios.put(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+          body,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+      } catch {
+        console.error('Error al actualizar stock')
+      }
+    }
+
     // ✅ actualizar serie y limpiar siempre, sin importar respuesta SUNAT
-    const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${SUCURSAL_ID}`)
+    const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user?.sucursalID}`, { headers: { Authorization: `Bearer ${accessToken}` } })
     setCorrelativoActual(resSucursal.data.correlativoBoleta)
 
     setBoleta({
@@ -241,7 +281,7 @@ export default function BoletaPage() {
   }, [cuotas, boleta.tipoPago]);
 
   useEffect(() => {
-    const detallesLimpios = detalles.map(({ _incluirIGV, _precioBase, _precioVentaConIGV, ...d }) => d) as BoletaDetalle[];
+    const detallesLimpios = detalles.map(({ _incluirIGV, _precioBase, _precioVentaConIGV, _sucursalProductoId, _tipoProducto, _stockDisponible, ...d }) => d) as BoletaDetalle[];
     setBoleta(prev => ({ ...prev, details: detallesLimpios }));
   }, [detalles]);
 
@@ -509,7 +549,8 @@ export default function BoletaPage() {
     const nuevos = [...detalles];
     nuevos[index] = {
       ...nuevos[index],
-      productoId: producto.productoId, codigo: producto.codigo,
+      productoId: producto.productoId, codigo: producto.codigo,  _sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+      _tipoProducto: producto.tipoProducto, _stockDisponible: producto.sucursalProducto.stock, 
       descripcion: producto.nomProducto, unidadMedida: producto.unidadMedida,
       tipoAfectacionIGV: producto.tipoAfectacionIGV,
       porcentajeIGV, // ✅ usa el porcentaje respetado
@@ -546,6 +587,12 @@ export default function BoletaPage() {
   const actualizarCantidad = (index: number, cantidad: number) => {
     const d = detalles[index];
     if (!d) return;
+    const esBien = d._tipoProducto === 'BIEN'
+    const stockDisponible = d._stockDisponible
+    if (esBien && stockDisponible != null && cantidad > stockDisponible) {
+      showToast(`Stock insuficiente. Disponible: ${stockDisponible}`, 'error')
+      cantidad = stockDisponible
+    }
     const precioBase = d._precioBase ?? d.precioUnitario ?? 0;
     const precioVentaConIGV = d._precioVentaConIGV ?? d.precioVenta ?? 0;
     const calc = calcularDetalle(precioBase, precioVentaConIGV, cantidad, d.porcentajeIGV ?? 18, d.tipoAfectacionIGV ?? '10', d.codigoTipoDescuento ?? '01', d.descuentoUnitario ?? 0);
@@ -662,7 +709,7 @@ export default function BoletaPage() {
                       {loadingCliente && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
                       {showDropdown && clientesFiltrados.length > 0 && (
                         <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                          {loadingLista ? <p className="text-xs text-gray-400 px-4 py-3">Cargando...</p> : (
+                          {loadingClientes ? <p className="text-xs text-gray-400 px-4 py-3">Cargando...</p> : (
                             clientesFiltrados.map(c => (
                               <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
                                 className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
@@ -887,6 +934,49 @@ export default function BoletaPage() {
                 </div>
               )}
 
+              {/* Guías de Remisión */}
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <button type="button" onClick={() => setShowGuias(!showGuias)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Guías de Remisión (opcional)</span>
+                  {showGuias ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </button>
+                {showGuias && (
+                  <div className="p-4 space-y-3">
+                    {guias.map((g, i) => (
+                      <div key={i} className="grid grid-cols-3 gap-3 items-end">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-gray-400">Tipo Doc</label>
+                          <select value={g.tipoDoc} onChange={(e) => actualizarGuia(i, 'tipoDoc', e.target.value)}
+                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                            <option value="09">Guía Remisión Remitente</option>
+                            <option value="31">Guía Remisión Transportista</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-gray-400">Serie</label>
+                          <input type="text" value={g.serie} onChange={(e) => actualizarGuia(i, 'serie', e.target.value)} placeholder="T001"
+                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-gray-400">Número</label>
+                          <div className="flex gap-2">
+                            <input type="text" value={g.numero} onChange={(e) => actualizarGuia(i, 'numero', e.target.value)} placeholder="00000001"
+                              className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
+                            <button type="button" onClick={() => eliminarGuia(i)} className="text-red-400 hover:text-red-600">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" onClick={agregarGuia} className="text-xs text-brand-blue hover:underline flex items-center gap-1 pt-1">
+                      <Plus className="w-3 h-3" /> Agregar guía
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Tabla Ítems */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -902,6 +992,7 @@ export default function BoletaPage() {
                         <th className="px-2 py-2 text-left text-gray-500 w-6">#</th>
                         <th className="px-2 py-2 text-left text-gray-500" style={{ minWidth: '100px' }}>Producto</th>
                         <th className="px-2 py-2 text-left text-gray-500 w-14">Cód.</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-18">U.M.</th>
                         <th className="px-2 py-2 text-center text-gray-500 w-16">Cant.</th>
                         <th className="px-2 py-2 text-center text-gray-500 w-22">P.Venta c/IGV</th>
                         <th className="px-2 py-2 text-center text-gray-500 w-18">%IGV</th>
@@ -957,11 +1048,29 @@ export default function BoletaPage() {
                                         p.nomProducto.toLowerCase().includes((busquedaProducto[i] ?? '').toLowerCase()) ||
                                         p.codigo.includes(busquedaProducto[i] ?? ''))
                                       .map((p: ProductoSucursal) => (
-                                        <button key={p.productoId} type="button" onMouseDown={() => seleccionarProducto(p, i)}
-                                          className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0">
-                                          <p className="text-xs font-medium text-gray-800">{p.nomProducto}</p>
-                                          <p className="text-[10px] text-gray-400">{p.codigo} · {simbolo} {p.sucursalProducto.precioUnitario.toFixed(2)}</p>
-                                        </button>
+                                          <button
+                                            key={p.productoId}
+                                            type="button"
+                                            disabled={p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0}
+                                            onMouseDown={() => {
+                                              if (p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0) return
+                                              seleccionarProducto(p, i)
+                                            }}
+                                            className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0
+                                              ${p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0
+                                                ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                                                : 'hover:bg-gray-50'}`}
+                                          >
+                                            <p className="text-xs font-medium text-gray-800">{p.nomProducto}</p>
+                                            <p className="text-[10px] text-gray-400">
+                                              {p.codigo} · S/ {p.sucursalProducto.precioUnitario.toFixed(2)}
+                                              {p.tipoProducto === 'BIEN' && (
+                                                <span className={p.sucursalProducto.stock === 0 ? ' text-red-400' : ' text-green-600'}>
+                                                  {p.sucursalProducto.stock === 0 ? ' · Sin stock' : ` · Stock: ${p.sucursalProducto.stock}`}
+                                                </span>
+                                              )}
+                                            </p>
+                                          </button>
                                       ))}
                                   </div>
                                 );
@@ -970,11 +1079,50 @@ export default function BoletaPage() {
 
                             <td className="px-2 py-1.5 text-gray-500 font-mono text-[10px]">{d.codigo || '-'}</td>
 
+                            {/* Unidad de medida — editable solo si no hay producto de BD */}
+                            <td className="px-2 py-1.5">
+                              {!d.productoId ? (
+                                <select
+                                  value={d.unidadMedida ?? 'NIU'}
+                                  onChange={(e) => {
+                                    const nuevos = [...detalles]
+                                    nuevos[i] = { ...nuevos[i], unidadMedida: e.target.value }
+                                    setDetalles(nuevos)
+                                  }}
+                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                                >
+                                  <option value="NIU">NIU</option>
+                                  <option value="KGM">KGM</option>
+                                  <option value="LTR">LTR</option>
+                                  <option value="ZZ">ZZ - Servicio</option>
+                                </select>
+                              ) : (
+                                <span className="text-xs text-gray-500">{d.unidadMedida || 'NIU'}</span>
+                              )}
+                            </td>
+
                             {/* Cantidad */}
                             <td className="px-2 py-1.5">
-                              <input type="number" min={1} value={d.cantidad ?? 1}
-                                onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
-                                className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
+                              <div className="space-y-0.5">
+                                <input
+                                  type="number" min={1}
+                                  max={d._tipoProducto === 'BIEN' ? (d._stockDisponible ?? undefined) : undefined}
+                                  value={d.cantidad ?? 1}
+                                  onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
+                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-center outline-none focus:border-brand-blue
+                                    ${d._tipoProducto === 'BIEN' && (d._stockDisponible ?? 0) > 0 && (d.cantidad ?? 1) > (d._stockDisponible ?? 0)
+                                      ? 'bg-red-50 border-red-300'
+                                      : 'bg-gray-50 border-gray-200'}`}
+                                />
+                                {d._tipoProducto === 'BIEN' && d._stockDisponible != null && (
+                                  <p className={`text-[9px] text-center ${
+                                    d._stockDisponible === 0 ? 'text-red-500' :
+                                    (d.cantidad ?? 1) > d._stockDisponible ? 'text-red-400' : 'text-gray-400'
+                                  }`}>
+                                    Stock: {d._stockDisponible}
+                                  </p>
+                                )}
+                              </div>
                             </td>
 
                             {/* Precio venta con IGV — editable */}
@@ -1038,49 +1186,6 @@ export default function BoletaPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-
-              {/* Guías de Remisión */}
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <button type="button" onClick={() => setShowGuias(!showGuias)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <span className="text-xs font-bold text-gray-500 uppercase">Guías de Remisión (opcional)</span>
-                  {showGuias ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                </button>
-                {showGuias && (
-                  <div className="p-4 space-y-3">
-                    {guias.map((g, i) => (
-                      <div key={i} className="grid grid-cols-3 gap-3 items-end">
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Tipo Doc</label>
-                          <select value={g.tipoDoc} onChange={(e) => actualizarGuia(i, 'tipoDoc', e.target.value)}
-                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
-                            <option value="09">Guía Remisión Remitente</option>
-                            <option value="31">Guía Remisión Transportista</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Serie</label>
-                          <input type="text" value={g.serie} onChange={(e) => actualizarGuia(i, 'serie', e.target.value)} placeholder="T001"
-                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Número</label>
-                          <div className="flex gap-2">
-                            <input type="text" value={g.numero} onChange={(e) => actualizarGuia(i, 'numero', e.target.value)} placeholder="00000001"
-                              className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
-                            <button type="button" onClick={() => eliminarGuia(i)} className="text-red-400 hover:text-red-600">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <button type="button" onClick={agregarGuia} className="text-xs text-brand-blue hover:underline flex items-center gap-1 pt-1">
-                      <Plus className="w-3 h-3" /> Agregar guía
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Totales */}

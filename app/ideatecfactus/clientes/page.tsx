@@ -16,6 +16,7 @@ import { EnviarCorreoCliente } from './gestionClientes/EnviarCorreoCliente';
 import { Direccion, Cliente } from './gestionClientes/Cliente';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
+import { useClientesRuc } from './gestionClientes/useClientesRuc';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const formatDireccion = (direcciones: Direccion[], tipoDocumentoId: string): string => {
@@ -44,13 +45,14 @@ const formatFecha = (fecha: string | null): string => {
 // ─── Page Principal ────────────────────────────────────────────────────────────
 export default function ClientesPage() {
   const { showToast } = useToast();
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
   //  TODO: reemplazar con el empresaruc real del contexto/sesión
   const EMPRESA_RUC = "20601737583";
   const SUCURSAL_ID = 1;
 
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [loading, setLoading] = useState(true);
+    // ── Cargar clientes desde la API ──
+  const { clientes, setClientes, loadingClientes } = useClientesRuc();
+
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Activo' | 'Inactivo'>('Todos');
   const [filterTipo, setFilterTipo] = useState<'Todos' | 'RUC' | 'DNI' | 'CE'>('Todos');
@@ -82,22 +84,6 @@ export default function ClientesPage() {
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [lengthErrors, setLengthErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // ── Cargar clientes desde la API ──
-  useEffect(() => {
-    const fetchClientes = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/ruc/${EMPRESA_RUC}`); // reemplazar con tu URL real
-        setClientes(response.data);
-      } catch (error) {
-        console.error('Error al cargar clientes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchClientes();
-  }, []);
 
   const requiredFields = useMemo(() => {
     if (nuevoCliente.tipoDocumentoId === "01") {
@@ -205,8 +191,12 @@ export default function ClientesPage() {
           }
         };
       }
-      console.log("payload a enviar:", JSON.stringify(payload, null, 2));
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`, payload);
+      console.log("Cliente a enviar:", JSON.stringify(payload, null, 2));
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`, payload,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
       showToast('Cliente guardado exitosamente', 'success');
       setClientes(prev => [response.data, ...prev]);
       setNuevoCliente(nuevoClienteInicial);
@@ -239,14 +229,36 @@ export default function ClientesPage() {
   };
 
   const handleEliminar = async (clienteId: number) => {
-    try {
-      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/${clienteId}`); // reemplazar
-      showToast("Cliente eliminado correctamente.", "success");
-      setClientes(prev => prev.filter(c => c.clienteId !== clienteId));
-    } catch (error) {
-      showToast("Error al eliminar cliente", "error");
-    }
-  };
+      try {
+        await axios.delete(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/${clienteId}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        showToast("Cliente eliminado correctamente.", "success");
+        setClientes(prev => prev.filter(c => c.clienteId !== clienteId));
+      } catch (error) {
+        console.error("Error al eliminar cliente:", error);
+
+        if (axios.isAxiosError(error)) {
+          if (!error.response) {
+            showToast("Sin conexión. Verifica tu internet e intenta nuevamente.", "error");
+          } else {
+            const status = error.response.status;
+            if (status === 404) {
+              showToast("No se encontró el cliente a eliminar.", "error");
+            } else if (status === 403) {
+              showToast("No tienes permisos para eliminar este cliente.", "error");
+            } else {
+              showToast("No se pudo eliminar el cliente. Intenta nuevamente.", "error");
+            }
+          }
+        } else {
+          showToast("Error inesperado. Intenta nuevamente.", "error");
+        }
+      }
+    };
 
   // ── Filtros ──
   const filtered = useMemo(() => clientes.filter(c => {
@@ -396,7 +408,7 @@ export default function ClientesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading ? (
+              {loadingClientes ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-16 text-center text-sm text-gray-400">
                     Cargando clientes...

@@ -6,6 +6,7 @@ import { CheckCircle2, Mail, Send, AlertCircle } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { Modal } from "@/app/components/ui/Modal";
 import { Cliente } from "./Cliente";
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   cliente: Cliente;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export const EnviarCorreoCliente: React.FC<Props> = ({ cliente, onClose }) => {
+  const { accessToken } = useAuth();
   const [asunto, setAsunto]   = useState("");
   const [mensaje, setMensaje] = useState("");
   const [sent, setSent]       = useState(false);
@@ -30,13 +32,19 @@ export const EnviarCorreoCliente: React.FC<Props> = ({ cliente, onClose }) => {
 
     setLoading(true);
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, {
-        toEmail: cliente.correo,
-        toName:  cliente.razonSocialNombre,
-        subject: asunto,
-        body:    mensaje,
-        tipo:    "0",
-      });
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+        {
+          toEmail: cliente.correo,
+          toName:  cliente.razonSocialNombre,
+          subject: asunto,
+          body:    mensaje,
+          tipo:    "0",
+        },
+        {
+          headers: { Authorization: `Bearer ${accessToken}` }, 
+        }
+      );
       setSent(true);
     } catch (err) {
       if (axios.isAxiosError(err)) {

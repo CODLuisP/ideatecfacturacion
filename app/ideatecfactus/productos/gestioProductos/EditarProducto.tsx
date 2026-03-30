@@ -7,6 +7,7 @@ import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { Categoria, EditProducto, NuevoProducto, ProductoSucursal } from "./Producto";
 import { useToast } from "@/app/components/ui/Toast";
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export default function EditarProducto({
   categorias,
 }: Props) {
   const { showToast } = useToast();
+  const { accessToken, user } = useAuth();
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [precioInput, setPrecioInput] = React.useState("0.00");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -146,8 +148,10 @@ export default function EditarProducto({
 
     try {
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Producto/${producto.productoId}`,
-        payload
+        `${process.env.NEXT_PUBLIC_API_URL}/api/productos/${producto.productoId}`, payload, 
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
       );
 
       const categoriaActualizada = categorias.find(
