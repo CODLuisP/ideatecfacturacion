@@ -446,7 +446,11 @@ export default function ConfiguracionPage() {
 
     setLoadingEmpresa(true);
     axios
-      .get(`${BASE_URL}/api/companies/${ruc}`)
+      .get(`${BASE_URL}/api/companies/${ruc}`,{
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
       .then((res) => {
         const d = res.data;
         setForm({
@@ -479,7 +483,11 @@ export default function ConfiguracionPage() {
 
     if (isSuperAdmin) {
       axios
-        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}`)
+        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}`,{
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
         .then((res) => setSucursales(res.data ?? []))
         .catch(() => showToast('No se pudieron cargar las sucursales', 'error'))
         .finally(() => setLoadingSucursales(false));
@@ -490,7 +498,11 @@ export default function ConfiguracionPage() {
         return;
       }
       axios
-        .get(`${BASE_URL}/api/Sucursal/${sucursalId}`)
+        .get(`${BASE_URL}/api/Sucursal/${sucursalId}`,{
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
         .then((res) => setSucursales([res.data]))
         .catch(() => showToast('No se pudo cargar la sucursal', 'error'))
         .finally(() => setLoadingSucursales(false));
@@ -506,7 +518,7 @@ export default function ConfiguracionPage() {
       const formData = new FormData();
       formData.append('File', file);
       await axios.post(`${BASE_URL}/api/companies/file/base64`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${accessToken}` },
       });
       showToast('Logo subido correctamente', 'success');
     } catch {
@@ -549,7 +561,12 @@ export default function ConfiguracionPage() {
         email:           form.email,
         logoBase64:      logoBase64Pure,
       };
-      await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload);
+      await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload, {
+        headers: {
+          Authorization:  `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       // ── CAMBIO 2: refresca el logo en el Topbar al instante ───────────────
       await refreshLogo();
@@ -610,7 +627,7 @@ export default function ConfiguracionPage() {
   };
 
   return (
-    <form onSubmit={handleSave} className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <form onSubmit={handleSave} className="mx-auto space-y-6 animate-in fade-in duration-500">
 
       {/* ── Datos de la Empresa ── */}
       <Card title="Datos de la Empresa" subtitle="Información que aparecerá en tus comprobantes electrónicos">

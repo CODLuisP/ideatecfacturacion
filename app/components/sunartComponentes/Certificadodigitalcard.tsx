@@ -2,15 +2,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Upload, CheckCircle2, FileJson, ShieldCheck,
-  Loader2, AlertTriangle, Eye, EyeOff,
+  Loader2, AlertTriangle, Eye, EyeOff, Lock,
 } from "lucide-react";
 import axios from "axios";
-import { Button }  from "@/app/components/ui/Button";
-import { Card }    from "@/app/components/ui/Card";
-import { Modal }   from "@/app/components/ui/Modal";
-import { cn }      from "@/app/utils/cn";
+import { Button }   from "@/app/components/ui/Button";
+import { Card }     from "@/app/components/ui/Card";
+import { Modal }    from "@/app/components/ui/Modal";
+import { cn }       from "@/app/utils/cn";
 import { useToast } from "@/app/components/ui/Toast";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth }  from "@/context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CompanyData {
@@ -21,13 +21,11 @@ export interface CompanyData {
 
 interface CertificadoDigitalCardProps {
   ruc: string;
-  /** Datos ya cargados por el padre (SunatPage). Si se pasan, no se hace fetch propio. */
   initialData?: CompanyData | null;
-  /** Estado de carga del padre. Se usa para mostrar el skeleton mientras el padre carga. */
   loadingInitial?: boolean;
 }
 
-// ─── Parse cert expiry from PEM base64 ────────────────────────────────────────
+// ─── Parse cert expiry from PEM base64 ───────────────────────────────────────
 function parseCertExpiry(pemBase64: string): { notBefore: Date | null; notAfter: Date | null } {
   try {
     const clean  = pemBase64.replace(/\s/g, "");
@@ -100,8 +98,8 @@ function daysUntil(d: Date | null): number | null {
 
 // ─── FileDrop ─────────────────────────────────────────────────────────────────
 function FileDrop({ onFile, accept }: { onFile: (file: File) => void; accept: string }) {
-  const [dragging, setDragging]   = useState(false);
-  const [fileName, setFileName]   = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
 
   const handle = (file: File | undefined) => {
@@ -183,28 +181,28 @@ export function CertificadoDigitalCard({
   loadingInitial,
 }: CertificadoDigitalCardProps) {
   const { showToast } = useToast();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
 
-  // Si el padre nos pasa datos usamos esos; si no, los pedimos nosotros
+  // ── Permisos: solo superadmin y admin pueden editar ──────────────────────
+  const canEdit = user?.rol === "superadmin" || user?.rol === "admin";
+
   const [company, setCompany]               = useState<CompanyData | null>(initialData ?? null);
   const [loadingCompany, setLoadingCompany] = useState(
     initialData !== undefined ? (loadingInitial ?? false) : true,
   );
 
-  // Modal / form states
   const [isModalOpen, setIsModalOpen]             = useState(false);
   const [certFile, setCertFile]                   = useState<File | null>(null);
   const [certPasswordInput, setCertPasswordInput] = useState("");
   const [showPassword, setShowPassword]           = useState(false);
   const [saving, setSaving]                       = useState(false);
 
-  // Flujo de conversión
   type Step = "idle" | "uploading" | "converting" | "saving" | "done" | "error";
   const [step, setStep]           = useState<Step>("idle");
   const [pemResult, setPemResult] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
 
-  // ── Sincronizar cuando el padre actualiza initialData / loadingInitial ──
+  // ── Sincronizar cuando el padre actualiza ────────────────────────────────
   useEffect(() => {
     if (initialData !== undefined) {
       setCompany(initialData);
@@ -212,9 +210,8 @@ export function CertificadoDigitalCard({
     }
   }, [initialData, loadingInitial]);
 
-  // ── Fetch propio — solo cuando se usa el componente sin datos del padre ──
+  // ── Fetch propio — solo si no vienen datos del padre ────────────────────
   useEffect(() => {
-    // Si initialData fue proporcionado (incluso null), no hacemos fetch propio
     if (initialData !== undefined) return;
     if (!ruc) return;
 
@@ -234,15 +231,14 @@ export function CertificadoDigitalCard({
     fetchCompany();
   }, [ruc]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Derived ──
-  const hasCert       = !!(company?.certificadoPem && company?.certificadoPassword);
-  const certExpiry    = hasCert ? parseCertExpiry(company!.certificadoPem!) : { notBefore: null, notAfter: null };
-  const daysLeft      = daysUntil(certExpiry.notAfter);
+  // ── Derived ──────────────────────────────────────────────────────────────
+  const hasCert        = !!(company?.certificadoPem && company?.certificadoPassword);
+  const certExpiry     = hasCert ? parseCertExpiry(company!.certificadoPem!) : { notBefore: null, notAfter: null };
+  const daysLeft       = daysUntil(certExpiry.notAfter);
   const isExpiringSoon = daysLeft !== null && daysLeft <= 30 && daysLeft > 0;
-  const isExpired     = daysLeft !== null && daysLeft <= 0;
+  const isExpired      = daysLeft !== null && daysLeft <= 0;
 
-  // ── Vigencia bar ──
-  const totalDays  = certExpiry.notBefore && certExpiry.notAfter
+  const totalDays   = certExpiry.notBefore && certExpiry.notAfter
     ? Math.ceil((certExpiry.notAfter.getTime() - certExpiry.notBefore.getTime()) / 86400000)
     : 0;
   const elapsedDays = certExpiry.notBefore && daysLeft !== null ? totalDays - daysLeft : 0;
@@ -266,12 +262,12 @@ export function CertificadoDigitalCard({
     : "text-emerald-600";
 
   const details = [
-    ["RUC",    ruc],
-    ["Tipo",   hasCert ? "PFX / P12"   : "—"],
-    ["Archivo", hasCert ? "Cargado"    : "No cargado"],
+    ["RUC",     ruc],
+    ["Tipo",    hasCert ? "PFX / P12" : "—"],
+    ["Archivo", hasCert ? "Cargado"   : "No cargado"],
   ];
 
-  // ── Cerrar modal y limpiar estado ──
+  // ── Cerrar modal ─────────────────────────────────────────────────────────
   const closeModal = () => {
     setIsModalOpen(false);
     setCertFile(null);
@@ -282,7 +278,7 @@ export function CertificadoDigitalCard({
     setStepError(null);
   };
 
-  // ── Paso 1: archivo → base64 ──
+  // ── Paso 1: archivo → base64 ─────────────────────────────────────────────
   const uploadToBase64 = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("file", file);
@@ -294,7 +290,7 @@ export function CertificadoDigitalCard({
     return res.data.base64;
   };
 
-  // ── Paso 2: base64 + contraseña → PEM ──
+  // ── Paso 2: base64 + contraseña → PEM ───────────────────────────────────
   const convertToPem = async (certBase64: string, password: string): Promise<string> => {
     const res = await axios.post<{ pem: string; cer: string }>(
       "http://localhost:5004/api/companies/certificate",
@@ -304,9 +300,10 @@ export function CertificadoDigitalCard({
     return res.data.pem;
   };
 
-  // ── Submit del modal ──
+  // ── Submit del modal ─────────────────────────────────────────────────────
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit)          return;
     if (!certFile)         { showToast("Selecciona un archivo .pfx o .p12", "error"); return; }
     if (!certPasswordInput){ showToast("Ingresa la contraseña del certificado", "error"); return; }
 
@@ -315,17 +312,14 @@ export function CertificadoDigitalCard({
     setPemResult(null);
 
     try {
-      // Paso 1 — subir
       setStep("uploading");
       const base64 = await uploadToBase64(certFile);
       if (!base64) throw new Error("No se pudo obtener el base64 del archivo");
 
-      // Paso 2 — convertir
       setStep("converting");
       const pem = await convertToPem(base64, certPasswordInput);
       if (!pem) throw new Error("No se pudo obtener el PEM del certificado");
 
-      // Paso 3 — guardar
       setStep("saving");
       await axios.put(
         `http://localhost:5004/api/companies/${ruc}`,
@@ -333,7 +327,6 @@ export function CertificadoDigitalCard({
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
-      // Actualizar estado local para reflejar el nuevo certificado sin recargar la página
       setCompany((prev) =>
         prev
           ? { ...prev, certificadoPem: pem, certificadoPassword: certPasswordInput }
@@ -355,7 +348,6 @@ export function CertificadoDigitalCard({
     }
   };
 
-  // ── Etiqueta del botón submit ──
   const submitLabel = () => {
     if (step === "uploading")  return "Subiendo archivo...";
     if (step === "converting") return "Convirtiendo a PEM...";
@@ -363,13 +355,12 @@ export function CertificadoDigitalCard({
     return hasCert ? "Actualizar Certificado" : "Cargar Certificado";
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <Card title="Certificado Digital (.pfx o .p12)" subtitle="Validación y vigencia">
         <div className="space-y-4">
           {loadingCompany ? (
-            /* Skeleton */
             <div className="space-y-4 animate-pulse">
               <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-3">
                 <div className="flex justify-between">
@@ -437,9 +428,26 @@ export function CertificadoDigitalCard({
                 </div>
               </div>
 
-              {/* Botón abrir modal */}
-              <Button type="submit" className="w-full" onClick={() => setIsModalOpen(true)}>
-                <Upload className="w-4 h-4" />
+              {/* Aviso de solo lectura para roles sin permiso */}
+              {!canEdit && (
+                <div className="flex items-center gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50 text-xs text-gray-500">
+                  <Lock className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+                  Solo los administradores pueden modificar el certificado digital.
+                </div>
+              )}
+
+              {/* Botón — deshabilitado si no tiene permiso */}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={!canEdit}
+                onClick={() => canEdit && setIsModalOpen(true)}
+                title={!canEdit ? "No tienes permisos para modificar el certificado" : undefined}
+              >
+                {canEdit
+                  ? <Upload className="w-4 h-4" />
+                  : <Lock className="w-4 h-4" />
+                }
                 {hasCert ? "Actualizar Certificado" : "Subir Certificado"}
               </Button>
             </>
@@ -447,9 +455,9 @@ export function CertificadoDigitalCard({
         </div>
       </Card>
 
-      {/* Modal */}
+      {/* Modal — solo se abre si canEdit */}
       <Modal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && canEdit}
         onClose={closeModal}
         title={hasCert ? "Actualizar Certificado Digital" : "Cargar Certificado Digital"}
       >
@@ -499,13 +507,13 @@ export function CertificadoDigitalCard({
               <Loader2 className="w-4 h-4 animate-spin shrink-0" />
               <div>
                 <p className="font-semibold">
-                  {step === "uploading"  ? "Paso 1/3 — Subiendo archivo..."      :
-                   step === "converting" ? "Paso 2/3 — Convirtiendo a PEM..."    :
+                  {step === "uploading"  ? "Paso 1/3 — Subiendo archivo..."    :
+                   step === "converting" ? "Paso 2/3 — Convirtiendo a PEM..."  :
                                           "Paso 3/3 — Guardando certificado..."}
                 </p>
                 <p className="text-blue-500 mt-0.5">
-                  {step === "uploading"  ? "Enviando el archivo .pfx al servidor."     :
-                   step === "converting" ? "Extrayendo certificado en formato PEM."    :
+                  {step === "uploading"  ? "Enviando el archivo .pfx al servidor."   :
+                   step === "converting" ? "Extrayendo certificado en formato PEM."  :
                                           "Guardando el certificado en tu empresa."}
                 </p>
               </div>
