@@ -254,7 +254,7 @@ function SucursalSerieRow({
         />
         <p className="text-[10px] text-gray-400 italic">Empieza con "{prefix}" — máx. 4 caracteres</p>
       </div>
-      <div className="w-36 space-y-1.5">
+      <div className="w-56 space-y-1.5">
         <FieldLabel>Correlativo inicial</FieldLabel>
         <input
           type="number"
@@ -393,7 +393,7 @@ function SucursalCard({
         <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
           <Button
             type="button"
-            variant="outline"
+        
             className="h-9 text-xs"
             disabled={saving}
             onClick={() => onSave(sucursal)}
