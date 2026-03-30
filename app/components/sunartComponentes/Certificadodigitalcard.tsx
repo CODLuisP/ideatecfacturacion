@@ -10,6 +10,7 @@ import { Card }    from "@/app/components/ui/Card";
 import { Modal }   from "@/app/components/ui/Modal";
 import { cn }      from "@/app/utils/cn";
 import { useToast } from "@/app/components/ui/Toast";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CompanyData {
@@ -182,6 +183,7 @@ export function CertificadoDigitalCard({
   loadingInitial,
 }: CertificadoDigitalCardProps) {
   const { showToast } = useToast();
+  const { accessToken } = useAuth();
 
   // Si el padre nos pasa datos usamos esos; si no, los pedimos nosotros
   const [company, setCompany]               = useState<CompanyData | null>(initialData ?? null);
@@ -219,7 +221,9 @@ export function CertificadoDigitalCard({
     const fetchCompany = async () => {
       setLoadingCompany(true);
       try {
-        const res = await axios.get(`http://localhost:5004/api/companies/${ruc}`);
+        const res = await axios.get(`http://localhost:5004/api/companies/${ruc}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
         setCompany(res.data);
       } catch {
         showToast("Error al cargar datos del certificado", "error");
@@ -229,7 +233,6 @@ export function CertificadoDigitalCard({
     };
     fetchCompany();
   }, [ruc]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Nota: initialData no va en deps porque ese efecto solo corre cuando initialData === undefined
 
   // ── Derived ──
   const hasCert       = !!(company?.certificadoPem && company?.certificadoPassword);
@@ -286,7 +289,7 @@ export function CertificadoDigitalCard({
     const res = await axios.post<{ base64: string }>(
       "http://localhost:5004/api/companies/file/base64",
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      { headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${accessToken}` } },
     );
     return res.data.base64;
   };
@@ -296,6 +299,7 @@ export function CertificadoDigitalCard({
     const res = await axios.post<{ pem: string; cer: string }>(
       "http://localhost:5004/api/companies/certificate",
       { cert: certBase64, certPass: password },
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     return res.data.pem;
   };
@@ -323,10 +327,11 @@ export function CertificadoDigitalCard({
 
       // Paso 3 — guardar
       setStep("saving");
-      await axios.put(`http://localhost:5004/api/companies/${ruc}`, {
-        certificadoPem:      pem,
-        certificadoPassword: certPasswordInput,
-      });
+      await axios.put(
+        `http://localhost:5004/api/companies/${ruc}`,
+        { certificadoPem: pem, certificadoPassword: certPasswordInput },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
 
       // Actualizar estado local para reflejar el nuevo certificado sin recargar la página
       setCompany((prev) =>
@@ -433,7 +438,7 @@ export function CertificadoDigitalCard({
               </div>
 
               {/* Botón abrir modal */}
-              <Button variant="outline" className="w-full" onClick={() => setIsModalOpen(true)}>
+              <Button type="submit" className="w-full" onClick={() => setIsModalOpen(true)}>
                 <Upload className="w-4 h-4" />
                 {hasCert ? "Actualizar Certificado" : "Subir Certificado"}
               </Button>

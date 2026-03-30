@@ -421,7 +421,8 @@ export default function ConfiguracionPage() {
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [logoBase64Pure, setLogoBase64Pure] = useState<string | null>(null);
 
-  const { accessToken, user } = useAuth();
+  // ── CAMBIO 1: agrega refreshLogo ──────────────────────────────────────────
+  const { accessToken, user, refreshLogo } = useAuth();
 
   const isSuperAdmin = user?.username === 'superAdminOpen';
 
@@ -549,6 +550,10 @@ export default function ConfiguracionPage() {
         logoBase64:      logoBase64Pure,
       };
       await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload);
+
+      // ── CAMBIO 2: refresca el logo en el Topbar al instante ───────────────
+      await refreshLogo();
+
       showToast('Datos de empresa actualizados correctamente', 'success');
     } catch {
       showToast('Error al guardar los datos. Verifica tu conexión.', 'error');

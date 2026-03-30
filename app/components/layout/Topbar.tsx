@@ -58,40 +58,22 @@ export const Topbar = ({
 }: TopbarProps) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const [logoSrc, setLogoSrc] = useState<string>("/user.png");
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
+
   const isSuperAdmin = user?.username === "superAdminOpen";
   const isBeta = user?.environment === "beta";
 
-  // ── Fetch logo desde la API usando el RUC del usuario ──
-  useEffect(() => {
-    if (!user?.ruc) return;
+  // 👇 Logo: si hay logoBase64 en el user del contexto, construye el data URL;
+  //    de lo contrario usa el fallback /user.png
+  const logoSrc = user?.logoBase64
+    ? `data:image/png;base64,${user.logoBase64}`
+    : "/user.png";
 
-    const fetchLogo = async () => {
-      try {
-        const res = await fetch(
-          `http://localhost:5004/api/companies/${user.ruc}`
-        );
-        if (!res.ok) return;
-
-        const data = await res.json();
-
-        if (data?.logoBase64) {
-          // La API devuelve base64 puro; construimos el data URL
-          setLogoSrc(`data:image/png;base64,${data.logoBase64}`);
-        }
-        // Si logoBase64 es null o undefined, se mantiene "/user.png"
-      } catch {
-        // Error de red u otro → se mantiene "/user.png"
-      }
-    };
-
-    fetchLogo();
-  }, [user?.ruc]);
+  // Sin useEffect de fetch: el AuthContext ya se encarga de traer y actualizar el logo
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -108,12 +90,9 @@ export const Topbar = ({
 
   return (
     <>
-      {/* ── Header principal ── */}
       <header
         className={`h-16 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 border-b transition-colors ${
-          isBeta
-            ? "bg-amber-50 border-amber-300"
-            : "bg-white border-gray-100"
+          isBeta ? "bg-amber-50 border-amber-300" : "bg-white border-gray-100"
         }`}
       >
         {/* Left */}
@@ -145,10 +124,8 @@ export const Topbar = ({
 
         {/* Right */}
         <div className="flex items-center gap-3">
-
-          {/* ── Context badge ── */}
+          {/* Context badge */}
           <div className="flex items-center gap-2 px-3 py-2">
-            {/* Empresa */}
             <div className="flex flex-col leading-none">
               <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">
                 Empresa
@@ -162,7 +139,6 @@ export const Topbar = ({
               </span>
             </div>
 
-            {/* Sucursal (usuario normal) */}
             {!isSuperAdmin && user?.nombreSucursal && (
               <>
                 <div className="w-px h-7 bg-gray-200 mx-1" />
@@ -182,7 +158,6 @@ export const Topbar = ({
               </>
             )}
 
-            {/* Acceso global (superAdmin) */}
             {isSuperAdmin && (
               <>
                 <div className="w-px h-7 bg-gray-200 mx-1" />
@@ -202,10 +177,7 @@ export const Topbar = ({
           {/* Notification Bell */}
           <div className="relative" ref={notifRef}>
             <button
-              onClick={() => {
-                setNotifOpen((v) => !v);
-                setUserOpen(false);
-              }}
+              onClick={() => { setNotifOpen((v) => !v); setUserOpen(false); }}
               className={`p-2.5 rounded-xl relative group transition-all ${
                 isBeta
                   ? "hover:bg-amber-100 text-amber-500"
@@ -214,9 +186,7 @@ export const Topbar = ({
             >
               <Bell
                 className={`w-5 h-5 transition-colors ${
-                  isBeta
-                    ? "group-hover:text-amber-700"
-                    : "group-hover:text-blue-600"
+                  isBeta ? "group-hover:text-amber-700" : "group-hover:text-blue-600"
                 }`}
               />
               {unreadCount > 0 && (
@@ -227,9 +197,7 @@ export const Topbar = ({
             {notifOpen && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <span className="text-sm font-bold text-gray-900">
-                    Notificaciones
-                  </span>
+                  <span className="text-sm font-bold text-gray-900">Notificaciones</span>
                   {unreadCount > 0 && (
                     <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                       {unreadCount} nuevas
@@ -246,15 +214,9 @@ export const Topbar = ({
                         {n.icon}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 leading-tight">
-                          {n.title}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">
-                          {n.desc}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                          {n.time}
-                        </p>
+                        <p className="text-sm font-semibold text-gray-800 leading-tight">{n.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{n.desc}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 font-medium">{n.time}</p>
                       </div>
                       {n.unread && (
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
@@ -276,24 +238,19 @@ export const Topbar = ({
           {/* User Dropdown */}
           <div className="relative" ref={userRef}>
             <button
-              onClick={() => {
-                setUserOpen((v) => !v);
-                setNotifOpen(false);
-              }}
+              onClick={() => { setUserOpen((v) => !v); setNotifOpen(false); }}
               className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-all group ${
                 isBeta ? "hover:bg-amber-100" : "hover:bg-gray-50"
               }`}
             >
               <div className="text-right hidden md:block">
-                <p className="text-sm font-bold text-gray-900 leading-none">
-                  {user?.username}
-                </p>
+                <p className="text-sm font-bold text-gray-900 leading-none">{user?.username}</p>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5">
                   {isSuperAdmin
                     ? "Super Admin"
                     : user?.rol === "admin"
-                      ? "Administrador"
-                      : user?.rol}
+                    ? "Administrador"
+                    : user?.rol}
                 </p>
               </div>
               <div
@@ -303,12 +260,12 @@ export const Topbar = ({
                     : "border-gray-200 group-hover:border-gray-300"
                 }`}
               >
+                {/* 👇 logoSrc se recalcula automáticamente cuando user.logoBase64 cambia */}
                 <img
                   src={logoSrc}
                   alt="Avatar"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
-                  onError={() => setLogoSrc("/user.png")}
                 />
               </div>
               <ChevronRight
@@ -318,11 +275,8 @@ export const Topbar = ({
 
             {userOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
-                {/* User info */}
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                  <p className="text-sm font-bold text-gray-900">
-                    {user?.username}
-                  </p>
+                  <p className="text-sm font-bold text-gray-900">{user?.username}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
                   {!isSuperAdmin && user?.nombreSucursal && (
                     <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
@@ -344,7 +298,6 @@ export const Topbar = ({
                   )}
                 </div>
 
-                {/* Options */}
                 <ul className="py-1.5">
                   <li>
                     <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
@@ -381,7 +334,6 @@ export const Topbar = ({
         </div>
       </header>
 
-      {/* ── Banner de advertencia Beta ── */}
       {isBeta && (
         <div className="sticky top-16 z-30 bg-amber-400 border-b border-amber-500 px-6 py-2 flex items-center gap-3">
           <FlaskConical className="w-4 h-4 text-amber-900 shrink-0" />
@@ -390,9 +342,7 @@ export const Topbar = ({
           </span>
           <p className="text-amber-900 text-xs font-medium">
             Estás en el entorno de pruebas —{" "}
-            <strong className="font-bold">
-              No emitas comprobantes reales a SUNAT.
-            </strong>{" "}
+            <strong className="font-bold">No emitas comprobantes reales a SUNAT.</strong>{" "}
             Los documentos generados aquí no tienen validez tributaria.
           </p>
         </div>
