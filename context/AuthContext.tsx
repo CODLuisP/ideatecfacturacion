@@ -20,7 +20,7 @@ export interface AuthUser {
   nombreSucursal: string | null;
   nombreEmpresa: string | null;
   environment: string | null;
-  logoBase64: string | null;
+  logoBase64: string | null; 
 }
 
 interface AuthContextValue {
@@ -31,6 +31,7 @@ interface AuthContextValue {
   isLoading: boolean;
   logout: () => void;
   setEnvironment: (env: string) => void;
+  refreshLogo: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -40,42 +41,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const { data: session, status } = useSession();
 
-  // Override que persiste el environment real (no el de la sesión de login)
   const [environmentOverride, setEnvironmentOverride] = useState<string | null>(null);
-  const [logoOverride, setLogoOverride] = useState<string | null>(null);  
+  const [logoOverride, setLogoOverride] = useState<string | null>(null);
 
-  // Al autenticarse, fetch del environment real desde el backend
-  // Esto corrige el bug: la sesión next-auth guarda el environment del momento
-  // del login, pero el usuario pudo haberlo cambiado después.
+  const fetchCompanyData = useCallback(async (ruc: string, token: string | null) => {
+    try {
+      const r = await fetch(`http://localhost:5004/api/companies/${ruc}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data?.environment) setEnvironmentOverride(data.environment);
+      setLogoOverride(data?.logoBase64 ?? null);
+    } catch {
+      // falla silenciosamente
+    }
+  }, []);
+
   useEffect(() => {
     const ruc = session?.user?.ruc;
+    const token = session?.accessToken ?? null;
     if (!ruc || status !== "authenticated") return;
+    fetchCompanyData(ruc, token);
+  }, [session?.user?.ruc, session?.accessToken, status, fetchCompanyData]);
 
-    fetch(`http://localhost:5004/api/companies/${ruc}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.environment) setEnvironmentOverride(data.environment);
-        if (data?.logoBase64) setLogoOverride(data.logoBase64); 
-      })
-      .catch(() => {
-        // Si falla, se usa el valor de la sesión como fallback silencioso
-      });
-  }, [session?.user?.ruc, status]);
+  const refreshLogo = useCallback(async () => {
+    const ruc = session?.user?.ruc;
+    const token = session?.accessToken ?? null;
+    if (!ruc) return;
+    await fetchCompanyData(ruc, token);
+  }, [session?.user?.ruc, session?.accessToken, fetchCompanyData]);
 
   const user: AuthUser | null = useMemo(() => {
     if (!session?.user) return null;
     return {
-      id: session.user.id ?? "",
-      username: session.user.username ?? "",
-      email: session.user.email ?? "",
-      rol: session.user.rol ?? "",
-      ruc: session.user.ruc ?? "",
-      sucursalID: session.user.sucursalID ?? null,
+      id:             session.user.id             ?? "",
+      username:       session.user.username       ?? "",
+      email:          session.user.email          ?? "",
+      rol:            session.user.rol            ?? "",
+      ruc:            session.user.ruc            ?? "",
+      sucursalID:     session.user.sucursalID     ?? null,
       nombreSucursal: session.user.nombreSucursal ?? null,
-      nombreEmpresa: session.user.nombreEmpresa ?? null,
-      // environmentOverride (del backend) tiene prioridad sobre la sesión
-      environment: environmentOverride ?? session.user.environment ?? null,
-      logoBase64: logoOverride ?? null,  // 👈
+      nombreEmpresa:  session.user.nombreEmpresa  ?? null,
+      environment:    environmentOverride ?? session.user.environment ?? null,
+      logoBase64:     logoOverride,
     };
   }, [
     session?.user?.id,
@@ -86,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     session?.user?.sucursalID,
     session?.user?.environment,
     environmentOverride,
-    logoOverride
+    logoOverride,
   ]);
 
   const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);
@@ -98,14 +107,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const value = useMemo(
     () => ({
       user,
-      accessToken: session?.accessToken ?? null,
-      refreshToken: session?.refreshToken ?? null,
+      accessToken:     session?.accessToken  ?? null,
+      refreshToken:    session?.refreshToken ?? null,
       isAuthenticated: status === "authenticated",
-      isLoading: status === "loading",
+      isLoading:       status === "loading",
       logout,
       setEnvironment,
+      refreshLogo, 
     }),
-    [user, session?.accessToken, session?.refreshToken, status, logout, setEnvironment],
+    [user, session?.accessToken, session?.refreshToken, status, logout, setEnvironment, refreshLogo],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -25,32 +25,6 @@ interface EstadoConexionSunatCardProps {
 const THRESHOLD_FAST = 800;
 const THRESHOLD_SLOW = 2000;
 
-// ─── XML de prueba mínimo para Beta SUNAT ─────────────────────────────────────
-// Usa RUC de prueba 20000000001 — solo para medir respuesta, no afecta producción
-const SOAP_PRUEBA = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope
-  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:ser="http://service.sunat.gob.pe"
-  xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-  <soapenv:Header>
-    <wsse:Security>
-      <wsse:UsernameToken>
-        <wsse:Username>20000000001MODDATOS</wsse:Username>
-        <wsse:Password>moddatos</wsse:Password>
-      </wsse:UsernameToken>
-    </wsse:Security>
-  </soapenv:Header>
-  <soapenv:Body>
-    <ser:sendBill>
-      <fileName>20000000001-01-F001-00000001.zip</fileName>
-      <contentFile>UEsDBAoAAAAAAA==</contentFile>
-    </ser:sendBill>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-
-// Beta SUNAT — credenciales públicas de prueba oficiales
-const BETA_URL = "https://e-beta.sunat.gob.pe/ol-ti-itcpfegem/billService";
-
 // ─── Estados ──────────────────────────────────────────────────────────────────
 type ServiceState = "operativo" | "lento" | "critico" | "caido";
 
@@ -81,7 +55,7 @@ const STATE_CONFIG: Record<ServiceState, {
     textColor: "text-emerald-700",
     title: "Servicio Operativo",
     icon: Zap,
-    description: (ms) => `SUNAT Beta respondió correctamente. Tiempo de respuesta: ${ms}ms.`,
+    description: (ms) => `SUNAT respondió correctamente. Tiempo de respuesta: ${ms}ms.`,
   },
   lento: {
     banner: "bg-amber-50",
@@ -163,17 +137,24 @@ export function EstadoConexionSunatCard({
     xmlCount,
     errors,
   });
-  const [loading, setLoading] = useState(true);
+
+  // initialLoading → solo true la primera vez, muestra skeleton completo
+  // refreshing     → true en cada refresco silencioso, solo mueve el ícono de refresh
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  // ── Envía SOAP de prueba a Beta SUNAT y mide el tiempo ────────────────────
-  const checkConnection = useCallback(async () => {
-    setLoading(true);
-    const start = Date.now();
+  const checkConnection = useCallback(async (isManual = false) => {
+    // Si ya tenemos datos previos, es refresco silencioso → no toca initialLoading
+    if (initialLoading || isManual) {
+      if (isManual) setRefreshing(true);
+    } else {
+      // refresco automático del intervalo → silencioso
+      setRefreshing(true);
+    }
 
+    const start = Date.now();
     try {
-      // IMPORTANTE: esto va a tu route de Next.js que hace el fetch a Beta SUNAT
-      // porque desde el browser no puedes hacer SOAP directo (CORS)
       const res = await fetch("/api/auth/sunat", {
         method: "GET",
         signal: AbortSignal.timeout(8000),
@@ -182,6 +163,7 @@ export function EstadoConexionSunatCard({
       const responseMs = Date.now() - start;
       const data: { alive: boolean; sunatMs: number } = await res.json();
 
+      // Actualiza solo los valores, el layout no cambia
       setStatus((prev) => ({
         ...prev,
         connected: data.alive,
@@ -190,14 +172,15 @@ export function EstadoConexionSunatCard({
     } catch {
       setStatus((prev) => ({ ...prev, connected: false, responseMs: 0 }));
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
       setLastChecked(new Date());
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     checkConnection();
-    const id = setInterval(checkConnection, refreshIntervalMs);
+    const id = setInterval(() => checkConnection(), refreshIntervalMs);
     return () => clearInterval(id);
   }, [checkConnection, refreshIntervalMs]);
 
@@ -206,10 +189,26 @@ export function EstadoConexionSunatCard({
   const Icon = cfg.icon;
 
   const stats = [
-    { label: "CDR Recibidos",  value: status.cdrCount.toLocaleString(), icon: CheckCircle2, color: "text-emerald-600" },
-    { label: "XML Generados",  value: status.xmlCount.toLocaleString(),  icon: FileJson,     color: "text-blue-600"   },
-    { label: "Errores Envío",  value: status.errors.toString(),          icon: AlertCircle,  color: status.errors > 0 ? "text-red-500" : "text-gray-400" },
+    { label: "CDR Recibidos", value: status.cdrCount.toLocaleString(), icon: CheckCircle2, color: "text-emerald-600" },
+    { label: "XML Generados", value: status.xmlCount.toLocaleString(),  icon: FileJson,    color: "text-blue-600"   },
+    { label: "Errores Envío", value: status.errors.toString(),          icon: AlertCircle, color: status.errors > 0 ? "text-red-500" : "text-gray-400" },
   ];
+
+  // ── Skeleton solo en la carga inicial ────────────────────────────────────
+  if (initialLoading) {
+    return (
+      <Card className={className} title="Estado de Conexión SUNAT" subtitle="Medido contra ambiente Beta SUNAT">
+        <div className="animate-pulse space-y-4">
+          <div className="h-24 bg-gray-100 rounded-2xl" />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="h-20 bg-gray-100 rounded-xl" />
+            <div className="h-20 bg-gray-100 rounded-xl" />
+            <div className="h-20 bg-gray-100 rounded-xl" />
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -217,32 +216,28 @@ export function EstadoConexionSunatCard({
       title="Estado de Conexión SUNAT"
       subtitle="Medido contra ambiente Beta SUNAT"
     >
-      <div className={cn("flex items-start gap-5 p-4 rounded-2xl border", cfg.banner, cfg.border)}>
-        <div className={cn("p-4 rounded-full text-white shadow-lg shrink-0", cfg.iconBg, cfg.iconShadow)}>
-          {loading
-            ? <RefreshCw className="w-8 h-8 animate-spin" />
-            : <Icon className="w-8 h-8" />
-          }
+      <div className={cn("flex items-start gap-5 p-4 rounded-2xl border transition-colors duration-500", cfg.banner, cfg.border)}>
+        <div className={cn("p-4 rounded-full text-white shadow-lg shrink-0 transition-colors duration-500", cfg.iconBg, cfg.iconShadow)}>
+          <Icon className="w-8 h-8" />
         </div>
         <div className="flex-1 space-y-1">
           <div className="flex items-center justify-between">
-            <h4 className={cn("text-lg font-bold", cfg.titleColor)}>
-              {loading ? "Verificando..." : cfg.title}
+            <h4 className={cn("text-lg font-bold transition-colors duration-500", cfg.titleColor)}>
+              {cfg.title}
             </h4>
+            {/* Solo este ícono pequeño gira durante el refresco silencioso */}
             <button
-              onClick={checkConnection}
-              disabled={loading}
+              onClick={() => checkConnection(true)}
+              disabled={refreshing}
               className="text-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors"
               title="Verificar ahora"
             >
-              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+              <RefreshCw className={cn("w-4 h-4 transition-transform", refreshing && "animate-spin")} />
             </button>
           </div>
-          {!loading && (
-            <p className={cn("text-sm leading-snug", cfg.textColor)}>
-              {cfg.description(status.responseMs)}
-            </p>
-          )}
+          <p className={cn("text-sm leading-snug transition-colors duration-500", cfg.textColor)}>
+            {cfg.description(status.responseMs)}
+          </p>
           {lastChecked && (
             <p className="text-[11px] text-gray-400">
               Última verificación: {lastChecked.toLocaleTimeString("es-PE")}
