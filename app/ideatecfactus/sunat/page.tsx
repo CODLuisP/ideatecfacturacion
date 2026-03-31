@@ -258,6 +258,8 @@ export default function SunatPage() {
   const { showToast } = useToast();
   const { user, setEnvironment, accessToken } = useAuth();
 
+  console.log('User data in SUNAT page:', user);
+
   // ── Permisos ──────────────────────────────────────────────────────────────
   const canEditCredentials = user?.rol === 'superadmin' || user?.rol === 'admin';
 
@@ -337,9 +339,11 @@ export default function SunatPage() {
             environment:  config.environment,
             clientId:     config.clientId     || null,
             clientSecret: config.clientSecret || null,
+            logoBase64:   user?.logoBase64   ?? null,
           }
         : {
             environment: config.environment,
+            logoBase64:   user?.logoBase64   ?? null,
           };
 
       await axios.put(`http://localhost:5004/api/companies/${user!.ruc}`, body, {

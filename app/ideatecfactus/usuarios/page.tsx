@@ -1,19 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import {
-  Shield,
-  Mail,
-  Search,
-  UserPlus,
-  Trash2,
-  Edit2,
-  EyeOff,
-  Eye,
+  Shield, ShieldCheck,
+  Mail, Search, UserPlus, Trash2, Edit2,
+  EyeOff, Eye, Crown, Briefcase,
+  Clock, CheckCircle2, XCircle,
 } from "lucide-react";
 import { useToast } from "@/app/components/ui/Toast";
 import { Button } from "@/app/components/ui/Button";
-import { Card } from "@/app/components/ui/Card";
-import { Badge } from "@/app/components/ui/Badge";
 import { Modal } from "@/app/components/ui/Modal";
 import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
@@ -21,26 +15,220 @@ import axios from "axios";
 import { EditarUsuarioModal } from "@/app/components/modalUsuarios/EditarUsuarioModal";
 import { EliminarUsuarioModal } from "@/app/components/modalUsuarios/EliminarUsuarioModal";
 
+// ─── Rol config ───────────────────────────────────────────────────────────────
+const ROL_CONFIG = {
+  superadmin: {
+    label:       "Super Admin",
+    description: "Acceso total al sistema. Gestiona empresas, sucursales y todos los usuarios.",
+    icon:        Crown,
+    bg:          "bg-red-50",
+    border:      "border-red-100",
+    text:        "text-red-700",
+    iconBg:      "bg-red-100",
+    dot:         "bg-red-500",
+    badgeBg:     "bg-red-50 border-red-200 text-red-700",
+  },
+  admin: {
+    label:       "Administrador",
+    description: "Gestiona configuración SUNAT, certificados, sucursales y usuarios de su empresa.",
+    icon:        ShieldCheck,
+    bg:          "bg-blue-50",
+    border:      "border-blue-100",
+    text:        "text-blue-700",
+    iconBg:      "bg-blue-100",
+    dot:         "bg-blue-500",
+    badgeBg:     "bg-blue-50 border-blue-200 text-blue-700",
+  },
+  facturador: {
+    label:       "Facturador",
+    description: "Emite y consulta comprobantes electrónicos. Sin acceso a configuración.",
+    icon:        Briefcase,
+    bg:          "bg-emerald-50",
+    border:      "border-emerald-100",
+    text:        "text-emerald-700",
+    iconBg:      "bg-emerald-100",
+    dot:         "bg-emerald-500",
+    badgeBg:     "bg-emerald-50 border-emerald-200 text-emerald-700",
+  },
+} as const;
+
+type Rol = keyof typeof ROL_CONFIG;
+
+// ─── Role Badge ───────────────────────────────────────────────────────────────
+function RoleBadge({ rol }: { rol: string }) {
+  const cfg = ROL_CONFIG[rol as Rol] ?? ROL_CONFIG.facturador;
+  const Icon = cfg.icon;
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border",
+      cfg.badgeBg
+    )}>
+      <Icon className="w-3 h-3" />
+      {cfg.label}
+    </span>
+  );
+}
+
+// ─── Filter Pill ──────────────────────────────────────────────────────────────
+function FilterPill({ active, onClick, children }: {
+  active: boolean; onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "px-3 py-1.5 rounded-xl text-xs font-medium border transition-all",
+        active
+          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ─── Usuario Card ─────────────────────────────────────────────────────────────
+function UsuarioCard({ u, canEdit, onEdit, onDelete }: {
+  u: any; canEdit: boolean; onEdit: () => void; onDelete: () => void;
+}) {
+  const cfg = ROL_CONFIG[u.rol as Rol] ?? ROL_CONFIG.facturador;
+  const Icon = cfg.icon;
+  const initials = u.username.slice(0, 2).toUpperCase();
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:border-gray-200 transition-colors group">
+
+      {/* Header — limpio, sin fondo de color */}
+      <div className="px-5 pt-5 pb-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
+              cfg.iconBg, cfg.text
+            )}>
+              {initials}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 leading-tight">{u.username}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {u.rol === "superadmin" ? "Acceso global" : `Sucursal: ${u.nombreSucursal ?? "Sin asignar"}`}
+              </p>
+            </div>
+          </div>
+
+          {canEdit && (
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={onEdit}
+                className="p-1.5 rounded-lg text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-all"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onDelete}
+                className="p-1.5 rounded-lg text-gray-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3">
+          <RoleBadge rol={u.rol} />
+        </div>
+      </div>
+
+      {/* Descripción del rol */}
+      <div className="px-5 py-0 border-t border-b border-gray-50">
+        <div className={cn("flex items-start gap-2 p-2.5 rounded-xl")}>
+          <Icon className={cn("w-3.5 h-3.5 shrink-0 mt-0.5", cfg.text)} />
+          <p className={cn("text-[11px] leading-relaxed")}>
+            {cfg.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="px-5 py-3 space-y-2">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Mail className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+          <span className="truncate">{u.email}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Clock className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+          <span>
+            {u.fechaUltimoAcceso
+              ? new Date(u.fechaUltimoAcceso).toLocaleDateString("es-PE", {
+                  day: "2-digit", month: "short", year: "numeric",
+                })
+              : "Sin accesos registrados"}
+          </span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-gray-50 flex items-center justify-between">
+        {u.estado ? (
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Activo
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+            <XCircle className="w-3.5 h-3.5" /> Inactivo
+          </span>
+        )}
+        <span className="text-[10px] text-gray-300 font-mono">ID #{u.usuarioID}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function UsuariosPage() {
   const { showToast } = useToast();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const { user, accessToken } = useAuth();
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    rol: "facturador",
-    password: "",
-  });
-  const [loadingCreate, setLoadingCreate] = useState(false);
-  const [usuarios, setUsuarios] = useState<any[]>([]);
+
+  const [isModalOpen,     setIsModalOpen]     = useState(false);
+  const [searchTerm,      setSearchTerm]      = useState("");
+  const [rolFilter,       setRolFilter]       = useState<string>("todos");
+  const [usuarios,        setUsuarios]        = useState<any[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(true);
+  const [loadingCreate,   setLoadingCreate]   = useState(false);
+  const [modalEditar,     setModalEditar]     = useState<any | null>(null);
+  const [modalEliminar,   setModalEliminar]   = useState<any | null>(null);
+  const [showPassword,    setShowPassword]    = useState(false);
 
-  const [modalEditar, setModalEditar] = useState<any | null>(null);
-  const [modalEliminar, setModalEliminar] = useState<any | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    username: "", email: "", rol: "facturador", password: "",
+  });
+
   const isSuperadmin = user?.rol === "superadmin";
+  const canManage    = user?.rol !== "facturador";
 
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const fetchUsuarios = async () => {
+    setLoadingUsuarios(true);
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario?incluirInactivos=false`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      setUsuarios(res.data.data);
+    } catch {
+      showToast("Error al cargar usuarios", "error");
+    } finally {
+      setLoadingUsuarios(false);
+    }
+  };
+
+  useEffect(() => {
+    if (accessToken) fetchUsuarios();
+  }, [accessToken]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleEditar = async (data: any) => {
     try {
       await axios.patch(
@@ -52,10 +240,7 @@ export default function UsuariosPage() {
       showToast("Usuario actualizado correctamente", "success");
       fetchUsuarios();
     } catch (error: any) {
-      showToast(
-        error.response?.data?.message || "Error al actualizar",
-        "error",
-      );
+      showToast(error.response?.data?.message || "Error al actualizar", "error");
     }
   };
 
@@ -73,270 +258,244 @@ export default function UsuariosPage() {
     }
   };
 
-  const fetchUsuarios = async () => {
-    setLoadingUsuarios(true);
-    try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario?incluirInactivos=false`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      setUsuarios(res.data.data);
-    } catch (error) {
-      showToast("Error al cargar usuarios", "error");
-    } finally {
-      setLoadingUsuarios(false);
-    }
-  };
-
-  useEffect(() => {
-    if (accessToken) fetchUsuarios();
-  }, [accessToken]);
-
   const handleCrearUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(formData.password)) {
-      showToast(
-        "La contraseña debe tener mínimo 8 caracteres con letras y números",
-        "error",
-      );
+      showToast("La contraseña debe tener mínimo 8 caracteres con letras y números", "error");
       return;
     }
-
     setLoadingCreate(true);
     try {
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/register`,
         {
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          rol: formData.rol,
-          ruc: user?.ruc,
+          username:   formData.username,
+          email:      formData.email,
+          password:   formData.password,
+          rol:        formData.rol,
+          ruc:        user?.ruc,
           sucursalID: user?.sucursalID,
         },
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       setIsModalOpen(false);
       showToast("Usuario creado correctamente", "success");
       setFormData({ username: "", email: "", rol: "facturador", password: "" });
       fetchUsuarios();
     } catch (error: any) {
-      showToast(
-        error.response?.data?.message || "Error al crear usuario",
-        "error",
-      );
+      showToast(error.response?.data?.message || "Error al crear usuario", "error");
     } finally {
       setLoadingCreate(false);
     }
   };
 
+  // ── Filtrado ───────────────────────────────────────────────────────────────
+  const filtered = usuarios.filter((u) => {
+    const matchSearch =
+      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchRol = rolFilter === "todos" || u.rol === rolFilter;
+    return matchSearch && matchRol;
+  });
+
+  const counts = {
+    todos:      usuarios.length,
+    superadmin: usuarios.filter((u) => u.rol === "superadmin").length,
+    admin:      usuarios.filter((u) => u.rol === "admin").length,
+    facturador: usuarios.filter((u) => u.rol === "facturador").length,
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder="Buscar usuarios por nombre o correo..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div className="space-y-5 animate-in fade-in duration-500">
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-2 flex-1">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o correo..."
+              className="w-full pl-8 pr-4 py-2 border border-gray-200 rounded-xl outline-none text-sm focus:border-blue-400 bg-white transition-colors placeholder:text-gray-400"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <FilterPill active={rolFilter === "todos"}      onClick={() => setRolFilter("todos")}>
+              Todos ({counts.todos})
+            </FilterPill>
+            <FilterPill active={rolFilter === "superadmin"} onClick={() => setRolFilter("superadmin")}>
+              Super Admin ({counts.superadmin})
+            </FilterPill>
+            <FilterPill active={rolFilter === "admin"}      onClick={() => setRolFilter("admin")}>
+              Admin ({counts.admin})
+            </FilterPill>
+            <FilterPill active={rolFilter === "facturador"} onClick={() => setRolFilter("facturador")}>
+              Facturador ({counts.facturador})
+            </FilterPill>
+          </div>
         </div>
-        {user?.rol !== "facturador" && (
+        {canManage && (
           <Button onClick={() => setIsModalOpen(true)}>
-            <UserPlus className="w-4 h-4" /> Nuevo Usuario
+            <UserPlus className="w-4 h-4" />
+            Nuevo usuario
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loadingUsuarios ? (
-          <p className="text-gray-400 text-sm">Cargando usuarios...</p>
-        ) : (
-          usuarios
-            .filter(
-              (u) =>
-                u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                u.email.toLowerCase().includes(searchTerm.toLowerCase()),
-            )
-            .map((u) => (
-              <Card
-                key={u.usuarioID}
-                className="group hover:border-brand-blue transition-all"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-brand-blue font-bold text-lg border border-blue-100">
-                      {u.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors">
-                        {u.username}
-                      </h4>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {u.rol === "superadmin"
-                          ? "Global"
-                          : `Sucursal: ${u.nombreSucursal ?? "Sin sucursal"}`}
-                      </p>
-                      <Badge
-                        variant={u.rol === "admin" ? "default" : "info"}
-                        className="mt-1"
-                      >
-                        <Shield className="w-3 h-3 mr-1" /> {u.rol}
-                      </Badge>
-                    </div>
-                  </div>
-                  {user?.rol !== "facturador" && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setModalEditar(u)}
-                        className="p-1.5 text-gray-300 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-all"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setModalEliminar(u)}
-                        className="p-1.5 text-gray-300 hover:text-brand-red hover:bg-red-50 rounded-lg transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
+      {/* Grid */}
+      {loadingUsuarios ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+              <div className="p-5 flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gray-100 shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-3 bg-gray-100 rounded w-2/3" />
+                  <div className="h-2.5 bg-gray-100 rounded w-1/2" />
                 </div>
+              </div>
+              <div className="mx-5 mb-4 h-12 bg-gray-50 rounded-xl" />
+              <div className="px-5 pb-4 space-y-2">
+                <div className="h-2.5 bg-gray-100 rounded w-3/4" />
+                <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+          <Shield className="w-8 h-8 text-gray-200" />
+          <p className="text-sm">No se encontraron usuarios</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((u) => (
+            <UsuarioCard
+              key={u.usuarioID}
+              u={u}
+              canEdit={canManage}
+              onEdit={()   => setModalEditar(u)}
+              onDelete={()  => setModalEliminar(u)}
+            />
+          ))}
+        </div>
+      )}
 
-                <div className="mt-6 space-y-3">
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    {u.email}
-                  </div>
-                </div>
+      {/* Footer count */}
+      {!loadingUsuarios && filtered.length > 0 && (
+        <p className="text-xs text-gray-400 text-right">
+          Mostrando <span className="font-medium text-gray-600">{filtered.length}</span> de{" "}
+          <span className="font-medium text-gray-600">{usuarios.length}</span> usuarios
+        </p>
+      )}
 
-                <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        u.estado ? "bg-emerald-500" : "bg-gray-300",
-                      )}
-                    />
-                    <span className="text-xs font-medium text-gray-500">
-                      {u.estado ? "Activo" : "Inactivo"}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold">
-                    Último acceso:{" "}
-                    {u.fechaUltimoAcceso
-                      ? new Date(u.fechaUltimoAcceso).toLocaleDateString()
-                      : "Nunca"}
-                  </span>
-                </div>
-              </Card>
-            ))
-        )}
-      </div>
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Registrar Nuevo Usuario"
-      >
+      {/* Modal crear usuario — sin opción superadmin */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar nuevo usuario">
         <form className="space-y-4" onSubmit={handleCrearUsuario}>
+
+          {/* Leyenda solo admin y facturador */}
+          <div className="rounded-xl border border-gray-100 overflow-hidden">
+            {(["admin", "facturador"] as Rol[]).map((r) => {
+              const cfg = ROL_CONFIG[r];
+              const Icon = cfg.icon;
+              return (
+                <div key={r} className={cn("flex items-start gap-2.5 px-3 py-2.5 border-b border-gray-50 last:border-0", cfg.bg)}>
+                  <Icon className={cn("w-3.5 h-3.5 shrink-0 mt-0.5", cfg.text)} />
+                  <div>
+                    <p className={cn("text-[11px] font-semibold", cfg.text)}>{cfg.label}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{cfg.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Usuario
-            </label>
+            <label className="text-xs font-bold text-gray-500 uppercase">Usuario</label>
             <input
               type="text"
               placeholder="Ej: juan.perez"
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               required
               value={formData.username}
-              onChange={(e) =>
-                setFormData({ ...formData, username: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             />
           </div>
+
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Correo Electrónico
-            </label>
+            <label className="text-xs font-bold text-gray-500 uppercase">Correo electrónico</label>
             <input
               type="email"
               placeholder="juan.p@empresa.com"
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               required
               value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
+
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Rol / Perfil
-            </label>
+            <label className="text-xs font-bold text-gray-500 uppercase">Rol / Perfil</label>
             <select
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               value={formData.rol}
-              onChange={(e) =>
-                setFormData({ ...formData, rol: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
             >
               <option value="facturador">Facturador</option>
               {(isSuperadmin || user?.rol === "admin") && (
-                <option value="admin">Admin</option>
+                <option value="admin">Administrador</option>
               )}
             </select>
+            {formData.rol && (
+              <p className={cn(
+                "text-[10px] italic px-2 py-1 rounded-lg",
+                ROL_CONFIG[formData.rol as Rol]?.bg,
+                ROL_CONFIG[formData.rol as Rol]?.text,
+              )}>
+                {ROL_CONFIG[formData.rol as Rol]?.description}
+              </p>
+            )}
           </div>
+
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Contraseña
-            </label>
+            <label className="text-xs font-bold text-gray-500 uppercase">Contraseña</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 placeholder="Mín. 8 caracteres con letras y números"
                 value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue pr-10"
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm pr-10 transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-[10px] text-gray-400 mt-1 italic">
+            <p className="text-[10px] text-gray-400 italic">
               Mínimo 8 caracteres, debe incluir letras y números.
             </p>
           </div>
+
           <div className="pt-4 flex justify-end gap-3">
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-            >
+            <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loadingCreate}>
-              {loadingCreate ? "Creando..." : "Crear Usuario"}
+              {loadingCreate ? "Creando..." : "Crear usuario"}
             </Button>
           </div>
         </form>
       </Modal>
+
       {modalEditar && (
         <EditarUsuarioModal
           usuario={modalEditar}

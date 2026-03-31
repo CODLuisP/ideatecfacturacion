@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, MapPin, Phone, Upload, X, ChevronDown, Loader2, Store, Hash } from 'lucide-react';
+import { Building2, MapPin, Phone, Upload, X, ChevronDown, Loader2, Store, Hash, Lock } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '@/app/components/ui/Toast';
 import { Card } from '@/app/components/ui/Card';
@@ -117,6 +117,9 @@ function Select({ label, required, hint, options, className, ...props }: SelectP
           required={required}
           className={cn(
             'w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm appearance-none transition-colors',
+            props.disabled
+              ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+              : '',
             className
           )}
           {...props}
@@ -147,19 +150,32 @@ function SectionHeader({ icon: Icon, title, subtitle }: { icon: React.ElementTyp
   );
 }
 
+// ─── Read-only Banner ─────────────────────────────────────────────────────────
+function ReadOnlyBanner() {
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl mb-6">
+      <Lock className="w-4 h-4 text-amber-500 shrink-0" />
+      <p className="text-xs text-amber-700 font-medium">
+        Estás en modo de solo lectura. Contacta a un administrador para modificar esta información.
+      </p>
+    </div>
+  );
+}
+
 // ─── Logo Uploader ────────────────────────────────────────────────────────────
 interface LogoUploaderProps {
   logoDataUrl: string;
   uploading: boolean;
+  canEdit: boolean;
   onFileSelected: (file: File, previewDataUrl: string) => void;
   onLogoRemove: () => void;
 }
-function LogoUploader({ logoDataUrl, uploading, onFileSelected, onLogoRemove }: LogoUploaderProps) {
+function LogoUploader({ logoDataUrl, uploading, canEdit, onFileSelected, onLogoRemove }: LogoUploaderProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const handle = (file: File | undefined) => {
-    if (!file) return;
+    if (!file || !canEdit) return;
     if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type)) return;
     if (file.size > 2 * 1024 * 1024) return;
     const reader = new FileReader();
@@ -171,13 +187,14 @@ function LogoUploader({ logoDataUrl, uploading, onFileSelected, onLogoRemove }: 
     <div className="md:col-span-2 flex items-center gap-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
       <div
         className={cn(
-          'w-24 h-24 bg-white rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-colors',
-          dragging ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+          'w-24 h-24 bg-white rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors',
+          canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-70',
+          dragging && canEdit ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'
         )}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e) => { if (!canEdit) return; e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
-        onClick={() => !uploading && ref.current?.click()}
+        onClick={() => canEdit && !uploading && ref.current?.click()}
       >
         {uploading ? (
           <Loader2 className="w-6 h-6 text-brand-blue animate-spin" />
@@ -192,20 +209,28 @@ function LogoUploader({ logoDataUrl, uploading, onFileSelected, onLogoRemove }: 
           accept="image/jpeg,image/png,image/svg+xml,image/webp"
           className="hidden"
           onChange={(e) => handle(e.target.files?.[0])}
+          disabled={!canEdit}
         />
       </div>
       <div className="space-y-2">
-        <div className="flex gap-2">
-          <Button variant="outline" className="h-9 text-xs" type="button" disabled={uploading} onClick={() => ref.current?.click()}>
-            <Upload className="w-3.5 h-3.5" />
-            {uploading ? 'Subiendo...' : 'Subir Logo'}
-          </Button>
-          {logoDataUrl && !uploading && (
-            <Button variant="outline" className="h-9 text-xs" type="button" onClick={onLogoRemove}>
-              <X className="w-3.5 h-3.5" /> Quitar
+        {canEdit ? (
+          <div className="flex gap-2">
+            <Button variant="outline" className="h-9 text-xs" type="button" disabled={uploading} onClick={() => ref.current?.click()}>
+              <Upload className="w-3.5 h-3.5" />
+              {uploading ? 'Subiendo...' : 'Subir Logo'}
             </Button>
-          )}
-        </div>
+            {logoDataUrl && !uploading && (
+              <Button variant="outline" className="h-9 text-xs" type="button" onClick={onLogoRemove}>
+                <X className="w-3.5 h-3.5" /> Quitar
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <Lock className="w-3.5 h-3.5" />
+            <span>Solo lectura</span>
+          </div>
+        )}
         <p className="text-[10px] text-gray-400">
           JPG, PNG, SVG o WEBP. Máximo 2MB.<br />
           Se mostrará en tus comprobantes electrónicos.
@@ -217,14 +242,9 @@ function LogoUploader({ logoDataUrl, uploading, onFileSelected, onLogoRemove }: 
 
 // ─── Sucursal Series Row ──────────────────────────────────────────────────────
 function SucursalSerieRow({
-  label,
-  serie,
-  correlativo,
-  onSerieChange,
-  onCorrelativoChange,
-  prefix,
-  hint,
-  readOnly,
+  label, serie, correlativo,
+  onSerieChange, onCorrelativoChange,
+  prefix, hint, readOnly,
 }: {
   label: string;
   serie: string;
@@ -243,7 +263,7 @@ function SucursalSerieRow({
           className={cn(
             'w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm transition-colors',
             readOnly
-              ? 'bg-gray-50 text-gray-500 cursor-not-allowed'
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
               : 'focus:border-brand-blue bg-white'
           )}
           value={serie}
@@ -254,7 +274,7 @@ function SucursalSerieRow({
         />
         <p className="text-[10px] text-gray-400 italic">Empieza con "{prefix}" — máx. 4 caracteres</p>
       </div>
-      <div className="w-36 space-y-1.5">
+      <div className="w-56 space-y-1.5">
         <FieldLabel>Correlativo inicial</FieldLabel>
         <input
           type="number"
@@ -262,7 +282,7 @@ function SucursalSerieRow({
           className={cn(
             'w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm transition-colors',
             readOnly
-              ? 'bg-gray-50 text-gray-500 cursor-not-allowed'
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
               : 'focus:border-brand-blue bg-white'
           )}
           value={correlativo}
@@ -279,11 +299,7 @@ function SucursalSerieRow({
 
 // ─── Sucursal Card ────────────────────────────────────────────────────────────
 function SucursalCard({
-  sucursal,
-  onChange,
-  onSave,
-  saving,
-  readOnly,
+  sucursal, onChange, onSave, saving, readOnly,
 }: {
   sucursal: Sucursal;
   onChange: (updated: Sucursal) => void;
@@ -321,79 +337,41 @@ function SucursalCard({
           >
             {sucursal.estado ? 'Activo' : 'Inactivo'}
           </span>
+          {readOnly && (
+            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-wide flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5" /> Solo lectura
+            </span>
+          )}
         </div>
       </div>
 
       {/* Body */}
       <div className="p-5 space-y-4">
-        <SucursalSerieRow
-          label="Factura"
-          serie={sucursal.serieFactura}
-          correlativo={sucursal.correlativoFactura}
-          onSerieChange={(v) => upd('serieFactura')(v)}
-          onCorrelativoChange={(v) => upd('correlativoFactura')(v)}
-          prefix="F"
-          hint="F001"
-          readOnly={readOnly}
-        />
-        <SucursalSerieRow
-          label="Boleta"
-          serie={sucursal.serieBoleta}
-          correlativo={sucursal.correlativoBoleta}
-          onSerieChange={(v) => upd('serieBoleta')(v)}
-          onCorrelativoChange={(v) => upd('correlativoBoleta')(v)}
-          prefix="B"
-          hint="B001"
-          readOnly={readOnly}
-        />
-        <SucursalSerieRow
-          label="Nota de Crédito"
-          serie={sucursal.serieNotaCredito}
-          correlativo={sucursal.correlativoNotaCredito}
-          onSerieChange={(v) => upd('serieNotaCredito')(v)}
-          onCorrelativoChange={(v) => upd('correlativoNotaCredito')(v)}
-          prefix="F"
-          hint="FC01"
-          readOnly={readOnly}
-        />
-        <SucursalSerieRow
-          label="Nota de Débito"
-          serie={sucursal.serieNotaDebito}
-          correlativo={sucursal.correlativoNotaDebito}
-          onSerieChange={(v) => upd('serieNotaDebito')(v)}
-          onCorrelativoChange={(v) => upd('correlativoNotaDebito')(v)}
-          prefix="F"
-          hint="FD01"
-          readOnly={readOnly}
-        />
-        <SucursalSerieRow
-          label="Guía de Remisión"
-          serie={sucursal.serieGuiaRemision}
-          correlativo={sucursal.correlativoGuiaRemision}
-          onSerieChange={(v) => upd('serieGuiaRemision')(v)}
-          onCorrelativoChange={(v) => upd('correlativoGuiaRemision')(v)}
-          prefix="T"
-          hint="T001"
-          readOnly={readOnly}
-        />
-        <SucursalSerieRow
-          label="Guía Transportista"
-          serie={sucursal.serieGuiaTransportista}
-          correlativo={sucursal.correlativoGuiaTransportista}
-          onSerieChange={(v) => upd('serieGuiaTransportista')(v)}
-          onCorrelativoChange={(v) => upd('correlativoGuiaTransportista')(v)}
-          prefix="V"
-          hint="V001"
-          readOnly={readOnly}
-        />
+        <SucursalSerieRow label="Factura" serie={sucursal.serieFactura} correlativo={sucursal.correlativoFactura}
+          onSerieChange={(v) => upd('serieFactura')(v)} onCorrelativoChange={(v) => upd('correlativoFactura')(v)}
+          prefix="F" hint="F001" readOnly={readOnly} />
+        <SucursalSerieRow label="Boleta" serie={sucursal.serieBoleta} correlativo={sucursal.correlativoBoleta}
+          onSerieChange={(v) => upd('serieBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoBoleta')(v)}
+          prefix="B" hint="B001" readOnly={readOnly} />
+        <SucursalSerieRow label="Nota de Crédito" serie={sucursal.serieNotaCredito} correlativo={sucursal.correlativoNotaCredito}
+          onSerieChange={(v) => upd('serieNotaCredito')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCredito')(v)}
+          prefix="F" hint="FC01" readOnly={readOnly} />
+        <SucursalSerieRow label="Nota de Débito" serie={sucursal.serieNotaDebito} correlativo={sucursal.correlativoNotaDebito}
+          onSerieChange={(v) => upd('serieNotaDebito')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebito')(v)}
+          prefix="F" hint="FD01" readOnly={readOnly} />
+        <SucursalSerieRow label="Guía de Remisión" serie={sucursal.serieGuiaRemision} correlativo={sucursal.correlativoGuiaRemision}
+          onSerieChange={(v) => upd('serieGuiaRemision')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaRemision')(v)}
+          prefix="T" hint="T001" readOnly={readOnly} />
+        <SucursalSerieRow label="Guía Transportista" serie={sucursal.serieGuiaTransportista} correlativo={sucursal.correlativoGuiaTransportista}
+          onSerieChange={(v) => upd('serieGuiaTransportista')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaTransportista')(v)}
+          prefix="V" hint="V001" readOnly={readOnly} />
       </div>
 
-      {/* Footer */}
+      {/* Footer — solo visible si puede editar */}
       {!readOnly && (
         <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
           <Button
             type="button"
-            variant="outline"
             className="h-9 text-xs"
             disabled={saving}
             onClick={() => onSave(sucursal)}
@@ -421,22 +399,17 @@ export default function ConfiguracionPage() {
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [logoBase64Pure, setLogoBase64Pure] = useState<string | null>(null);
 
-  // ── CAMBIO 1: agrega refreshLogo ──────────────────────────────────────────
   const { accessToken, user, refreshLogo } = useAuth();
 
+  // ── Permisos por rol ───────────────────────────────────────────────────────
   const isSuperAdmin = user?.username === 'superAdminOpen';
+  const canEdit      = user?.rol === 'admin' || isSuperAdmin;
+  const isFacturador = user?.rol === 'facturador';
 
   const [form, setForm] = useState<EmpresaForm>({
-    ruc: '',
-    razonSocial: '',
-    nombreComercial: '',
-    departamento: '',
-    provincia: '',
-    distrito: '',
-    direccion: '',
-    ubigeo: '',
-    telefono: '',
-    email: '',
+    ruc: '', razonSocial: '', nombreComercial: '',
+    departamento: '', provincia: '', distrito: '',
+    direccion: '', ubigeo: '', telefono: '', email: '',
   });
 
   // ── GET empresa ───────────────────────────────────────────────────────────
@@ -446,10 +419,8 @@ export default function ConfiguracionPage() {
 
     setLoadingEmpresa(true);
     axios
-      .get(`${BASE_URL}/api/companies/${ruc}`,{
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+      .get(`${BASE_URL}/api/companies/${ruc}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       })
       .then((res) => {
         const d = res.data;
@@ -483,25 +454,18 @@ export default function ConfiguracionPage() {
 
     if (isSuperAdmin) {
       axios
-        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}`,{
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
         })
         .then((res) => setSucursales(res.data ?? []))
         .catch(() => showToast('No se pudieron cargar las sucursales', 'error'))
         .finally(() => setLoadingSucursales(false));
     } else {
       const sucursalId = user?.sucursalID;
-      if (!sucursalId) {
-        setLoadingSucursales(false);
-        return;
-      }
+      if (!sucursalId) { setLoadingSucursales(false); return; }
       axios
-        .get(`${BASE_URL}/api/Sucursal/${sucursalId}`,{
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+        .get(`${BASE_URL}/api/Sucursal/${sucursalId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
         })
         .then((res) => setSucursales([res.data]))
         .catch(() => showToast('No se pudo cargar la sucursal', 'error'))
@@ -511,6 +475,7 @@ export default function ConfiguracionPage() {
 
   // ── Subir logo ────────────────────────────────────────────────────────────
   const handleFileSelected = async (file: File, previewDataUrl: string) => {
+    if (!canEdit) return;
     setLogoDataUrl(previewDataUrl);
     setLogoBase64Pure(stripDataUrlPrefix(previewDataUrl));
     setUploadingLogo(true);
@@ -531,18 +496,22 @@ export default function ConfiguracionPage() {
   };
 
   const handleLogoRemove = () => {
+    if (!canEdit) return;
     setLogoDataUrl('');
     setLogoBase64Pure(null);
   };
 
   const upd =
     (key: keyof EmpresaForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      if (!canEdit) return;
       setForm((f) => ({ ...f, [key]: e.target.value }));
+    };
 
   // ── PUT empresa ───────────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) return;
     if (!form.ruc || !form.razonSocial || !form.direccion || !form.email) {
       showToast('Completa los campos obligatorios', 'error');
       return;
@@ -562,15 +531,9 @@ export default function ConfiguracionPage() {
         logoBase64:      logoBase64Pure,
       };
       await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload, {
-        headers: {
-          Authorization:  `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       });
-
-      // ── CAMBIO 2: refresca el logo en el Topbar al instante ───────────────
       await refreshLogo();
-
       showToast('Datos de empresa actualizados correctamente', 'success');
     } catch {
       showToast('Error al guardar los datos. Verifica tu conexión.', 'error');
@@ -579,8 +542,9 @@ export default function ConfiguracionPage() {
     }
   };
 
-  // ── PUT sucursal — con Bearer token y payload exacto de la API ────────────
+  // ── PUT sucursal ──────────────────────────────────────────────────────────
   const handleSaveSucursal = async (sucursal: Sucursal) => {
+    if (!canEdit) return;
     setSavingSucursalId(sucursal.sucursalId);
     try {
       const payload = {
@@ -600,18 +564,9 @@ export default function ConfiguracionPage() {
         serieGuiaTransportista:       sucursal.serieGuiaTransportista,
         correlativoGuiaTransportista: sucursal.correlativoGuiaTransportista,
       };
-
-      await axios.put(
-        `${BASE_URL}/api/Sucursal/${sucursal.sucursalId}`,
-        payload,
-        {
-          headers: {
-            Authorization:  `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
+      await axios.put(`${BASE_URL}/api/Sucursal/${sucursal.sucursalId}`, payload, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
       showToast(`Series de "${sucursal.nombre}" guardadas correctamente`, 'success');
     } catch {
       showToast(`Error al guardar la sucursal "${sucursal.nombre}"`, 'error');
@@ -621,6 +576,7 @@ export default function ConfiguracionPage() {
   };
 
   const handleSucursalChange = (updated: Sucursal) => {
+    if (!canEdit) return;
     setSucursales((prev) =>
       prev.map((s) => (s.sucursalId === updated.sucursalId ? updated : s))
     );
@@ -637,64 +593,80 @@ export default function ConfiguracionPage() {
             <span className="text-sm">Cargando datos de la empresa...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <LogoUploader
-              logoDataUrl={logoDataUrl}
-              uploading={uploadingLogo}
-              onFileSelected={handleFileSelected}
-              onLogoRemove={handleLogoRemove}
-            />
+          <>
+            {isFacturador && <ReadOnlyBanner />}
 
-            <div className="md:col-span-2">
-              <SectionHeader icon={Building2} title="Identificación Tributaria" subtitle="Datos registrados en SUNAT" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <LogoUploader
+                logoDataUrl={logoDataUrl}
+                uploading={uploadingLogo}
+                canEdit={canEdit}
+                onFileSelected={handleFileSelected}
+                onLogoRemove={handleLogoRemove}
+              />
+
+              <div className="md:col-span-2">
+                <SectionHeader icon={Building2} title="Identificación Tributaria" subtitle="Datos registrados en SUNAT" />
+              </div>
+
+              <Input label="RUC" value={form.ruc} disabled hint="El RUC no puede modificarse" />
+              <Input label="Razón Social" value={form.razonSocial} onChange={upd('razonSocial')}
+                required placeholder="Nombre legal de la empresa" disabled={!canEdit} />
+              <Input label="Nombre Comercial" value={form.nombreComercial} onChange={upd('nombreComercial')}
+                placeholder="Nombre con el que opera (opcional)" disabled={!canEdit} />
+
+              <div className="md:col-span-2">
+                <SectionHeader icon={MapPin} title="Ubicación y Domicilio Fiscal" subtitle="Dirección registrada en SUNAT para tus comprobantes" />
+              </div>
+
+              <Select label="Departamento" required value={form.departamento} onChange={upd('departamento')}
+                options={DEPARTAMENTOS.map((d) => ({ value: d, label: d }))} disabled={!canEdit} />
+              <Input label="Provincia" value={form.provincia} onChange={upd('provincia')}
+                required placeholder="Ej: Cajamarca" disabled={!canEdit} />
+              <Input label="Distrito" value={form.distrito} onChange={upd('distrito')}
+                required placeholder="Ej: Cajamarca" disabled={!canEdit} />
+              <Input label="Ubigeo" value={form.ubigeo} onChange={upd('ubigeo')}
+                placeholder="Ej: 060101" maxLength={6} disabled={!canEdit}
+                hint="Código de ubicación geográfica INEI (6 dígitos)" />
+
+              <div className="md:col-span-2">
+                <Input label="Dirección Fiscal" value={form.direccion} onChange={upd('direccion')}
+                  required placeholder="Av. / Jr. / Calle + número, referencia" disabled={!canEdit}
+                  hint="Dirección completa tal como aparece en SUNAT" />
+              </div>
+
+              <div className="md:col-span-2">
+                <SectionHeader icon={Phone} title="Datos de Contacto" subtitle="Información de comunicación de la empresa" />
+              </div>
+
+              <Input label="Teléfono" value={form.telefono} onChange={upd('telefono')}
+                placeholder="Ej: 01 234 5678 / 999 123 456" type="tel" disabled={!canEdit} />
+              <Input label="Email" value={form.email} onChange={upd('email')}
+                required placeholder="contacto@empresa.pe" type="email" disabled={!canEdit}
+                hint="Se usará para notificaciones y envío de comprobantes" />
             </div>
-
-            <Input label="RUC" value={form.ruc} disabled hint="El RUC no puede modificarse" />
-            <Input label="Razón Social" value={form.razonSocial} onChange={upd('razonSocial')} required placeholder="Nombre legal de la empresa" />
-            <Input label="Nombre Comercial" value={form.nombreComercial} onChange={upd('nombreComercial')} placeholder="Nombre con el que opera (opcional)" />
-
-            <div className="md:col-span-2">
-              <SectionHeader icon={MapPin} title="Ubicación y Domicilio Fiscal" subtitle="Dirección registrada en SUNAT para tus comprobantes" />
-            </div>
-
-            <Select
-              label="Departamento"
-              required
-              value={form.departamento}
-              onChange={upd('departamento')}
-              options={DEPARTAMENTOS.map((d) => ({ value: d, label: d }))}
-            />
-            <Input label="Provincia" value={form.provincia} onChange={upd('provincia')} required placeholder="Ej: Cajamarca" />
-            <Input label="Distrito"  value={form.distrito}  onChange={upd('distrito')}  required placeholder="Ej: Cajamarca" />
-            <Input label="Ubigeo" value={form.ubigeo} onChange={upd('ubigeo')} placeholder="Ej: 060101" maxLength={6} hint="Código de ubicación geográfica INEI (6 dígitos)" />
-
-            <div className="md:col-span-2">
-              <Input label="Dirección Fiscal" value={form.direccion} onChange={upd('direccion')} required placeholder="Av. / Jr. / Calle + número, referencia" hint="Dirección completa tal como aparece en SUNAT" />
-            </div>
-
-            <div className="md:col-span-2">
-              <SectionHeader icon={Phone} title="Datos de Contacto" subtitle="Información de comunicación de la empresa" />
-            </div>
-
-            <Input label="Teléfono" value={form.telefono} onChange={upd('telefono')} placeholder="Ej: 01 234 5678 / 999 123 456" type="tel" />
-            <Input label="Email" value={form.email} onChange={upd('email')} required placeholder="contacto@empresa.pe" type="email" hint="Se usará para notificaciones y envío de comprobantes" />
-          </div>
+          </>
         )}
 
-        <div className="mt-8 flex justify-end">
-          <Button type="submit" disabled={saving || loadingEmpresa || uploadingLogo}>
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {saving ? 'Guardando...' : 'Guardar Datos de Empresa'}
-          </Button>
-        </div>
+        {/* Botón guardar — oculto para facturador */}
+        {canEdit && (
+          <div className="mt-8 flex justify-end">
+            <Button type="submit" disabled={saving || loadingEmpresa || uploadingLogo}>
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? 'Guardando...' : 'Guardar Datos de Empresa'}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {/* ── Series de Comprobantes ── */}
       <Card
         title="Series de Comprobantes"
         subtitle={
-          isSuperAdmin
-            ? 'Configura las series y correlativos de cada sucursal'
+          canEdit
+            ? isSuperAdmin
+              ? 'Configura las series y correlativos de cada sucursal'
+              : 'Configura las series y correlativos de tu sucursal'
             : 'Consulta las series y correlativos de tu sucursal'
         }
       >
@@ -709,18 +681,21 @@ export default function ConfiguracionPage() {
             <p className="text-sm">No se encontraron sucursales</p>
           </div>
         ) : (
-          <div className="space-y-5">
-            {sucursales.map((sucursal) => (
-              <SucursalCard
-                key={sucursal.sucursalId}
-                sucursal={sucursal}
-                onChange={handleSucursalChange}
-                onSave={handleSaveSucursal}
-                saving={savingSucursalId === sucursal.sucursalId}
-                readOnly={false}
-              />
-            ))}
-          </div>
+          <>
+            {isFacturador && <ReadOnlyBanner />}
+            <div className="space-y-5">
+              {sucursales.map((sucursal) => (
+                <SucursalCard
+                  key={sucursal.sucursalId}
+                  sucursal={sucursal}
+                  onChange={handleSucursalChange}
+                  onSave={handleSaveSucursal}
+                  saving={savingSucursalId === sucursal.sucursalId}
+                  readOnly={!canEdit}
+                />
+              ))}
+            </div>
+          </>
         )}
       </Card>
 
