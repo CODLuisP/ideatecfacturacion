@@ -6,7 +6,7 @@ import { Card } from '@/app/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
 import { useEmpresaEmisor } from './gestionBoletas/useEmpresaEmisor';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Boleta, BoletaCliente, BoletaDetalle, BoletaPago, BoletaCuota, BoletaGuia } from './gestionBoletas/Boleta';
+import { Boleta, BoletaCliente, BoletaDetalle, BoletaPago, BoletaCuota, BoletaGuia, Sucursal } from './gestionBoletas/Boleta';
 import { useClienteBoleta } from './gestionBoletas/useClienteBoleta';
 import { Cliente } from '../../clientes/gestionClientes/Cliente';
 import { useSucursal } from './gestionBoletas/useSucursal';
@@ -17,6 +17,8 @@ import axios from 'axios';
 import { numeroALetras } from '@/app/components/ui/numeroALetras';
 import { useToast } from '@/app/components/ui/Toast';
 import { useClientesRuc } from '../../clientes/gestionClientes/useClientesRuc';
+import { useSucursalRuc } from './gestionBoletas/useSucursalRuc';
+import { SelectPersonalizado } from '@/app/components/ui/SelectPersonalizado';
 
 interface DetalleLocal extends Partial<BoletaDetalle> {
   _incluirIGV?: boolean
@@ -43,9 +45,13 @@ export default function BoletaPage() {
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } = useClienteBoleta();
-    const { clientes, setClientes, loadingClientes } = useClientesRuc();
-  const { sucursal } = useSucursal();
+  const { clientes, loadingClientes } = useClientesRuc();
+
+  const { sucursal: sucursalDelHook, loadingSucursal } = useSucursal();
+  const [sucursal, setSucursal] = useState<Sucursal | null>(null)
+  const { sucursales, loadingSucursales } = useSucursalRuc()
   const [correlativoActual, setCorrelativoActual] = useState<number | null>(null);
+
   const { productosSucursal } = useProductosSucursal();
 
   const { fecha, fechaHora } = formatoFechaActual();
@@ -79,93 +85,103 @@ export default function BoletaPage() {
       showToast(`El ítem ${itemSinDescripcion + 1} no tiene descripción o producto`, 'error')
       return
     }
-  setEmitiendo(true)
-  setErrorEmision(null)
-  try {
-    const boletaFinal = prepararBoleta()
-    const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } })
-    const comprobanteId = resBoleta.data.comprobanteId;
-    const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } })
-    const respuesta = resSunat.data
+    setEmitiendo(true)
+    setErrorEmision(null)
+    try {
+      const boletaFinal = prepararBoleta()
+      const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } })
+      const comprobanteId = resBoleta.data.comprobanteId;
+      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } })
+      const respuesta = resSunat.data
 
-    // ✅ toast según respuesta SUNAT
-    if (respuesta.exitoso) {
-      showToast(respuesta.mensaje ?? 'Boleta emitida correctamente.', 'success')
-    } else {
-      console.log("Mensaje de error: ", respuesta.mensaje)
-        showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, 'error')
-    }
-
-    // ✅ actualizar stock — solo productos tipo BIEN con productoId
-    const itemsParaStock = detalles.filter(d => 
-      d.productoId && 
-      d.productoId !== 0 && 
-      d._sucursalProductoId &&
-      d._tipoProducto === 'BIEN' // o como venga en tu interfaz
-    )
-
-    if (itemsParaStock.length > 0) {
-      const body = itemsParaStock.map(d => ({
-        sucursalProductoId: d._sucursalProductoId,
-        cantidad: d.cantidad ?? 1
-      }))
-      
-      try {
-        console.log("Body actulizar stock: ", body)
-        await axios.put(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-          body,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-      } catch {
-        console.error('Error al actualizar stock')
+      // ✅ toast según respuesta SUNAT
+      if (respuesta.exitoso) {
+        showToast(respuesta.mensaje ?? 'Boleta emitida correctamente.', 'success')
+      } else {
+        console.log("Mensaje de error: ", respuesta.mensaje)
+          showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, 'error')
       }
+
+      // ✅ actualizar stock — solo productos tipo BIEN con productoId
+      const itemsParaStock = detalles.filter(d => 
+        d.productoId && 
+        d.productoId !== 0 && 
+        d._sucursalProductoId &&
+        d._tipoProducto === 'BIEN' // o como venga en tu interfaz
+      )
+
+      if (itemsParaStock.length > 0) {
+        const body = itemsParaStock.map(d => ({
+          sucursalProductoId: d._sucursalProductoId,
+          cantidad: d.cantidad ?? 1
+        }))
+        
+        try {
+          console.log("Body actulizar stock: ", body)
+          await axios.put(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+            body,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          )
+        } catch {
+          console.error('Error al actualizar stock')
+        }
+      }
+
+      // ✅ actualizar serie y limpiar siempre, sin importar respuesta SUNAT
+      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user?.sucursalID}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      setCorrelativoActual(resSucursal.data.correlativoBoleta)
+
+      setBoleta({
+        ublVersion: "2.1",
+        tipoOperacion: "0101",
+        tipoComprobante: "03",
+        tipoMoneda: "PEN",
+        fechaEmision: formatoFechaActual().fechaHora,
+        horaEmision: formatoFechaActual().fechaHora,
+        fechaVencimiento: formatoFechaActual().fecha,
+        tipoPago: "Contado",
+        serie: resSucursal.data.serieBoleta,
+        correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, '0'),
+        company: boleta.company,
+      })
+
+      setDetalles([])
+      setBusquedaProducto([])
+      setShowDropdownProducto([])
+      inputRefs.current = []
+      setPagos([{ medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }])
+      setPagosEditados([false])
+      setBusqueda('')
+      setDescuentoGlobal(0)
+      setCodigoTipoDescGlobal('03')
+      setNumeroCuotas(1)
+      setCuotas([])
+      setGuias([])
+      setFechaEmisionEditada(false)
+
+    } catch (err: any) {
+      const data = err?.response?.data
+      const mensaje = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante'
+      const detalle = data?.detalle
+      const mensajeCompleto = detalle ? `${mensaje}: ${detalle}` : mensaje
+      setErrorEmision(mensajeCompleto)
+      console.log("Error de api: ", mensajeCompleto)
+      showToast("Error al emitir comprobante.", 'error')
+    } finally {
+      setEmitiendo(false)
     }
-
-    // ✅ actualizar serie y limpiar siempre, sin importar respuesta SUNAT
-    const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user?.sucursalID}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-    setCorrelativoActual(resSucursal.data.correlativoBoleta)
-
-    setBoleta({
-      ublVersion: "2.1",
-      tipoOperacion: "0101",
-      tipoComprobante: "03",
-      tipoMoneda: "PEN",
-      fechaEmision: formatoFechaActual().fechaHora,
-      horaEmision: formatoFechaActual().fechaHora,
-      fechaVencimiento: formatoFechaActual().fecha,
-      tipoPago: "Contado",
-      serie: resSucursal.data.serieBoleta,
-      correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, '0'),
-      company: boleta.company,
-    })
-
-    setDetalles([])
-    setBusquedaProducto([])
-    setShowDropdownProducto([])
-    inputRefs.current = []
-    setPagos([{ medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }])
-    setPagosEditados([false])
-    setBusqueda('')
-    setDescuentoGlobal(0)
-    setCodigoTipoDescGlobal('03')
-    setNumeroCuotas(1)
-    setCuotas([])
-    setGuias([])
-    setFechaEmisionEditada(false)
-
-  } catch (err: any) {
-    const data = err?.response?.data
-    const mensaje = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante'
-    const detalle = data?.detalle
-    const mensajeCompleto = detalle ? `${mensaje}: ${detalle}` : mensaje
-    setErrorEmision(mensajeCompleto)
-    console.log("Error de api: ", mensajeCompleto)
-    showToast("Error al emitir comprobante.", 'error')
-  } finally {
-    setEmitiendo(false)
   }
-  }
+
+  useEffect(() => {
+    if (!sucursalDelHook) return
+    setSucursal(sucursalDelHook)
+  }, [sucursalDelHook])
+
+  useEffect(() => {
+    if (!sucursal) return
+    setCorrelativoActual(sucursal.correlativoBoleta)
+  }, [sucursal])
 
   useEffect(() => {
     if (fechaEmisionEditada) { if (intervaloRef.current) clearInterval(intervaloRef.current); return; }
@@ -246,15 +262,15 @@ export default function BoletaPage() {
 
   useEffect(() => { if (!empresa) return; setBoleta(prev => ({ ...prev, company: empresa })); }, [empresa]);
   useEffect(() => { if (!cliente) return; setBoleta(prev => ({ ...prev, cliente: cliente as BoletaCliente })); }, [cliente]);
-  useEffect(() => {
-    if (!sucursal) return;
-    setBoleta(prev => ({ ...prev, serie: sucursal.serieBoleta, correlativo: String(sucursal.correlativoBoleta).padStart(8, '0') }));
-  }, [sucursal]);
 
   useEffect(() => {
-    if (!sucursal) return
-    setCorrelativoActual(sucursal.correlativoBoleta) //Actualiza serie y correlativo
-  }, [sucursal])
+    if (!sucursal) return;
+    setBoleta(prev => ({ 
+      ...prev, 
+      serie: sucursal.serieBoleta, 
+      correlativo: String(sucursal.correlativoBoleta).padStart(8, '0') 
+    }));
+  }, [sucursal]);
 
   useEffect(() => {
     if (boleta.tipoPago !== 'Contado' && boleta.tipoPago !== 'CreditoInicial') return;
@@ -663,7 +679,7 @@ export default function BoletaPage() {
 
   const simbolo = boleta.tipoMoneda === 'USD' ? '$' : 'S/'  //simbolo dolares y soles
 
-  useEffect(() => { console.log('boleta:', boleta); }, [boleta]);
+  useEffect(() => { console.log('boleta:', boleta); console.log('sucursales:', sucursales); console.log('User:', user); }, [boleta]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -725,16 +741,47 @@ export default function BoletaPage() {
                     className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
                   {errorCliente && <p className="text-xs text-red-500">{errorCliente}</p>}
                 </div>
+
+                {/* Correlativo sucursal */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Serie y Número</label>
                   <div className="flex gap-2">
-                    <select disabled className="w-1/3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none px-2 text-sm">
-                      <option>{sucursal?.serieBoleta}</option>
-                    </select>
-                    <input type="text" disabled value={String(correlativoActual ?? sucursal?.correlativoBoleta ?? '').padStart(8, '0')}
-                      className="w-2/3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono text-sm" />
+                    {user?.rol === 'superadmin' ? (
+                      <SelectPersonalizado
+                        className="w-1/3"
+                        disabled={loadingSucursales}
+                        value={sucursal?.sucursalId ?? null}
+                        opciones={sucursales.map(s => ({
+                          value: s.sucursalId,
+                          label: `${s.serieBoleta} - ${s.nombre ?? s.codEstablecimiento}`,
+                          labelCorto: s.serieBoleta,
+                        }))}
+                        onChange={(id) => {
+                          const seleccionada = sucursales.find(s => s.sucursalId === id)
+                          if (!seleccionada) return
+                          setSucursal(seleccionada)
+                          setCorrelativoActual(seleccionada.correlativoBoleta)
+                          setBoleta(prev => ({
+                            ...prev,
+                            serie: seleccionada.serieBoleta,
+                            correlativo: String(seleccionada.correlativoBoleta).padStart(8, '0')
+                          }))
+                        }}
+                      />
+                    ) : (
+                      <select disabled className="w-1/3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none px-2 text-sm">
+                        <option>{loadingSucursal ? 'Cargando...' : sucursal?.serieBoleta}</option>
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      disabled
+                      value={String(correlativoActual ?? sucursal?.correlativoBoleta ?? '').padStart(8, '0')}
+                      className="w-2/3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono text-sm"
+                    />
                   </div>
                 </div>
+
               </div>
 
               {/* Fechas */}
