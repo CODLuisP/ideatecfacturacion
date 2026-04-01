@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from 'next/navigation';
-import { Plus, Printer, ShieldCheck, ChevronLeft, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Printer, ShieldCheck, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Card } from '@/app/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
@@ -19,14 +19,19 @@ import { useToast } from '@/app/components/ui/Toast';
 import { useClientesRuc } from '../../clientes/gestionClientes/useClientesRuc';
 import { useSucursalRuc } from './gestionBoletas/useSucursalRuc';
 import { SelectPersonalizado } from '@/app/components/ui/SelectPersonalizado';
+import { DatePickerLimitado } from '@/app/components/ui/DatePickerLimitado';
+import { ModalGuardarClienteBoleta } from './gestionBoletas/Modalguardarclienteboleta';
 
+// ── Interfaces locales ───────────────────────────────────────
 interface DetalleLocal extends Partial<BoletaDetalle> {
   _incluirIGV?: boolean
   _precioBase?: number
-  _precioVentaConIGV?: number // precio con IGV que se muestra y edita
+  _precioBaseOriginal?: number
+  _precioVentaConIGV?: number
   _sucursalProductoId?: number
   _tipoProducto?: string | null
   _stockDisponible?: number | null
+  _esIcbper?: boolean
 }
 
 interface PagoLocal {
@@ -41,154 +46,101 @@ export default function BoletaPage() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
-  const IGV_DEFAULT = 18 
+  const IGV_DEFAULT = 18
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } = useClienteBoleta();
-  const { clientes, loadingClientes } = useClientesRuc();
+  const { clientes, loadingClientes, fetchClientes } = useClientesRuc();
 
   const { sucursal: sucursalDelHook, loadingSucursal } = useSucursal();
   const [sucursal, setSucursal] = useState<Sucursal | null>(null)
   const { sucursales, loadingSucursales } = useSucursalRuc()
   const [correlativoActual, setCorrelativoActual] = useState<number | null>(null);
 
-  const { productosSucursal } = useProductosSucursal();
-
+  const { productosSucursal, fetchProductosSucursal } = useProductosSucursal();
   const { fecha, fechaHora } = formatoFechaActual();
 
+  // ── Estado cliente / búsqueda ────────────────────────────────
   const [tipoDoc, setTipoDoc] = useState('01');
   const [busqueda, setBusqueda] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // ── Estado modal guardar cliente ─────────────────────────────
+  const [showModalCliente, setShowModalCliente] = useState(false)
+
+  const guardarCliente = async (extra: {
+    nombreComercial: string
+    telefono: string
+    correo: string
+    direccionLineal: string
+  }) => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+        {
+          sucursalID: user?.sucursalID,
+          numeroDocumento: boleta.cliente?.numeroDocumento,
+          razonSocialNombre: boleta.cliente?.razonSocial,
+          nombreComercial: extra.nombreComercial || '',
+          telefono: extra.telefono || '',
+          correo: extra.correo || '',
+          tipoDocumentoId: boleta.cliente?.tipoDocumento,
+          direccion: {
+            ubigeo: boleta.cliente?.ubigeo || '',
+            direccionLineal: extra.direccionLineal || boleta.cliente?.direccionLineal || '',
+            departamento: boleta.cliente?.departamento || '',
+            provincia: boleta.cliente?.provincia || '',
+            distrito: boleta.cliente?.distrito || '',
+            tipoDireccion: 'PRINCIPAL',
+          }
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      showToast('Cliente guardado correctamente', 'success')
+      setShowModalCliente(false)
+      const listaActualizada = await fetchClientes()
+      const clienteGuardado = listaActualizada?.find(
+        (c: any) => c.numeroDocumento === boleta.cliente?.numeroDocumento
+      )
+      setBoleta(prev => ({
+        ...prev,
+        cliente: prev.cliente ? { 
+          ...prev.cliente, 
+          clienteId: clienteGuardado?.clienteId ?? null,
+          direccionLineal: extra.direccionLineal,
+        } : prev.cliente
+      }))
+      setCorreoCliente(extra.correo)
+      setTelefonoCliente(extra.telefono)
+    } catch {
+      showToast('Error al guardar el cliente', 'error')
+    }
+  }
+
+  // ── Envío por correo y WhatsApp ──────────────────────────────
+  const [correoCliente, setCorreoCliente] = useState('')
+  const [telefonoCliente, setTelefonoCliente] = useState('')
+  const [enviarCorreo, setEnviarCorreo] = useState(false)
+  const [enviarWhatsapp, setEnviarWhatsapp] = useState(false)
+
   const [horaDisplay, setHoraDisplay] = useState(fechaHora);
   const [fechaEmisionEditada, setFechaEmisionEditada] = useState(false);
   const intervaloRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Emisión ──────────────────────────────────────────────────
   const [emitiendo, setEmitiendo] = useState(false)
   const [errorEmision, setErrorEmision] = useState<string | null>(null)
 
-  const emitirComprobante = async () => {
-    // validaciones existentes
-    if (!detalles.length) {
-      showToast('Debe agregar al menos un ítem', 'error')
-      return
-    }
+  // ── Guías de Remisión ────────────────────────────────────────
+  const [showGuias, setShowGuias] = useState(false);
+  const [guias, setGuias] = useState<{ serie: string; numero: string; tipoDoc: string }[]>([]);
+  const agregarGuia = () => setGuias(prev => [...prev, { serie: '', numero: '', tipoDoc: '09' }]);
+  const eliminarGuia = (i: number) => setGuias(prev => prev.filter((_, idx) => idx !== i));
+  const actualizarGuia = (i: number, campo: string, valor: string) => {
+    setGuias(prev => { const n = [...prev]; n[i] = { ...n[i], [campo]: valor }; return n; });
+  };
 
-    // ✅ validar cliente
-    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) {
-      showToast('Debe seleccionar o ingresar un cliente', 'error')
-      return
-    }
-
-    // ✅ validar que todos los ítems tengan descripción
-    const itemSinDescripcion = detalles.findIndex(d => !d.descripcion || d.descripcion.trim() === '')
-    if (itemSinDescripcion !== -1) {
-      showToast(`El ítem ${itemSinDescripcion + 1} no tiene descripción o producto`, 'error')
-      return
-    }
-    setEmitiendo(true)
-    setErrorEmision(null)
-    try {
-      const boletaFinal = prepararBoleta()
-      const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } })
-      const comprobanteId = resBoleta.data.comprobanteId;
-      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } })
-      const respuesta = resSunat.data
-
-      // ✅ toast según respuesta SUNAT
-      if (respuesta.exitoso) {
-        showToast(respuesta.mensaje ?? 'Boleta emitida correctamente.', 'success')
-      } else {
-        console.log("Mensaje de error: ", respuesta.mensaje)
-          showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, 'error')
-      }
-
-      // ✅ actualizar stock — solo productos tipo BIEN con productoId
-      const itemsParaStock = detalles.filter(d => 
-        d.productoId && 
-        d.productoId !== 0 && 
-        d._sucursalProductoId &&
-        d._tipoProducto === 'BIEN' // o como venga en tu interfaz
-      )
-
-      if (itemsParaStock.length > 0) {
-        const body = itemsParaStock.map(d => ({
-          sucursalProductoId: d._sucursalProductoId,
-          cantidad: d.cantidad ?? 1
-        }))
-        
-        try {
-          console.log("Body actulizar stock: ", body)
-          await axios.put(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-            body,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          )
-        } catch {
-          console.error('Error al actualizar stock')
-        }
-      }
-
-      // ✅ actualizar serie y limpiar siempre, sin importar respuesta SUNAT
-      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user?.sucursalID}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-      setCorrelativoActual(resSucursal.data.correlativoBoleta)
-
-      setBoleta({
-        ublVersion: "2.1",
-        tipoOperacion: "0101",
-        tipoComprobante: "03",
-        tipoMoneda: "PEN",
-        fechaEmision: formatoFechaActual().fechaHora,
-        horaEmision: formatoFechaActual().fechaHora,
-        fechaVencimiento: formatoFechaActual().fecha,
-        tipoPago: "Contado",
-        serie: resSucursal.data.serieBoleta,
-        correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, '0'),
-        company: boleta.company,
-      })
-
-      setDetalles([])
-      setBusquedaProducto([])
-      setShowDropdownProducto([])
-      inputRefs.current = []
-      setPagos([{ medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }])
-      setPagosEditados([false])
-      setBusqueda('')
-      setDescuentoGlobal(0)
-      setCodigoTipoDescGlobal('03')
-      setNumeroCuotas(1)
-      setCuotas([])
-      setGuias([])
-      setFechaEmisionEditada(false)
-
-    } catch (err: any) {
-      const data = err?.response?.data
-      const mensaje = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante'
-      const detalle = data?.detalle
-      const mensajeCompleto = detalle ? `${mensaje}: ${detalle}` : mensaje
-      setErrorEmision(mensajeCompleto)
-      console.log("Error de api: ", mensajeCompleto)
-      showToast("Error al emitir comprobante.", 'error')
-    } finally {
-      setEmitiendo(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!sucursalDelHook) return
-    setSucursal(sucursalDelHook)
-  }, [sucursalDelHook])
-
-  useEffect(() => {
-    if (!sucursal) return
-    setCorrelativoActual(sucursal.correlativoBoleta)
-  }, [sucursal])
-
-  useEffect(() => {
-    if (fechaEmisionEditada) { if (intervaloRef.current) clearInterval(intervaloRef.current); return; }
-    intervaloRef.current = setInterval(() => { setHoraDisplay(formatoFechaActual().fechaHora); }, 1000);
-    return () => { if (intervaloRef.current) clearInterval(intervaloRef.current); };
-  }, [fechaEmisionEditada]);
-
+  // ── Pagos ────────────────────────────────────────────────────
   const [pagos, setPagos] = useState<PagoLocal[]>([
     { medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }
   ]);
@@ -215,18 +167,32 @@ export default function BoletaPage() {
     setPagos(prev => { const n = [...prev]; n[i] = { ...n[i], [campo]: valor }; return n; });
   };
 
+  // ── Cuotas ───────────────────────────────────────────────────
   const [numeroCuotas, setNumeroCuotas] = useState(1);
   const [cuotas, setCuotas] = useState<{ numeroCuota: string; monto: string; fechaVencimiento: string }[]>([]);
 
-  // fecha base: día 15 del mes siguiente a hoy
+  const calcularFechasCuotas = (fechaBase: string, numCuotas: number): string[] => {
+    const fechas: string[] = []
+    const [anio, mes, dia] = fechaBase.split('-').map(Number)
+    for (let i = 0; i < numCuotas; i++) {
+      let nuevoDia = dia
+      let nuevoMes = mes + i
+      let nuevoAnio = anio
+      while (nuevoMes > 12) { nuevoMes -= 12; nuevoAnio++ }
+      const ultimoDia = new Date(nuevoAnio, nuevoMes, 0).getDate()
+      if (nuevoDia > ultimoDia) nuevoDia = ultimoDia
+      const pad = (n: number) => String(n).padStart(2, '0')
+      fechas.push(`${nuevoAnio}-${pad(nuevoMes)}-${pad(nuevoDia)}`)
+    }
+    return fechas
+  }
+
   useEffect(() => {
     const hoy = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
     const fechaBase = `${hoy.getFullYear()}-${pad(hoy.getMonth() + 2)}-15`
-      .replace(/(\d{4})-13-/, (_, y) => `${Number(y) + 1}-01-`) // si es diciembre
-    
+      .replace(/(\d{4})-13-/, (_, y) => `${Number(y) + 1}-01-`)
     const fechas = calcularFechasCuotas(fechaBase, numeroCuotas)
-    
     setCuotas(Array.from({ length: numeroCuotas }, (_, i) => ({
       numeroCuota: `Cuota${String(i + 1).padStart(3, '0')}`,
       monto: '',
@@ -234,44 +200,119 @@ export default function BoletaPage() {
     })));
   }, [numeroCuotas]);
 
+  // ── Detalles / ítems ─────────────────────────────────────────
   const [detalles, setDetalles] = useState<DetalleLocal[]>([]);
   const [busquedaProducto, setBusquedaProducto] = useState<string[]>([]);
   const [showDropdownProducto, setShowDropdownProducto] = useState<boolean[]>([]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // ── ICBPER bolsa plástica ────────────────────────────────────
+  const [cantidadBolsa, setCantidadBolsa] = useState(0)
+  const ICBPER_FACTOR = 0.50
+
+  useEffect(() => {
+    if (productosSucursal.length === 0) return
+
+    const productoBolsa = productosSucursal.find(p => p.productoId === 6)
+
+    setDetalles(prev => {
+      const sinBolsa = prev.filter(d => d._esIcbper !== true)
+      if (cantidadBolsa === 0) return sinBolsa
+
+      const precioConIGV = productoBolsa?.sucursalProducto.precioUnitario ?? 0.20
+      const precioBase = parseFloat((precioConIGV / (1 + 18 / 100)).toFixed(6))
+      const icbper = parseFloat((cantidadBolsa * ICBPER_FACTOR).toFixed(2))
+      const baseIgv = parseFloat((precioBase * cantidadBolsa).toFixed(2))
+      const montoIGV = parseFloat((baseIgv * 0.18).toFixed(2))
+
+      const bolsaItem: DetalleLocal = {
+        item: sinBolsa.length + 1,
+        productoId: productoBolsa?.productoId ?? null,
+        codigo: productoBolsa?.codigo ?? 'BOLSA',
+        descripcion: productoBolsa?.nomProducto ?? 'BOLSA ICBPER',
+        cantidad: cantidadBolsa,
+        unidadMedida: productoBolsa?.unidadMedida ?? 'NIU',
+        precioUnitario: precioBase,
+        tipoAfectacionIGV: '10',
+        porcentajeIGV: 18,
+        baseIgv,
+        montoIGV,
+        codigoTipoDescuento: '01',
+        descuentoUnitario: 0,
+        descuentoTotal: 0,
+        valorVenta: baseIgv,
+        precioVenta: precioConIGV,
+        totalVentaItem: parseFloat((precioConIGV * cantidadBolsa + icbper).toFixed(2)),
+        icbper,
+        factorIcbper: ICBPER_FACTOR,
+        _incluirIGV: true,
+        _precioBase: precioBase,
+        _precioVentaConIGV: precioConIGV,
+        _precioBaseOriginal: precioBase,
+        _sucursalProductoId: productoBolsa?.sucursalProducto?.sucursalProductoId,
+        _tipoProducto: productoBolsa?.tipoProducto ?? null,
+        _stockDisponible: productoBolsa?.sucursalProducto?.stock ?? null,
+        _esIcbper: true,
+      }
+      return [...sinBolsa, bolsaItem]
+    })
+
+    setBusquedaProducto(prev => {
+      const sinBolsa = prev.filter((_, i) => !detalles[i]?._esIcbper)
+      if (cantidadBolsa === 0) return sinBolsa
+      return [...sinBolsa, productoBolsa?.nomProducto ?? 'BOLSA ICBPER']
+    })
+  }, [cantidadBolsa, productosSucursal])
+
   // ── Descuento global ─────────────────────────────────────────
   const [descuentoGlobal, setDescuentoGlobal] = useState(0);
   const [codigoTipoDescGlobal, setCodigoTipoDescGlobal] = useState('03');
-  
-  //cambios a dolares
+
+  // ── Tipo de cambio USD ───────────────────────────────────────
   const [tipoCambio, setTipoCambio] = useState(3.75)
 
-  const [showGuias, setShowGuias] = useState(false);
-  const [guias, setGuias] = useState<{ serie: string; numero: string; tipoDoc: string }[]>([]);
-  const agregarGuia = () => setGuias(prev => [...prev, { serie: '', numero: '', tipoDoc: '09' }]);
-  const eliminarGuia = (i: number) => setGuias(prev => prev.filter((_, idx) => idx !== i));
-  const actualizarGuia = (i: number, campo: string, valor: string) => {
-    setGuias(prev => { const n = [...prev]; n[i] = { ...n[i], [campo]: valor }; return n; });
-  };
-
+  // ── Boleta state ─────────────────────────────────────────────
   const [boleta, setBoleta] = useState<Partial<Boleta>>({
     ublVersion: "2.1", tipoOperacion: "0101", tipoComprobante: "03",
     tipoMoneda: "PEN", fechaEmision: fechaHora, horaEmision: fechaHora,
     fechaVencimiento: fecha, tipoPago: "Contado",
   });
 
+  // ── Effects de inicialización ────────────────────────────────
   useEffect(() => { if (!empresa) return; setBoleta(prev => ({ ...prev, company: empresa })); }, [empresa]);
-  useEffect(() => { if (!cliente) return; setBoleta(prev => ({ ...prev, cliente: cliente as BoletaCliente })); }, [cliente]);
+  useEffect(() => {
+    if (!cliente) return;
+    setBoleta(prev => ({ ...prev, cliente: cliente as BoletaCliente }));
+    setCorreoCliente('')
+    setTelefonoCliente('')
+  }, [cliente]);
+
+  useEffect(() => {
+    if (!sucursalDelHook) return
+    setSucursal(sucursalDelHook)
+  }, [sucursalDelHook])
+
+  useEffect(() => {
+    if (!sucursal) return
+    setCorrelativoActual(sucursal.correlativoBoleta)
+  }, [sucursal])
 
   useEffect(() => {
     if (!sucursal) return;
-    setBoleta(prev => ({ 
-      ...prev, 
-      serie: sucursal.serieBoleta, 
-      correlativo: String(sucursal.correlativoBoleta).padStart(8, '0') 
+    setBoleta(prev => ({
+      ...prev,
+      serie: sucursal.serieBoleta,
+      correlativo: String(sucursal.correlativoBoleta).padStart(8, '0')
     }));
   }, [sucursal]);
 
+  useEffect(() => {
+    if (fechaEmisionEditada) { if (intervaloRef.current) clearInterval(intervaloRef.current); return; }
+    intervaloRef.current = setInterval(() => { setHoraDisplay(formatoFechaActual().fechaHora); }, 1000);
+    return () => { if (intervaloRef.current) clearInterval(intervaloRef.current); };
+  }, [fechaEmisionEditada]);
+
+  // ── Sincronizar pagos en boleta ──────────────────────────────
   useEffect(() => {
     if (boleta.tipoPago !== 'Contado' && boleta.tipoPago !== 'CreditoInicial') return;
     const pagosFormateados: BoletaPago[] = pagos.map(p => ({
@@ -297,7 +338,11 @@ export default function BoletaPage() {
   }, [cuotas, boleta.tipoPago]);
 
   useEffect(() => {
-    const detallesLimpios = detalles.map(({ _incluirIGV, _precioBase, _precioVentaConIGV, _sucursalProductoId, _tipoProducto, _stockDisponible, ...d }) => d) as BoletaDetalle[];
+    const detallesLimpios = detalles.map(({
+      _incluirIGV, _precioBase, _precioBaseOriginal, _precioVentaConIGV,
+      _sucursalProductoId, _tipoProducto, _stockDisponible, _esIcbper,
+      ...d
+    }) => d) as BoletaDetalle[];
     setBoleta(prev => ({ ...prev, details: detallesLimpios }));
   }, [detalles]);
 
@@ -307,9 +352,8 @@ export default function BoletaPage() {
     setBoleta(prev => ({ ...prev, guias: guiasFormateadas }));
   }, [guias]);
 
-  // ── Totales con lógica de descuentos ─────────────────────────
+  // ── Totales ──────────────────────────────────────────────────
   const totales = useMemo(() => {
-    // Suma base de gravadas SIN considerar descuento tipo 00 aún
     const gravadas_bruto = detalles.filter(d => d.tipoAfectacionIGV === '10')
       .reduce((acc, d) => acc + (d.baseIgv ?? 0), 0)
     const exoneradas = detalles.filter(d => d.tipoAfectacionIGV === '20')
@@ -319,10 +363,10 @@ export default function BoletaPage() {
     const igv_bruto = detalles.filter(d => d.tipoAfectacionIGV === '10')
       .reduce((acc, d) => acc + (d.montoIGV ?? 0), 0)
 
-    // totalDescuentos = suma de descuentoTotal de todos los ítems
-    const totalDescuentosItems = detalles.reduce((acc, d) => acc + (d.descuentoTotal ?? 0), 0)
+    const totalDescuentosItems = detalles
+      .filter(d => d.codigoTipoDescuento === '01')
+      .reduce((acc, d) => acc + (d.descuentoTotal ?? 0), 0)
 
-    // Descuento global tipo 02 → afecta gravadas e IGV
     let gravadas = gravadas_bruto
     let igv = igv_bruto
     let descGlobalEnTotales = 0
@@ -330,23 +374,21 @@ export default function BoletaPage() {
     if (codigoTipoDescGlobal === '02' && descuentoGlobal > 0) {
       gravadas = parseFloat(Math.max(0, gravadas_bruto - descuentoGlobal).toFixed(2))
       igv = parseFloat((gravadas * (detalles.find(d => d.tipoAfectacionIGV === '10')?.porcentajeIGV ?? 18) / 100).toFixed(2))
-      // tipo 02 el descuento global NO suma a totalDescuentos ni se resta del importe aparte
     }
-
-    // Descuento global tipo 03 → NO afecta gravadas ni IGV, se resta del importeTotal
     if (codigoTipoDescGlobal === '03' && descuentoGlobal > 0) {
       descGlobalEnTotales = descuentoGlobal
     }
 
-// descuentos tipo 01 no afectan base pero sí el total a pagar
     const descuentosTipo01 = detalles
       .filter(d => d.codigoTipoDescuento === '01')
       .reduce((acc, d) => acc + (d.descuentoTotal ?? 0), 0)
 
+    const totalIcbper = detalles.reduce((acc, d) => acc + (d.icbper ?? 0), 0)
+
     const valorVenta = parseFloat((gravadas + exoneradas + inafectas).toFixed(2))
     const subTotal = parseFloat((valorVenta + igv - descuentosTipo01).toFixed(2))
     const totalDescuentos = parseFloat((totalDescuentosItems + descGlobalEnTotales).toFixed(2))
-    const importeTotal = parseFloat(Math.max(0, subTotal - descGlobalEnTotales).toFixed(2))
+    const importeTotal = parseFloat(Math.max(0, subTotal - descGlobalEnTotales + totalIcbper).toFixed(2))
 
     return {
       gravadas: parseFloat(gravadas.toFixed(2)),
@@ -357,39 +399,54 @@ export default function BoletaPage() {
       valorVenta,
       subTotal,
       importeTotal,
+      totalIcbper: parseFloat(totalIcbper.toFixed(2)),
       total: importeTotal,
     }
   }, [detalles, descuentoGlobal, codigoTipoDescGlobal]);
 
-  // Auto-calcular monto pagos
+  // ── Auto-calcular monto pagos ────────────────────────────────
   useEffect(() => {
-    if (totales.total === 0) return
     if (boleta.tipoPago !== 'Contado' && boleta.tipoPago !== 'CreditoInicial') return
+
+    if (pagos.length === 1) {
+      pagosEditadosRef.current = [false]
+      setPagosEditados([false])
+      setPagos(prev => prev.map(p => ({
+        ...p,
+        monto: totales.total === 0 ? '' : totales.total.toFixed(2)
+      })))
+      return
+    }
+
+    if (totales.total === 0) {
+      setPagos(prev => prev.map(p => ({ ...p, monto: '' })))
+      setPagosEditados(prev => prev.map(() => false))
+      return
+    }
+
     setPagos(prev => prev.map((pago, i) => {
       if (pagosEditadosRef.current[i]) return pago
+      if (i > 0) return pago
       const pagadoAntes = prev.slice(0, i).reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
       const restante = Math.max(0, totales.total - pagadoAntes).toFixed(2)
       return { ...pago, monto: restante }
     }))
-  }, [totales.total, boleta.tipoPago])
+  }, [totales.total, boleta.tipoPago, pagos.length])
 
-  // Auto-calcular cuotas
+  // ── Auto-calcular cuotas ─────────────────────────────────────
   useEffect(() => {
     if (boleta.tipoPago !== 'Credito' && boleta.tipoPago !== 'CreditoInicial') return
-    if (totales.total === 0) return
-
+    if (totales.total === 0) {
+      setCuotas(prev => prev.map(c => ({ ...c, monto: '' })))
+      return
+    }
     const baseCalculo = boleta.tipoPago === 'CreditoInicial'
-      ? Math.max(0, totales.total - totalPagado)
-      : totales.total
-
+      ? Math.max(0, totales.total - totalPagado) : totales.total
     const montoPorCuota = parseFloat((baseCalculo / numeroCuotas).toFixed(2))
-    setCuotas(prev => prev.map(cuota => ({
-      ...cuota,
-      monto: String(montoPorCuota) // ✅ siempre recalcula
-    })))
+    setCuotas(prev => prev.map(cuota => ({ ...cuota, monto: String(montoPorCuota) })))
   }, [totales.total, numeroCuotas, boleta.tipoPago, totalPagado])
 
-  // Sincronizar totales en boleta
+  // ── Sincronizar totales en boleta ────────────────────────────
   useEffect(() => {
     const moneda = boleta.tipoMoneda === 'USD' ? 'DÓLARES' : 'SOLES'
     const legend = [{ code: '1000', value: numeroALetras(totales.importeTotal, moneda) }]
@@ -402,7 +459,8 @@ export default function BoletaPage() {
       totalOperacionesExoneradas: totales.exoneradas,
       totalOperacionesInafectas: totales.inafectas,
       totalIGV: totales.igv,
-      totalImpuestos: totales.igv,
+      totalIcbper: totales.totalIcbper,
+      totalImpuestos: parseFloat((totales.igv + totales.totalIcbper).toFixed(2)),
       totalDescuentos: totales.totalDescuentos,
       codigoTipoDescGlobal,
       descuentoGlobal,
@@ -414,6 +472,7 @@ export default function BoletaPage() {
     }));
   }, [totales, descuentoGlobal, codigoTipoDescGlobal, boleta.tipoPago, totalPagado]);
 
+  // ── Filtrar clientes ─────────────────────────────────────────
   const clientesFiltrados = clientes.filter(c => {
     if (c.tipoDocumento.tipoDocumentoId !== tipoDoc) return false;
     if (busqueda.length === 0) return true;
@@ -423,6 +482,8 @@ export default function BoletaPage() {
   const seleccionarDeLista = (c: Cliente) => {
     setBusqueda(c.numeroDocumento); setShowDropdown(false);
     const direccion = c.direccion?.[0];
+    setCorreoCliente(c.correo ?? '')
+    setTelefonoCliente(c.telefono ?? '')
     setBoleta(prev => ({
       ...prev,
       cliente: {
@@ -436,7 +497,7 @@ export default function BoletaPage() {
   };
 
   useEffect(() => {
-    const longitud = tipoDoc === '01' ? 8 : tipoDoc === '06' ? 11 : 0;
+    const longitud = tipoDoc === '01' ? 8 : tipoDoc === '06' ? 11 : 12;
     if (!longitud || busqueda.length !== longitud) return;
     const yaEsta = clientes.some(c => c.numeroDocumento === busqueda);
     if (!yaEsta) buscarCliente(tipoDoc, busqueda);
@@ -444,8 +505,8 @@ export default function BoletaPage() {
 
   // ── Cálculo de detalle ───────────────────────────────────────
   const calcularDetalle = useCallback((
-    precioBase: number,        // precio SIN IGV
-    precioVentaConIGV: number, // precio CON IGV que muestra el vendedor
+    precioBase: number,
+    precioVentaConIGV: number,
     cantidad: number,
     porcentajeIGV: number,
     tipoAfectacion: string,
@@ -458,39 +519,33 @@ export default function BoletaPage() {
     let descuentoTotal = 0
 
     if (tipoAfectacion === '10') {
-      // gravado
+      const pvConIGV = parseFloat((precioBase * (1 + porcentajeIGV / 100)).toFixed(2))
       if (codigoDescuento === '00') {
-        // descuento afecta base: baseIgv = (precioBase - descuentoUnitario_base) * cantidad
-        // descuentoUnitario está en precio con IGV, convertir a base
-        const descBase = parseFloat((descuentoUnitario / (1 + porcentajeIGV / 100)).toFixed(6))
-        baseIgv = parseFloat(((precioBase - descBase) * cantidad).toFixed(2))
+        baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2))
         montoIGV = parseFloat((baseIgv * porcentajeIGV / 100).toFixed(2))
-        precioVenta = parseFloat((precioVentaConIGV - descuentoUnitario).toFixed(2))
+        precioVenta = parseFloat(((precioBase - descuentoUnitario) * (1 + porcentajeIGV / 100)).toFixed(2))
         totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2))
         valorVenta = baseIgv
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       } else {
-        // tipo 01: NO afecta base
         baseIgv = parseFloat((precioBase * cantidad).toFixed(2))
         montoIGV = parseFloat((baseIgv * porcentajeIGV / 100).toFixed(2))
-        precioVenta = parseFloat((precioVentaConIGV - descuentoUnitario).toFixed(2))
-        totalVentaItem = parseFloat(((precioVentaConIGV - descuentoUnitario) * cantidad).toFixed(2))
+        precioVenta = parseFloat((pvConIGV - descuentoUnitario).toFixed(2))
+        totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2))
         valorVenta = baseIgv
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       }
     } else {
-      // exonerado / inafecto (20, 30)
+      // exonerado (20) / inafecto (30)
       if (codigoDescuento === '00') {
-        // afecta base
         baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2))
-        precioVenta = parseFloat((precioVentaConIGV - descuentoUnitario).toFixed(2))
+        precioVenta = parseFloat((precioBase - descuentoUnitario).toFixed(2))
         totalVentaItem = parseFloat((baseIgv).toFixed(2))
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       } else {
-        // tipo 01: no afecta base
         baseIgv = parseFloat((precioBase * cantidad).toFixed(2))
-        precioVenta = parseFloat(precioVentaConIGV.toFixed(2))
-        totalVentaItem = parseFloat(((precioVentaConIGV - descuentoUnitario) * cantidad).toFixed(2))
+        precioVenta = parseFloat(precioBase.toFixed(2))
+        totalVentaItem = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2))
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       }
       montoIGV = 0
@@ -500,31 +555,7 @@ export default function BoletaPage() {
     return { precioUnitario, precioVenta, baseIgv, montoIGV, totalVentaItem, valorVenta, descuentoTotal }
   }, []);
 
-  //calcular fechas automaticas para cuotas
-  const calcularFechasCuotas = (fechaBase: string, numCuotas: number): string[] => {
-    const fechas: string[] = []
-    const [anio, mes, dia] = fechaBase.split('-').map(Number)
-    
-    for (let i = 0; i < numCuotas; i++) {
-      let nuevoDia = dia
-      let nuevoMes = mes + i
-      let nuevoAnio = anio
-
-      while (nuevoMes > 12) {
-        nuevoMes -= 12
-        nuevoAnio++
-      }
-
-      // último día del mes destino
-      const ultimoDia = new Date(nuevoAnio, nuevoMes, 0).getDate()
-      if (nuevoDia > ultimoDia) nuevoDia = ultimoDia
-
-      const pad = (n: number) => String(n).padStart(2, '0')
-      fechas.push(`${nuevoAnio}-${pad(nuevoMes)}-${pad(nuevoDia)}`)
-    }
-    return fechas
-  }
-
+  // ── Agregar fila ─────────────────────────────────────────────
   const agregarFila = () => {
     setDetalles(prev => [...prev, {
       item: prev.length + 1, productoId: null, codigo: null, descripcion: '', cantidad: 1, unidadMedida: 'NIU',
@@ -538,13 +569,13 @@ export default function BoletaPage() {
     inputRefs.current = [...inputRefs.current, null];
   };
 
+  // ── Seleccionar producto ─────────────────────────────────────
   const seleccionarProducto = (producto: ProductoSucursal, index: number) => {
     const precioSistema = producto.sucursalProducto.precioUnitario;
     const precioEnMoneda = boleta.tipoMoneda === 'USD'
       ? parseFloat((precioSistema / tipoCambio).toFixed(6))
       : precioSistema
 
-    // ✅ respetar el % que ya tiene la fila, si no usar IGV_DEFAULT
     const porcentajeExistente = detalles[index]?.porcentajeIGV
     const porcentajeIGV = producto.tipoAfectacionIGV === '10'
       ? (porcentajeExistente !== undefined ? porcentajeExistente : IGV_DEFAULT)
@@ -565,13 +596,15 @@ export default function BoletaPage() {
     const nuevos = [...detalles];
     nuevos[index] = {
       ...nuevos[index],
-      productoId: producto.productoId, codigo: producto.codigo,  _sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
-      _tipoProducto: producto.tipoProducto, _stockDisponible: producto.sucursalProducto.stock, 
+      productoId: producto.productoId, codigo: producto.codigo,
+      _sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+      _tipoProducto: producto.tipoProducto, _stockDisponible: producto.sucursalProducto.stock,
       descripcion: producto.nomProducto, unidadMedida: producto.unidadMedida,
       tipoAfectacionIGV: producto.tipoAfectacionIGV,
-      porcentajeIGV, // ✅ usa el porcentaje respetado
+      porcentajeIGV,
       codigoTipoDescuento: '01',
       _incluirIGV: producto.incluirIGV, _precioBase: precioBase,
+      _precioBaseOriginal: precioBase,
       _precioVentaConIGV: precioVentaConIGV,
       ...calc,
     };
@@ -581,25 +614,22 @@ export default function BoletaPage() {
     const nd = [...showDropdownProducto]; nd[index] = false; setShowDropdownProducto(nd);
   };
 
-  // Vendedor edita precioVenta con IGV → recalcula base (descuento oculto sin informar a SUNAT)
+  // ── Actualizar precio venta ──────────────────────────────────
   const actualizarPrecioVenta = (index: number, nuevoPrecioVenta: number) => {
     const d = detalles[index];
     if (!d) return;
     const tipoAfectacion = d.tipoAfectacionIGV ?? '10';
     const porcentajeIGV = d.porcentajeIGV ?? 18;
-    const codigoDescuento = d.codigoTipoDescuento ?? '01';
-
-    // nueva base a partir del nuevo precioVenta
     const nuevoPrecioBase = tipoAfectacion === '10'
       ? parseFloat((nuevoPrecioVenta / (1 + porcentajeIGV / 100)).toFixed(6))
       : nuevoPrecioVenta;
-
-    const calc = calcularDetalle(nuevoPrecioBase, nuevoPrecioVenta, d.cantidad ?? 1, porcentajeIGV, tipoAfectacion, codigoDescuento, d.descuentoUnitario ?? 0);
+    const calc = calcularDetalle(nuevoPrecioBase, nuevoPrecioVenta, d.cantidad ?? 1, porcentajeIGV, tipoAfectacion, d.codigoTipoDescuento ?? '01', d.descuentoUnitario ?? 0);
     const nuevos = [...detalles];
     nuevos[index] = { ...d, _precioBase: nuevoPrecioBase, _precioVentaConIGV: nuevoPrecioVenta, ...calc };
     setDetalles(nuevos);
   };
 
+  // ── Actualizar cantidad ──────────────────────────────────────
   const actualizarCantidad = (index: number, cantidad: number) => {
     const d = detalles[index];
     if (!d) return;
@@ -615,6 +645,7 @@ export default function BoletaPage() {
     const nuevos = [...detalles]; nuevos[index] = { ...d, cantidad, ...calc }; setDetalles(nuevos);
   };
 
+  // ── Actualizar descuento ─────────────────────────────────────
   const actualizarDescuento = (index: number, descuentoUnitario: number) => {
     const d = detalles[index];
     if (!d) return;
@@ -624,31 +655,50 @@ export default function BoletaPage() {
     const nuevos = [...detalles]; nuevos[index] = { ...d, descuentoUnitario, ...calc }; setDetalles(nuevos);
   };
 
+  // ── Actualizar % IGV ─────────────────────────────────────────
   const actualizarPorcentajeIGV = (index: number, porcentaje: number) => {
     const d = detalles[index];
     if (!d) return;
     const tipoAfectacion = d.tipoAfectacionIGV ?? '10'
-    
-    // ✅ recalcula base desde precioVentaConIGV con el nuevo porcentaje
     const precioVentaConIGV = d._precioVentaConIGV ?? d.precioVenta ?? 0
     const nuevaPrecioBase = tipoAfectacion === '10'
       ? parseFloat((precioVentaConIGV / (1 + porcentaje / 100)).toFixed(6))
       : precioVentaConIGV
-
-    const calc = calcularDetalle(
-      nuevaPrecioBase,
-      precioVentaConIGV,
-      d.cantidad ?? 1,
-      porcentaje,
-      tipoAfectacion,
-      d.codigoTipoDescuento ?? '01',
-      d.descuentoUnitario ?? 0
-    )
+    const calc = calcularDetalle(nuevaPrecioBase, precioVentaConIGV, d.cantidad ?? 1, porcentaje, tipoAfectacion, d.codigoTipoDescuento ?? '01', d.descuentoUnitario ?? 0)
     const nuevos = [...detalles]
     nuevos[index] = { ...d, porcentajeIGV: porcentaje, _precioBase: nuevaPrecioBase, ...calc }
     setDetalles(nuevos)
   }
 
+  // ── Actualizar tipo afectación IGV ───────────────────────────
+  const actualizarTipoAfectacion = (index: number, tipoAfectacion: string) => {
+    setDetalles(prev => {
+      const nuevos = [...prev]
+      const actual = prev[index]
+      const precioBase = actual._precioBaseOriginal ?? actual._precioBase ?? actual.precioUnitario ?? 0
+      const porcentajeIGV = tipoAfectacion === '10'
+        ? (actual.porcentajeIGV && actual.porcentajeIGV > 0 ? actual.porcentajeIGV : IGV_DEFAULT)
+        : 0
+
+      const precioVentaConIGV = tipoAfectacion === '10'
+        ? parseFloat((precioBase * (1 + porcentajeIGV / 100)).toFixed(2))
+        : precioBase
+
+      const calc = calcularDetalle(precioBase, precioVentaConIGV, actual.cantidad ?? 1, porcentajeIGV, tipoAfectacion, actual.codigoTipoDescuento ?? '01', actual.descuentoUnitario ?? 0)
+
+      nuevos[index] = {
+        ...actual,
+        tipoAfectacionIGV: tipoAfectacion,
+        porcentajeIGV,
+        _precioBase: precioBase,
+        _precioVentaConIGV: precioVentaConIGV,
+        ...calc
+      }
+      return nuevos
+    })
+  }
+
+  // ── Actualizar código descuento ──────────────────────────────
   const actualizarCodigoDescuento = (index: number, codigo: string) => {
     const d = detalles[index];
     if (!d) return;
@@ -658,13 +708,19 @@ export default function BoletaPage() {
     const nuevos = [...detalles]; nuevos[index] = { ...d, codigoTipoDescuento: codigo, ...calc }; setDetalles(nuevos);
   };
 
+  // ── Eliminar fila ────────────────────────────────────────────
   const eliminarFila = (index: number) => {
+    if (detalles[index]?._esIcbper) {
+      setCantidadBolsa(0)
+      return
+    }
     setDetalles(prev => prev.filter((_, i) => i !== index));
     setBusquedaProducto(prev => prev.filter((_, i) => i !== index));
     setShowDropdownProducto(prev => prev.filter((_, i) => i !== index));
     inputRefs.current = inputRefs.current.filter((_, i) => i !== index);
   };
 
+  // ── Preparar y emitir boleta ─────────────────────────────────
   const prepararBoleta = () => ({
     ...boleta,
     tipoPago: boleta.tipoPago === 'CreditoInicial' ? 'Credito' : boleta.tipoPago,
@@ -672,38 +728,182 @@ export default function BoletaPage() {
     horaEmision: fechaEmisionEditada ? boleta.horaEmision : formatoFechaActual().fechaHora,
   });
 
+  const emitirComprobante = async () => {
+    if (!detalles.length) { showToast('Debe agregar al menos un ítem', 'error'); return }
+    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) {
+      showToast('Debe seleccionar o ingresar un cliente', 'error'); return
+    }
+    const itemSinDescripcion = detalles.findIndex(d => !d.descripcion || d.descripcion.trim() === '')
+    if (itemSinDescripcion !== -1) {
+      showToast(`El ítem ${itemSinDescripcion + 1} no tiene descripción o producto`, 'error'); return
+    }
+    if (enviarCorreo && !correoCliente.trim()) {
+      showToast('Debe ingresar el correo del cliente para enviar por correo', 'error'); return
+    }
+    if (enviarWhatsapp && !telefonoCliente.trim()) {
+      showToast('Debe ingresar el teléfono del cliente para enviar por WhatsApp', 'error'); return
+    }
+
+    setEmitiendo(true)
+    setErrorEmision(null)
+    try {
+      const boletaFinal = prepararBoleta()
+      const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } })
+      const comprobanteId = resBoleta.data.comprobanteId;
+      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } })
+      const respuesta = resSunat.data
+
+      if (respuesta.exitoso) {
+        showToast(respuesta.mensaje ?? 'Boleta emitida correctamente.', 'success')
+        if (enviarCorreo && correoCliente) {
+          try {
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-correo`,
+              { correo: correoCliente },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            )
+            showToast('Comprobante enviado por correo', 'success')
+          } catch { showToast('Error al enviar por correo', 'error') }
+        }
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-whatsapp`,
+              { telefono: telefonoCliente },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            )
+            showToast('Comprobante enviado por WhatsApp', 'success')
+          } catch { showToast('Error al enviar por WhatsApp', 'error') }
+        }
+      } else {
+        showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, 'error')
+      }
+
+      // Actualizar stock
+      const itemsParaStock = detalles.filter(d =>
+        d.productoId && d.productoId !== 0 && d._sucursalProductoId && d._tipoProducto === 'BIEN'
+      )
+      if (itemsParaStock.length > 0) {
+        const body = itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 }))
+        try {
+          await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`, body, { headers: { Authorization: `Bearer ${accessToken}` } })
+          await fetchProductosSucursal()
+        } catch { console.error('Error al actualizar stock') }
+      }
+
+      // Resetear formulario
+      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user?.sucursalID}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      setCorrelativoActual(resSucursal.data.correlativoBoleta)
+
+      setBoleta({
+        ublVersion: "2.1", tipoOperacion: "0101", tipoComprobante: "03",
+        tipoMoneda: "PEN", fechaEmision: formatoFechaActual().fechaHora,
+        horaEmision: formatoFechaActual().fechaHora, fechaVencimiento: formatoFechaActual().fecha,
+        tipoPago: "Contado",
+        serie: resSucursal.data.serieBoleta,
+        correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, '0'),
+        company: boleta.company,
+      })
+      setDetalles([])
+      setBusquedaProducto([])
+      setShowDropdownProducto([])
+      inputRefs.current = []
+      setPagos([{ medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }])
+      setPagosEditados([false])
+      setBusqueda('')
+      setDescuentoGlobal(0)
+      setCodigoTipoDescGlobal('03')
+      setNumeroCuotas(1)
+      setCuotas([])
+      setGuias([])
+      setFechaEmisionEditada(false)
+      setCantidadBolsa(0)
+      setCorreoCliente('')
+      setTelefonoCliente('')
+      setEnviarCorreo(false)
+      setEnviarWhatsapp(false)
+
+    } catch (err: any) {
+      const data = err?.response?.data
+      const mensaje = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante'
+      const detalle = data?.detalle
+      const mensajeCompleto = detalle ? `${mensaje}: ${detalle}` : mensaje
+      setErrorEmision(mensajeCompleto)
+      showToast("Error al emitir comprobante.", 'error')
+    } finally {
+      setEmitiendo(false)
+    }
+  }
+
   const montoRestante = (index: number) => {
     const pagado = pagos.reduce((acc, p, i) => i < index ? acc + (Number(p.monto) || 0) : acc, 0)
     return Math.max(0, totales.total - pagado).toFixed(2)
   }
 
-  const simbolo = boleta.tipoMoneda === 'USD' ? '$' : 'S/'  //simbolo dolares y soles
+  const simbolo = boleta.tipoMoneda === 'USD' ? '$' : 'S/'
 
-  useEffect(() => { console.log('boleta:', boleta); console.log('sucursales:', sucursales); console.log('User:', user); }, [boleta]);
+  useEffect(() => { console.log('boleta:', boleta); }, [boleta]);
 
+  // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center gap-4 mb-2">
-        <Button variant="ghost" onClick={() => router.push('/ideatecfactus/emision')} className="h-10 w-10 p-0 rounded-full">
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
-        <div>
-          <h3 className="text-xl font-bold text-gray-900">Nueva Boleta de Venta</h3>
-          <p className="text-sm text-gray-500">Regresar a selección de comprobante</p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <Card title="Datos del Comprobante" subtitle="Completa la información requerida">
             <form className="space-y-6">
 
-              {/* Cliente + Serie */}
+              {/* Fila 1: Serie y correlativo */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Serie y Número</label>
+                  <div className="flex gap-2">
+                    {user?.rol === 'superadmin' ? (
+                      <SelectPersonalizado
+                        className="w-1/3"
+                        disabled={loadingSucursales}
+                        value={sucursal?.sucursalId ?? null}
+                        opciones={sucursales.map((s: Sucursal) => ({
+                          value: s.sucursalId,
+                          label: `${s.serieBoleta} - ${s.nombre ?? s.codEstablecimiento}`,
+                          labelCorto: s.serieBoleta,
+                        }))}
+                        onChange={(id) => {
+                          const seleccionada = sucursales.find((s: Sucursal) => s.sucursalId === id)
+                          if (!seleccionada) return
+                          setSucursal(seleccionada)
+                          setCorrelativoActual(seleccionada.correlativoBoleta)
+                          setBoleta(prev => ({
+                            ...prev,
+                            serie: seleccionada.serieBoleta,
+                            correlativo: String(seleccionada.correlativoBoleta).padStart(8, '0')
+                          }))
+                        }}
+                      />
+                    ) : (
+                      <select disabled className="w-1/3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none px-2 text-sm">
+                        <option>{loadingSucursal ? 'Cargando...' : sucursal?.serieBoleta}</option>
+                      </select>
+                    )}
+                    <input type="text" disabled
+                      value={String(correlativoActual ?? sucursal?.correlativoBoleta ?? '').padStart(8, '0')}
+                      className="w-2/3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono text-sm"
+                    />
+                  </div>
+                </div>
+                {/* Celda vacía para mantener el grid de 2 columnas */}
+                <div className="space-y-1.5" />
+              </div>
+
+              {/* Fila 2: Cliente */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Columna izquierda: Tipo doc + búsqueda + razón social */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Tipo y Nº Documento</label>
                   <div className="flex gap-2">
-                    <select value={tipoDoc} onChange={(e) => { setTipoDoc(e.target.value); setBusqueda(''); setShowDropdown(false); setBoleta(prev => ({ ...prev, cliente: undefined })); }}
+                    <select value={tipoDoc} onChange={(e) => {
+                      setTipoDoc(e.target.value); setBusqueda(''); setShowDropdown(false);
+                      setBoleta(prev => ({ ...prev, cliente: undefined }));
+                    }}
                       className="w-1/3 py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
                       <option value="01">DNI</option>
                       <option value="06">RUC</option>
@@ -713,8 +913,11 @@ export default function BoletaPage() {
                       <input type="text" value={busqueda}
                         onChange={(e) => {
                           setBusqueda(e.target.value); setShowDropdown(true);
-                          if (e.target.value.length < busqueda.length || e.target.value === '')
+                          if (e.target.value.length < busqueda.length || e.target.value === '') {
                             setBoleta(prev => ({ ...prev, cliente: undefined }));
+                            setCorreoCliente('')
+                            setTelefonoCliente('')
+                          }
                         }}
                         onFocus={() => setShowDropdown(true)}
                         onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
@@ -737,51 +940,70 @@ export default function BoletaPage() {
                       )}
                     </div>
                   </div>
-                  <input type="text" disabled value={boleta.cliente?.razonSocial ?? ''} placeholder="Nombre o razón social"
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
+
+                  {/* Razón social + botón guardar */}
+                  <div className="flex items-center gap-2">
+                    <input type="text" disabled value={boleta.cliente?.razonSocial ?? ''} placeholder="Nombre o razón social"
+                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
+                    {boleta.cliente?.clienteId === null && boleta.cliente?.razonSocial && (
+                      <button type="button" onClick={() => setShowModalCliente(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                        title="Guardar cliente en mi base de datos">+</button>
+                    )}
+                  </div>
                   {errorCliente && <p className="text-xs text-red-500">{errorCliente}</p>}
                 </div>
 
-                {/* Correlativo sucursal */}
+                {/* Columna derecha: Contacto */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Serie y Número</label>
-                  <div className="flex gap-2">
-                    {user?.rol === 'superadmin' ? (
-                      <SelectPersonalizado
-                        className="w-1/3"
-                        disabled={loadingSucursales}
-                        value={sucursal?.sucursalId ?? null}
-                        opciones={sucursales.map(s => ({
-                          value: s.sucursalId,
-                          label: `${s.serieBoleta} - ${s.nombre ?? s.codEstablecimiento}`,
-                          labelCorto: s.serieBoleta,
-                        }))}
-                        onChange={(id) => {
-                          const seleccionada = sucursales.find(s => s.sucursalId === id)
-                          if (!seleccionada) return
-                          setSucursal(seleccionada)
-                          setCorrelativoActual(seleccionada.correlativoBoleta)
-                          setBoleta(prev => ({
-                            ...prev,
-                            serie: seleccionada.serieBoleta,
-                            correlativo: String(seleccionada.correlativoBoleta).padStart(8, '0')
-                          }))
-                        }}
-                      />
-                    ) : (
-                      <select disabled className="w-1/3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none px-2 text-sm">
-                        <option>{loadingSucursal ? 'Cargando...' : sucursal?.serieBoleta}</option>
-                      </select>
-                    )}
-                    <input
-                      type="text"
-                      disabled
-                      value={String(correlativoActual ?? sucursal?.correlativoBoleta ?? '').padStart(8, '0')}
-                      className="w-2/3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono text-sm"
-                    />
+                  <label className="text-xs font-bold text-gray-500 uppercase">Contacto</label>
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
+                    ${enviarCorreo && !correoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                    <input type="email" value={correoCliente}
+                      onChange={(e) => {
+                        setCorreoCliente(e.target.value)
+                        if (!e.target.value) setEnviarCorreo(false)
+                      }}
+                      disabled={!boleta.cliente?.razonSocial}
+                      placeholder="Correo del cliente"
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={enviarCorreo}
+                        onChange={(e) => setEnviarCorreo(e.target.checked)}
+                        disabled={!correoCliente}
+                        className="w-3.5 h-3.5 accent-brand-blue" />
+                      <span className="text-xs text-gray-500">Enviar</span>
+                    </label>
+                  </div>
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
+                    ${enviarWhatsapp && !telefonoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                    <input type="text" value={telefonoCliente}
+                      onChange={(e) => {
+                        setTelefonoCliente(e.target.value)
+                        if (!e.target.value) setEnviarWhatsapp(false)
+                      }}
+                      disabled={!boleta.cliente?.razonSocial}
+                      placeholder="Teléfono / WhatsApp"
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={enviarWhatsapp}
+                        onChange={(e) => setEnviarWhatsapp(e.target.checked)}
+                        disabled={!telefonoCliente}
+                        className="w-3.5 h-3.5 accent-brand-blue" />
+                      <span className="text-xs text-gray-500">Enviar</span>
+                    </label>
                   </div>
                 </div>
 
+                {/* Dirección — ocupa ambas columnas */}
+                {boleta.cliente?.razonSocial && (
+                  <div className="md:col-span-2">
+                    <input type="text" disabled
+                      value={boleta.cliente?.direccionLineal ?? ''}
+                      placeholder="Dirección del cliente"
+                      className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500" />
+                  </div>
+                )}
               </div>
 
               {/* Fechas */}
@@ -790,17 +1012,24 @@ export default function BoletaPage() {
                   <label className="text-xs font-bold text-gray-500 uppercase">Fecha y Hora de Emisión</label>
                   <input type="datetime-local"
                     value={fechaEmisionEditada ? (boleta.fechaEmision?.slice(0, 16) ?? '') : horaDisplay.slice(0, 16)}
-                    onChange={(e) => { setFechaEmisionEditada(true); setBoleta(prev => ({ ...prev, fechaEmision: e.target.value + ':00', horaEmision: e.target.value + ':00' })); }}
+                    min={(() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().slice(0, 16) })()}
+                    max={new Date().toISOString().slice(0, 16)}
+                    onChange={(e) => {
+                      setFechaEmisionEditada(true);
+                      setBoleta(prev => ({ ...prev, fechaEmision: e.target.value + ':00', horaEmision: e.target.value + ':00' }));
+                    }}
                     className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                   {fechaEmisionEditada && (
                     <button type="button" onClick={() => setFechaEmisionEditada(false)} className="text-[10px] text-brand-blue hover:underline">↺ Usar hora actual</button>
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Vencimiento</label>
-                  <input type="date" value={boleta.fechaVencimiento?.slice(0, 10) ?? ''}
-                    onChange={(e) => setBoleta(prev => ({ ...prev, fechaVencimiento: e.target.value }))}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                  <DatePickerLimitado
+                    label="Fecha de Vencimiento"
+                    modo="vencimiento"
+                    value={boleta.fechaVencimiento ?? ''}
+                    onChange={(val) => setBoleta(prev => ({ ...prev, fechaVencimiento: val }))}
+                  />
                 </div>
               </div>
 
@@ -808,13 +1037,11 @@ export default function BoletaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Moneda</label>
-                  <select value={boleta.tipoMoneda ?? 'PEN'} 
+                  <select value={boleta.tipoMoneda ?? 'PEN'}
                     onChange={(e) => {
                       const nuevaMoneda = e.target.value
                       const monedaAnterior = boleta.tipoMoneda ?? 'PEN'
                       setBoleta(prev => ({ ...prev, tipoMoneda: nuevaMoneda }))
-
-                      // reconvertir precios de ítems existentes
                       if (detalles.length > 0) {
                         setDetalles(prev => prev.map(d => {
                           const precioBase = d._precioBase ?? 0
@@ -823,13 +1050,11 @@ export default function BoletaPage() {
                             : nuevaMoneda === 'PEN' && monedaAnterior === 'USD'
                             ? parseFloat((precioBase * tipoCambio).toFixed(6))
                             : precioBase
-
                           const porcentajeIGV = d.porcentajeIGV ?? 18
                           const tipoAfectacion = d.tipoAfectacionIGV ?? '10'
                           const nuevoPrecioVenta = tipoAfectacion === '10'
                             ? parseFloat((nuevoPrecioBase * (1 + porcentajeIGV / 100)).toFixed(2))
                             : nuevoPrecioBase
-
                           const calc = calcularDetalle(nuevoPrecioBase, nuevoPrecioVenta, d.cantidad ?? 1, porcentajeIGV, tipoAfectacion, d.codigoTipoDescuento ?? '01', d.descuentoUnitario ?? 0)
                           return { ...d, _precioBase: nuevoPrecioBase, _precioVentaConIGV: nuevoPrecioVenta, ...calc }
                         }))
@@ -896,8 +1121,11 @@ export default function BoletaPage() {
                                     actualizarPago(i, 'monto', '')
                                   }
                                 }}
+                                disabled={pago.medioPago === 'Efectivo' && pagos.length === 1}
                                 placeholder={montoRestante(i)}
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
+                                className={`w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
+                                  ${pago.medioPago === 'Efectivo' && pagos.length === 1 ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                              />
                               {pagos.length > 1 && (
                                 <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-2">
                                   <Trash2 className="w-4 h-4" />
@@ -965,15 +1193,19 @@ export default function BoletaPage() {
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] text-gray-400">Fecha Vencimiento</label>
-                          <input type="date" value={cuota.fechaVencimiento} onChange={(e) => {
-                            const nuevaFecha = e.target.value
-                            const fechasSiguientes = calcularFechasCuotas(nuevaFecha, cuotas.length - i)
-                            setCuotas(prev => prev.map((cuota, idx) => {
-                              if (idx < i) return cuota // cuotas anteriores no tocar
-                              return { ...cuota, fechaVencimiento: fechasSiguientes[idx - i] }
-                            }))
-                          }}
-                            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue" />
+                          <DatePickerLimitado
+                            modo="cuota"
+                            fechaMinima={i > 0 ? cuotas[i - 1].fechaVencimiento : undefined}
+                            value={cuota.fechaVencimiento}
+                            onChange={(e) => {
+                              const nuevaFecha = e
+                              const fechasSiguientes = calcularFechasCuotas(nuevaFecha, cuotas.length - i)
+                              setCuotas(prev => prev.map((cuota, idx) => {
+                                if (idx < i) return cuota
+                                return { ...cuota, fechaVencimiento: fechasSiguientes[idx - i] }
+                              }))
+                            }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -1033,19 +1265,20 @@ export default function BoletaPage() {
                   </Button>
                 </div>
                 <div className="border border-gray-100 rounded-xl overflow-x-auto">
-                  <table className="w-full text-xs" style={{ minWidth: '780px' }}>
+                  <table className="w-full text-xs" style={{ minWidth: '860px' }}>
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-2 py-2 text-left text-gray-500 w-6">#</th>
                         <th className="px-2 py-2 text-left text-gray-500" style={{ minWidth: '100px' }}>Producto</th>
                         <th className="px-2 py-2 text-left text-gray-500 w-14">Cód.</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-18">U.M.</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">U.M.</th>
                         <th className="px-2 py-2 text-center text-gray-500 w-16">Cant.</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-20">Afect. IGV</th>
                         <th className="px-2 py-2 text-center text-gray-500 w-22">P.Venta c/IGV</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-18">%IGV</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">%IGV</th>
                         <th className="px-2 py-2 text-center text-gray-500 w-16">T.Desc</th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-20">Desc.Unit</th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">P.Venta Final</th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">Desc.Unit</th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">P.Final</th>
                         <th className="px-2 py-2 text-right text-gray-500 w-18">Total</th>
                         <th className="px-2 py-2 w-6"></th>
                       </tr>
@@ -1053,7 +1286,7 @@ export default function BoletaPage() {
                     <tbody className="divide-y divide-gray-50">
                       {detalles.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="px-4 py-8 text-center text-xs text-gray-400">
+                          <td colSpan={13} className="px-4 py-8 text-center text-xs text-gray-400">
                             Sin ítems. Haz clic en "Agregar ítem" para comenzar.
                           </td>
                         </tr>
@@ -1065,6 +1298,7 @@ export default function BoletaPage() {
                             {/* Buscador producto */}
                             <td className="px-2 py-1.5" style={{ overflow: 'visible', position: 'relative' }}>
                               <input ref={el => { inputRefs.current[i] = el; }} type="text" value={busquedaProducto[i] ?? ''}
+                                disabled={!!d._esIcbper}
                                 onChange={(e) => {
                                   const nb = [...busquedaProducto]; nb[i] = e.target.value; setBusquedaProducto(nb);
                                   const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd);
@@ -1074,7 +1308,6 @@ export default function BoletaPage() {
                                   setTimeout(() => {
                                     const nd = [...showDropdownProducto]; nd[i] = false; setShowDropdownProducto(nd);
                                   }, 150)
-                                  // ✅ si no seleccionó producto, tomar el texto como descripción
                                   const textoEscrito = busquedaProducto[i] ?? ''
                                   if (textoEscrito && (!detalles[i]?.productoId || detalles[i]?.productoId === 0)) {
                                     const nuevos = [...detalles]
@@ -1095,29 +1328,29 @@ export default function BoletaPage() {
                                         p.nomProducto.toLowerCase().includes((busquedaProducto[i] ?? '').toLowerCase()) ||
                                         p.codigo.includes(busquedaProducto[i] ?? ''))
                                       .map((p: ProductoSucursal) => (
-                                          <button
-                                            key={p.productoId}
-                                            type="button"
-                                            disabled={p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0}
-                                            onMouseDown={() => {
-                                              if (p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0) return
-                                              seleccionarProducto(p, i)
-                                            }}
-                                            className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0
-                                              ${p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0
-                                                ? 'opacity-50 cursor-not-allowed bg-gray-50'
-                                                : 'hover:bg-gray-50'}`}
-                                          >
-                                            <p className="text-xs font-medium text-gray-800">{p.nomProducto}</p>
-                                            <p className="text-[10px] text-gray-400">
-                                              {p.codigo} · S/ {p.sucursalProducto.precioUnitario.toFixed(2)}
-                                              {p.tipoProducto === 'BIEN' && (
-                                                <span className={p.sucursalProducto.stock === 0 ? ' text-red-400' : ' text-green-600'}>
-                                                  {p.sucursalProducto.stock === 0 ? ' · Sin stock' : ` · Stock: ${p.sucursalProducto.stock}`}
-                                                </span>
-                                              )}
-                                            </p>
-                                          </button>
+                                        <button
+                                          key={p.productoId}
+                                          type="button"
+                                          disabled={p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0}
+                                          onMouseDown={() => {
+                                            if (p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0) return
+                                            seleccionarProducto(p, i)
+                                          }}
+                                          className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0
+                                            ${p.tipoProducto === 'BIEN' && p.sucursalProducto.stock === 0
+                                              ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                                              : 'hover:bg-gray-50'}`}
+                                        >
+                                          <p className="text-xs font-medium text-gray-800">{p.nomProducto}</p>
+                                          <p className="text-[10px] text-gray-400">
+                                            {p.codigo} · S/ {p.sucursalProducto.precioUnitario.toFixed(2)}
+                                            {p.tipoProducto === 'BIEN' && (
+                                              <span className={p.sucursalProducto.stock === 0 ? ' text-red-400' : ' text-green-600'}>
+                                                {p.sucursalProducto.stock === 0 ? ' · Sin stock' : ` · Stock: ${p.sucursalProducto.stock}`}
+                                              </span>
+                                            )}
+                                          </p>
+                                        </button>
                                       ))}
                                   </div>
                                 );
@@ -1126,18 +1359,12 @@ export default function BoletaPage() {
 
                             <td className="px-2 py-1.5 text-gray-500 font-mono text-[10px]">{d.codigo || '-'}</td>
 
-                            {/* Unidad de medida — editable solo si no hay producto de BD */}
+                            {/* Unidad de medida */}
                             <td className="px-2 py-1.5">
                               {!d.productoId ? (
-                                <select
-                                  value={d.unidadMedida ?? 'NIU'}
-                                  onChange={(e) => {
-                                    const nuevos = [...detalles]
-                                    nuevos[i] = { ...nuevos[i], unidadMedida: e.target.value }
-                                    setDetalles(nuevos)
-                                  }}
-                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                                >
+                                <select value={d.unidadMedida ?? 'NIU'}
+                                  onChange={(e) => { const nuevos = [...detalles]; nuevos[i] = { ...nuevos[i], unidadMedida: e.target.value }; setDetalles(nuevos); }}
+                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
                                   <option value="NIU">NIU</option>
                                   <option value="KGM">KGM</option>
                                   <option value="LTR">LTR</option>
@@ -1148,47 +1375,72 @@ export default function BoletaPage() {
                               )}
                             </td>
 
-                            {/* Cantidad */}
+                            {/* Cantidad con botones +/- */}
                             <td className="px-2 py-1.5">
-                              <div className="space-y-0.5">
-                                <input
-                                  type="number" min={1}
-                                  max={d._tipoProducto === 'BIEN' ? (d._stockDisponible ?? undefined) : undefined}
-                                  value={d.cantidad ?? 1}
-                                  onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-center outline-none focus:border-brand-blue
-                                    ${d._tipoProducto === 'BIEN' && (d._stockDisponible ?? 0) > 0 && (d.cantidad ?? 1) > (d._stockDisponible ?? 0)
-                                      ? 'bg-red-50 border-red-300'
-                                      : 'bg-gray-50 border-gray-200'}`}
-                                />
-                                {d._tipoProducto === 'BIEN' && d._stockDisponible != null && (
-                                  <p className={`text-[9px] text-center ${
-                                    d._stockDisponible === 0 ? 'text-red-500' :
-                                    (d.cantidad ?? 1) > d._stockDisponible ? 'text-red-400' : 'text-gray-400'
-                                  }`}>
-                                    Stock: {d._stockDisponible}
-                                  </p>
-                                )}
-                              </div>
+                              {d._esIcbper ? (
+                                <span className="text-xs text-gray-500 text-center block">{d.cantidad}</span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => actualizarCantidad(i, Math.max(1, (d.cantidad ?? 1) - 1))}
+                                      className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 text-sm font-bold transition-colors"
+                                    >−</button>
+                                    <input type="number" min={1}
+                                      max={d._tipoProducto === 'BIEN' ? (d._stockDisponible ?? undefined) : undefined}
+                                      value={d.cantidad ?? 1}
+                                      onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
+                                      className={`w-10 py-1 border rounded-lg text-xs text-center outline-none focus:border-brand-blue
+                                        ${d._tipoProducto === 'BIEN' && (d._stockDisponible ?? 0) > 0 && (d.cantidad ?? 1) > (d._stockDisponible ?? 0)
+                                          ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'}`}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => actualizarCantidad(i, (d.cantidad ?? 1) + 1)}
+                                      className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 text-sm font-bold transition-colors"
+                                    >+</button>
+                                  </div>
+                                  {d._tipoProducto === 'BIEN' && d._stockDisponible != null && (
+                                    <p className={`text-[9px] text-center ${d._stockDisponible === 0 ? 'text-red-500' : (d.cantidad ?? 1) > d._stockDisponible ? 'text-red-400' : 'text-gray-400'}`}>
+                                      Stock: {d._stockDisponible}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                             </td>
 
-                            {/* Precio venta con IGV — editable */}
+                            {/* Tipo afectación IGV — 10, 20, 30 */}
+                            <td className="px-2 py-1.5">
+                              <select value={d.tipoAfectacionIGV ?? '10'}
+                                disabled={!!d._esIcbper}
+                                onChange={(e) => actualizarTipoAfectacion(i, e.target.value)}
+                                className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                                <option value="10">10 - Gravado</option>
+                                <option value="20">20 - Exonerado</option>
+                                <option value="30">30 - Inafecto</option>
+                              </select>
+                            </td>
+
+                            {/* Precio venta con IGV */}
                             <td className="px-2 py-1.5">
                               <input type="number" min={0} step="0.01"
                                 value={d._precioVentaConIGV ?? d.precioVenta ?? 0}
                                 onChange={(e) => actualizarPrecioVenta(i, Number(e.target.value))}
-                                className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono" />
+                                disabled={!!d._esIcbper}
+                                className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono
+                                  ${d._esIcbper ? 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`} />
                             </td>
 
-                            {/* %IGV — solo editable si gravado */}
+                            {/* %IGV */}
                             <td className="px-2 py-1.5">
                               {d.tipoAfectacionIGV === '10' ? (
-                                <select
-                                  value={d.porcentajeIGV ?? IGV_DEFAULT}
+                                <select value={d.porcentajeIGV ?? IGV_DEFAULT}
+                                  disabled={!!d._esIcbper}
                                   onChange={(e) => actualizarPorcentajeIGV(i, Number(e.target.value))}
                                   className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
-                                  <option value={18}>18</option>
-                                  <option value={10.5}>10.5</option>
+                                  <option value={18}>18%</option>
+                                  <option value={10.5}>10.5%</option>
                                 </select>
                               ) : (
                                 <span className="block text-center text-gray-400 text-xs">N/A</span>
@@ -1199,7 +1451,9 @@ export default function BoletaPage() {
                             <td className="px-2 py-1.5">
                               <select value={d.codigoTipoDescuento ?? '01'}
                                 onChange={(e) => actualizarCodigoDescuento(i, e.target.value)}
-                                className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                                disabled={!!d._esIcbper}
+                                className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
+                                  ${d._esIcbper ? 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`}>
                                 <option value="01">01 - No afecta base</option>
                                 <option value="00">00 - Afecta base</option>
                               </select>
@@ -1209,10 +1463,12 @@ export default function BoletaPage() {
                             <td className="px-2 py-1.5">
                               <input type="number" min={0} step="0.01" value={d.descuentoUnitario ?? 0}
                                 onChange={(e) => actualizarDescuento(i, Number(e.target.value))}
-                                className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono" />
+                                disabled={!!d._esIcbper}
+                                className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono
+                                  ${d._esIcbper ? 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`} />
                             </td>
 
-                            {/* Precio venta final (con descuento aplicado) */}
+                            {/* Precio venta final */}
                             <td className="px-2 py-1.5 text-right font-mono text-gray-700 text-xs">
                               {(d.precioVenta ?? 0).toFixed(2)}
                             </td>
@@ -1232,6 +1488,32 @@ export default function BoletaPage() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* Bolsa ICBPER */}
+              <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-amber-800">🛍️ ¿Desea bolsa plástica?</span>
+                  <span className="text-[10px] text-amber-600">(S/ 0.20 c/u + ICBPER S/ {ICBPER_FACTOR})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCantidadBolsa(prev => Math.max(0, prev - 1))}
+                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors"
+                  >−</button>
+                  <span className="w-8 text-center text-sm font-semibold text-amber-900">{cantidadBolsa}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCantidadBolsa(prev => prev + 1)}
+                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors"
+                  >+</button>
+                  {cantidadBolsa > 0 && (
+                    <span className="text-[10px] text-amber-600 ml-1">
+                      ICBPER: S/ {(cantidadBolsa * ICBPER_FACTOR).toFixed(2)}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1261,6 +1543,12 @@ export default function BoletaPage() {
                     <span>IGV:</span>
                     <span className="font-medium text-gray-900 w-24">{simbolo} {totales.igv.toFixed(2)}</span>
                   </div>
+                  {totales.totalIcbper > 0 && (
+                    <div className="flex justify-end gap-8 text-sm text-gray-500">
+                      <span>ICBPER (Bolsas):</span>
+                      <span className="font-medium text-amber-600 w-24">{simbolo} {totales.totalIcbper.toFixed(2)}</span>
+                    </div>
+                  )}
                   {totales.totalDescuentos > 0 && (
                     <div className="flex justify-end gap-8 text-sm text-gray-500">
                       <span>Descuentos:</span>
@@ -1268,7 +1556,7 @@ export default function BoletaPage() {
                     </div>
                   )}
 
-                  {/* Descuento global con tipo */}
+                  {/* Descuento global */}
                   <div className="flex justify-end gap-2 items-center">
                     <span className="text-sm text-gray-500">Desc. Global:</span>
                     <select value={codigoTipoDescGlobal} onChange={(e) => setCodigoTipoDescGlobal(e.target.value)}
@@ -1313,7 +1601,7 @@ export default function BoletaPage() {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Emitiendo...
                   </span>
-                ) : 'Emitir Comprobante'}
+                ) : 'Emitir Boleta'}
               </Button>
               {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
               <Button variant="outline" className="w-full" type="button">Guardar como Borrador</Button>
@@ -1327,6 +1615,24 @@ export default function BoletaPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal guardar cliente */}
+      {showModalCliente && boleta.cliente && (
+        <ModalGuardarClienteBoleta
+          cliente={{
+            numeroDocumento: boleta.cliente.numeroDocumento ?? '',
+            razonSocial: boleta.cliente.razonSocial ?? '',
+            tipoDocumento: boleta.cliente.tipoDocumento ?? '',
+            ubigeo: boleta.cliente.ubigeo ?? '',
+            direccionLineal: boleta.cliente.direccionLineal ?? '',
+            departamento: boleta.cliente.departamento ?? '',
+            provincia: boleta.cliente.provincia ?? '',
+            distrito: boleta.cliente.distrito ?? '',
+          }}
+          onGuardar={guardarCliente}
+          onCerrar={() => setShowModalCliente(false)}
+        />
+      )}
     </div>
   );
 }

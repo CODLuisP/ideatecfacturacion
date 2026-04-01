@@ -22,6 +22,8 @@ import { SelectPersonalizado } from '@/app/components/ui/SelectPersonalizado';
 import { useEmpresaEmisor } from '../boleta/gestionBoletas/useEmpresaEmisor';
 import { useSucursal } from '../boleta/gestionBoletas/useSucursal';
 import { useSucursalRuc } from '../boleta/gestionBoletas/useSucursalRuc';
+import { DatePickerLimitado } from '@/app/components/ui/DatePickerLimitado';
+import { ModalGuardarCliente } from './gestionFacturas/ModalGuardarCliente';
 
 // ── Tipos afectación gratuita ────────────────────────────────
 const TIPOS_GRATUITOS = ['11', '21', '31']
@@ -35,6 +37,7 @@ interface DetalleLocal extends Partial<FacturaDetalle> {
   _sucursalProductoId?: number
   _tipoProducto?: string | null
   _stockDisponible?: number | null
+  _esIcbper?: boolean
 }
 
 interface PagoLocal {
@@ -99,14 +102,14 @@ export default function FacturaPage() {
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } = useClienteFactura();
-  const { clientes, loadingClientes } = useClientesRuc();
+  const { clientes, loadingClientes, fetchClientes  } = useClientesRuc();
 
   const { sucursal: sucursalDelHook, loadingSucursal } = useSucursal();
   const [sucursal, setSucursal] = useState<Sucursal | null>(null)
   const { sucursales, loadingSucursales } = useSucursalRuc()
   const [correlativoActual, setCorrelativoActual] = useState<number | null>(null);
 
-  const { productosSucursal } = useProductosSucursal();
+  const { productosSucursal, fetchProductosSucursal } = useProductosSucursal();
   const { fecha, fechaHora } = formatoFechaActual();
 
   // ── Estado cliente / búsqueda ────────────────────────────────
@@ -114,6 +117,57 @@ export default function FacturaPage() {
   const [tipoDoc, setTipoDoc] = useState('06');
   const [busqueda, setBusqueda] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // ── Estado modal guardar cliente ─────────────────────────────
+  const [showModalCliente, setShowModalCliente] = useState(false)
+
+  const guardarCliente = async (extra: { nombreComercial: string; telefono: string; correo: string }) => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+        {
+          sucursalID: user?.sucursalID,
+          numeroDocumento: factura.cliente?.numeroDocumento,
+          razonSocialNombre: factura.cliente?.razonSocial,
+          nombreComercial: extra.nombreComercial,
+          telefono: extra.telefono,
+          correo: extra.correo,
+          tipoDocumentoId: factura.cliente?.tipoDocumento,
+          direccion: {
+            ubigeo: factura.cliente?.ubigeo,
+            direccionLineal: factura.cliente?.direccionLineal,
+            departamento: factura.cliente?.departamento,
+            provincia: factura.cliente?.provincia,
+            distrito: factura.cliente?.distrito,
+            tipoDireccion: 'PRINCIPAL',
+          }
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      showToast('Cliente guardado correctamente', 'success')
+      setShowModalCliente(false)
+      const listaActualizada = await fetchClientes()
+      const clienteGuardado = listaActualizada?.find(
+        (c: any) => c.numeroDocumento === factura.cliente?.numeroDocumento
+      )
+      setFactura(prev => ({
+        ...prev,
+        cliente: prev.cliente ? { 
+          ...prev.cliente, 
+          clienteId: clienteGuardado?.clienteId ?? null,
+        } : prev.cliente
+      }))
+    } catch {
+      showToast('Error al guardar el cliente', 'error')
+    }
+  }
+
+  // ── Envío por correo y WhatsApp ──────────────────────────────
+  const [correoCliente, setCorreoCliente] = useState('')
+  const [telefonoCliente, setTelefonoCliente] = useState('')
+  const [enviarCorreo, setEnviarCorreo] = useState(false)
+  const [enviarWhatsapp, setEnviarWhatsapp] = useState(false)
+
   const [horaDisplay, setHoraDisplay] = useState(fechaHora);
   const [fechaEmisionEditada, setFechaEmisionEditada] = useState(false);
   const intervaloRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -216,6 +270,68 @@ export default function FacturaPage() {
   const [showDropdownProducto, setShowDropdownProducto] = useState<boolean[]>([]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // ── ICBPER bolsa plástica ────────────────────────────────────
+  const [cantidadBolsa, setCantidadBolsa] = useState(0)
+  const ICBPER_FACTOR = 0.50
+
+  useEffect(() => {
+    if (productosSucursal.length === 0) return
+    
+    const productoBolsa = productosSucursal.find(p => p.productoId === 6) // ✅ declarar fuera del setDetalles
+    
+    const sinBolsaIdx = detalles.findIndex(d => d._esIcbper)
+    
+    setDetalles(prev => {
+      const sinBolsa = prev.filter(d => d._esIcbper !== true)
+      if (cantidadBolsa === 0) return sinBolsa
+
+      const precioConIGV = productoBolsa?.sucursalProducto.precioUnitario ?? 0.20
+      const precioBase = parseFloat((precioConIGV / (1 + 18 / 100)).toFixed(6))
+      const icbper = parseFloat((cantidadBolsa * ICBPER_FACTOR).toFixed(2))
+      const baseIgv = parseFloat((precioBase * cantidadBolsa).toFixed(2))
+      const montoIGV = parseFloat((baseIgv * 0.18).toFixed(2))
+
+      const bolsaItem: DetalleLocal = {
+        item: sinBolsa.length + 1,
+        productoId: productoBolsa?.productoId ?? null,
+        codigo: productoBolsa?.codigo ?? 'BOLSA',
+        descripcion: productoBolsa?.nomProducto ?? 'BOLSA ICBPER',
+        cantidad: cantidadBolsa,
+        unidadMedida: productoBolsa?.unidadMedida ?? 'NIU',
+        precioUnitario: precioBase,
+        tipoAfectacionIGV: '10',
+        porcentajeIGV: 18,
+        baseIgv,
+        montoIGV,
+        codigoTipoDescuento: '01',
+        descuentoUnitario: 0,
+        descuentoTotal: 0,
+        valorVenta: baseIgv,
+        precioVenta: precioConIGV,
+        totalVentaItem: parseFloat((precioConIGV * cantidadBolsa + icbper).toFixed(2)),
+        icbper,
+        factorIcbper: ICBPER_FACTOR,
+        _incluirIGV: true,
+        _precioBase: precioBase,
+        _precioVentaConIGV: precioConIGV,
+        _precioBaseOriginal: precioBase,
+        _sucursalProductoId: productoBolsa?.sucursalProducto?.sucursalProductoId,
+        _tipoProducto: productoBolsa?.tipoProducto ?? null,
+        _stockDisponible: productoBolsa?.sucursalProducto?.stock ?? null,
+        _esIcbper: true,
+      }
+      return [...sinBolsa, bolsaItem]
+    })
+
+    // ✅ actualizar busquedaProducto
+    setBusquedaProducto(prev => {
+      const sinBolsa = prev.filter((_, i) => !detalles[i]?._esIcbper)
+      if (cantidadBolsa === 0) return sinBolsa
+      return [...sinBolsa, productoBolsa?.nomProducto ?? 'BOLSA ICBPER']
+    })
+
+  }, [cantidadBolsa, productosSucursal])
+
   // ── Descuento global ─────────────────────────────────────────
   const [descuentoGlobal, setDescuentoGlobal] = useState(0);
   const [codigoTipoDescGlobal, setCodigoTipoDescGlobal] = useState('03');
@@ -232,7 +348,12 @@ export default function FacturaPage() {
 
   // ── Effects de inicialización ────────────────────────────────
   useEffect(() => { if (!empresa) return; setFactura(prev => ({ ...prev, company: empresa })); }, [empresa]);
-  useEffect(() => { if (!cliente) return; setFactura(prev => ({ ...prev, cliente: cliente as FacturaCliente })); }, [cliente]);
+  useEffect(() => { 
+    if (!cliente) return; 
+    setFactura(prev => ({ ...prev, cliente: cliente as FacturaCliente }));
+    setCorreoCliente('')
+    setTelefonoCliente('') 
+  }, [cliente]);
 
   useEffect(() => {
     if (!sucursalDelHook) return
@@ -285,7 +406,11 @@ export default function FacturaPage() {
   }, [cuotas, factura.tipoPago]);
 
   useEffect(() => {
-    const detallesLimpios = detalles.map(({ _incluirIGV, _precioBase, _precioVentaConIGV, _sucursalProductoId, _tipoProducto, _stockDisponible, ...d }) => d) as FacturaDetalle[];
+    const detallesLimpios = detalles.map(({ 
+      _incluirIGV, _precioBase, _precioBaseOriginal, _precioVentaConIGV, 
+      _sucursalProductoId, _tipoProducto, _stockDisponible, _esIcbper, 
+      ...d 
+    }) => d) as FacturaDetalle[];
     setFactura(prev => ({ ...prev, details: detallesLimpios }));
   }, [detalles]);
 
@@ -322,7 +447,9 @@ export default function FacturaPage() {
     const igvGratuitas = detalles.filter(d => d.tipoAfectacionIGV === '11')
       .reduce((acc, d) => acc + (d.montoIGV ?? 0), 0)
 
-    const totalDescuentosItems = detalles.reduce((acc, d) => acc + (d.descuentoTotal ?? 0), 0)
+    const totalDescuentosItems = detalles
+      .filter(d => d.codigoTipoDescuento === '01')
+      .reduce((acc, d) => acc + (d.descuentoTotal ?? 0), 0)
 
     let gravadas = gravadas_bruto
     let igv = igv_bruto
@@ -336,18 +463,15 @@ export default function FacturaPage() {
       descGlobalEnTotales = descuentoGlobal
     }
 
-    const descuentosTipo01 = detalles
-      .filter(d => d.codigoTipoDescuento === '01')
-      .reduce((acc, d) => acc + (d.descuentoTotal ?? 0), 0)
-
     // Si hay gratuitas, importeTotal es 0
     const soloGratuitas = detalles.length > 0 && detalles.every(d => esGratuito(d.tipoAfectacionIGV ?? ''))
     const hayGratuitas = detalles.some(d => esGratuito(d.tipoAfectacionIGV ?? ''))
+    const totalIcbper = detalles.reduce((acc, d) => acc + (d.icbper ?? 0), 0)
 
     const valorVenta = soloGratuitas ? 0 : parseFloat((gravadas + exoneradas + inafectas).toFixed(2))
-    const subTotal = soloGratuitas ? 0 : parseFloat((valorVenta + igv - descuentosTipo01).toFixed(2))
+    const subTotal = soloGratuitas ? 0 : parseFloat((valorVenta + igv).toFixed(2))
     const totalDescuentos = parseFloat((totalDescuentosItems + descGlobalEnTotales).toFixed(2))
-    const importeTotal = soloGratuitas ? 0 : parseFloat(Math.max(0, subTotal - descGlobalEnTotales).toFixed(2))
+    const importeTotal = soloGratuitas ? 0 : parseFloat(Math.max(0, subTotal - totalDescuentosItems - descGlobalEnTotales + totalIcbper).toFixed(2))
 
     // totalImpuestos: para gratuitas es 0 (el IGV se informa pero no se cobra)
     const totalImpuestos = soloGratuitas ? 0 : parseFloat(igv.toFixed(2))
@@ -364,6 +488,7 @@ export default function FacturaPage() {
       subTotal,
       importeTotal,
       totalImpuestos,
+      totalIcbper: parseFloat(totalIcbper.toFixed(2)), 
       total: importeTotal,
       soloGratuitas,
       hayGratuitas,
@@ -371,29 +496,45 @@ export default function FacturaPage() {
   }, [detalles, descuentoGlobal, codigoTipoDescGlobal]);
 
   // ── Auto-calcular monto pagos ────────────────────────────────
-useEffect(() => {
-  if (totales.total === 0) return
-  if (factura.tipoPago !== 'Contado' && factura.tipoPago !== 'CreditoInicial') return
-  
-  // ✅ si queda un solo pago, resetear editado
-  if (pagos.length === 1) {
-    pagosEditadosRef.current = [false]
-    setPagosEditados([false])
-  }
+  useEffect(() => {
+    if (factura.tipoPago !== 'Contado' && factura.tipoPago !== 'CreditoInicial') return
+    
+    // ✅ siempre resetear si solo hay un pago, sin importar si fue editado
+    if (pagos.length === 1) {
+      pagosEditadosRef.current = [false]
+      setPagosEditados([false])
+      setPagos(prev => prev.map(p => ({ 
+        ...p, 
+        monto: totales.total === 0 ? '' : totales.total.toFixed(2) 
+      })))
+      return
+    }
 
-  setPagos(prev => prev.map((pago, i) => {
-    if (pagosEditadosRef.current[i]) return pago
-    if (i > 0) return pago
-    const pagadoAntes = prev.slice(0, i).reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
-    const restante = Math.max(0, totales.total - pagadoAntes).toFixed(2)
-    return { ...pago, monto: restante }
-  }))
-}, [totales.total, factura.tipoPago, pagos.length])
+    if (totales.total === 0) {
+      setPagos(prev => prev.map(p => ({ ...p, monto: '' })))
+      setPagosEditados(prev => prev.map(() => false))
+      return
+    }
+
+    setPagos(prev => prev.map((pago, i) => {
+      if (pagosEditadosRef.current[i]) return pago
+      if (i > 0) return pago
+      const pagadoAntes = prev.slice(0, i).reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
+      const restante = Math.max(0, totales.total - pagadoAntes).toFixed(2)
+      return { ...pago, monto: restante }
+    }))
+  }, [totales.total, factura.tipoPago, pagos.length])
 
   // ── Auto-calcular cuotas ─────────────────────────────────────
   useEffect(() => {
     if (factura.tipoPago !== 'Credito' && factura.tipoPago !== 'CreditoInicial') return
-    if (totales.total === 0) return
+    
+    // ✅ limpiar si no hay items
+    if (totales.total === 0) {
+      setCuotas(prev => prev.map(c => ({ ...c, monto: '' })))
+      return
+    }
+
     const baseCalculo = factura.tipoPago === 'CreditoInicial'
       ? Math.max(0, totales.total - totalPagado) : totales.total
     const montoPorCuota = parseFloat((baseCalculo / numeroCuotas).toFixed(2))
@@ -427,7 +568,8 @@ useEffect(() => {
       totalOperacionesGratuitas: totales.gratuitas,
       totalIgvGratuitas: totales.igvGratuitas,
       totalIGV: totales.igv,
-      totalImpuestos: totales.totalImpuestos,
+      totalIcbper: totales.totalIcbper,
+      totalImpuestos: parseFloat((totales.totalImpuestos + totales.totalIcbper).toFixed(2)),
       totalDescuentos: totales.totalDescuentos,
       codigoTipoDescGlobal,
       descuentoGlobal,
@@ -452,6 +594,8 @@ useEffect(() => {
   const seleccionarDeLista = (c: Cliente) => {
     setBusqueda(c.numeroDocumento); setShowDropdown(false);
     const direccion = c.direccion?.[0];
+    setCorreoCliente(c.correo ?? '')
+    setTelefonoCliente(c.telefono ?? '')
     setFactura(prev => ({
       ...prev,
       cliente: {
@@ -498,32 +642,34 @@ useEffect(() => {
     }
 
     if (tipoAfectacion === '10') {
-      // ✅ siempre recalcular precioVentaConIGV desde precioBase para garantizar IGV correcto
       const pvConIGV = parseFloat((precioBase * (1 + porcentajeIGV / 100)).toFixed(2))
       if (codigoDescuento === '00') {
-        const descBase = parseFloat((descuentoUnitario / (1 + porcentajeIGV / 100)).toFixed(6))
-        baseIgv = parseFloat(((precioBase - descBase) * cantidad).toFixed(2))
+        // ✅ descuento afecta base — descuentoUnitario es en base (sin IGV)
+        baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2))
         montoIGV = parseFloat((baseIgv * porcentajeIGV / 100).toFixed(2))
-        precioVenta = parseFloat((pvConIGV - descuentoUnitario).toFixed(2))
+        precioVenta = parseFloat(((precioBase - descuentoUnitario) * (1 + porcentajeIGV / 100)).toFixed(2))
         totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2))
         valorVenta = baseIgv
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       } else {
+        // ✅ descuento tipo 01 — NO afecta base
         baseIgv = parseFloat((precioBase * cantidad).toFixed(2))
         montoIGV = parseFloat((baseIgv * porcentajeIGV / 100).toFixed(2))
         precioVenta = parseFloat((pvConIGV - descuentoUnitario).toFixed(2))
-        totalVentaItem = parseFloat(((pvConIGV - descuentoUnitario) * cantidad).toFixed(2))
+        totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2))
         valorVenta = baseIgv
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       }
     } else {
       // exonerado (20) / inafecto (30)
       if (codigoDescuento === '00') {
+        // ✅ descuento afecta base
         baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2))
         precioVenta = parseFloat((precioBase - descuentoUnitario).toFixed(2))
         totalVentaItem = parseFloat((baseIgv).toFixed(2))
         descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2))
       } else {
+        // ✅ descuento tipo 01 — NO afecta base
         baseIgv = parseFloat((precioBase * cantidad).toFixed(2))
         precioVenta = parseFloat(precioBase.toFixed(2))
         totalVentaItem = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2))
@@ -702,6 +848,9 @@ useEffect(() => {
 
   // ── Eliminar fila ────────────────────────────────────────────
   const eliminarFila = (index: number) => {
+    if (detalles[index]?._esIcbper) {
+      setCantidadBolsa(0) 
+    return }
     setDetalles(prev => prev.filter((_, i) => i !== index));
     setBusquedaProducto(prev => prev.filter((_, i) => i !== index));
     setShowDropdownProducto(prev => prev.filter((_, i) => i !== index));
@@ -737,6 +886,38 @@ useEffect(() => {
       showToast('Debe ingresar la cuenta bancaria de detracción', 'error'); return
     }
 
+     // ✅ validar detracción
+    if (aplicarDetraccion) {
+      if (totales.importeTotal < 700) {
+        showToast('La detracción solo aplica cuando el importe supera S/ 700.00', 'error')
+        return
+      }
+      if (!detraccion.cuentaBancoDetraccion) {
+        showToast('Debe ingresar la cuenta bancaria de detracción', 'error')
+        return
+      }
+      if (totales.soloGratuitas) {
+        showToast('No aplica detracción en operaciones gratuitas', 'error')
+        return
+      }
+    }
+
+    //validacion de enviar correo telefono
+    if (enviarCorreo && !correoCliente.trim()) {
+      showToast('Debe ingresar el correo del cliente para enviar por correo', 'error')
+      return
+    }
+    if (enviarWhatsapp && !telefonoCliente.trim()) {
+      showToast('Debe ingresar el teléfono del cliente para enviar por WhatsApp', 'error')
+      return
+    }
+
+    // ✅ advertir si debería aplicar detracción y no lo hizo
+    if (!aplicarDetraccion && totales.importeTotal >= 700 && !totales.soloGratuitas) {
+      showToast('⚠️ El importe supera S/ 700. Verifica si aplica detracción.', 'info')
+      // no bloquear, solo advertir
+    }
+
     setEmitiendo(true)
     setErrorEmision(null)
     try {
@@ -748,6 +929,29 @@ useEffect(() => {
 
       if (respuesta.exitoso) {
         showToast(respuesta.mensaje ?? 'Factura emitida correctamente.', 'success')
+        // enviar por correo
+        if (enviarCorreo && correoCliente) {
+          try {
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-correo`,
+              { correo: correoCliente },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            )
+            showToast('Comprobante enviado por correo', 'success')
+          } catch { showToast('Error al enviar por correo', 'error') }
+        }
+
+        // enviar por WhatsApp
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-whatsapp`,
+              { telefono: telefonoCliente },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            )
+            showToast('Comprobante enviado por WhatsApp', 'success')
+          } catch { showToast('Error al enviar por WhatsApp', 'error') }
+        }
       } else {
         showToast(`Factura ${facturaFinal.serie}-${facturaFinal.correlativo} generada pero rechazada por SUNAT`, 'error')
       }
@@ -759,7 +963,9 @@ useEffect(() => {
       if (itemsParaStock.length > 0) {
         const body = itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 }))
         try {
+          console.log('body stock:', body)
           await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`, body, { headers: { Authorization: `Bearer ${accessToken}` } })
+          await fetchProductosSucursal()
         } catch { console.error('Error al actualizar stock') }
       }
 
@@ -791,6 +997,11 @@ useEffect(() => {
       setFechaEmisionEditada(false)
       setAplicarDetraccion(false)
       setDetraccion({ codigoBienDetraccion: '014', codigoMedioPago: '001', cuentaBancoDetraccion: '', porcentajeDetraccion: 4, montoDetraccion: 0, observacion: '' })
+      setCantidadBolsa(0)
+      setCorreoCliente('')
+      setTelefonoCliente('')
+      setEnviarCorreo(false)
+      setEnviarWhatsapp(false)
 
     } catch (err: any) {
       const data = err?.response?.data
@@ -818,7 +1029,7 @@ useEffect(() => {
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center gap-4 mb-2">
+      {/*<div className="flex items-center gap-4 mb-2">
         <Button variant="ghost" onClick={() => router.push('/ideatecfactus/emision')} className="h-10 w-10 p-0 rounded-full">
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -826,58 +1037,14 @@ useEffect(() => {
           <h3 className="text-xl font-bold text-gray-900">Nueva Factura</h3>
           <p className="text-sm text-gray-500">Regresar a selección de comprobante</p>
         </div>
-      </div>
+      </div>*/}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <Card title="Datos del Comprobante" subtitle="Completa la información requerida">
             <form className="space-y-6">
-
-              {/* Cliente + Serie */}
+              {/* Serie y correlativo — usa serieFactura / correlativoFactura */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Tipo y Nº Documento</label>
-                  <div className="flex gap-2">
-                    {/* Solo RUC y CE para factura */}
-                    <select value={tipoDoc} onChange={(e) => { setTipoDoc(e.target.value); setBusqueda(''); setShowDropdown(false); setFactura(prev => ({ ...prev, cliente: undefined })); }}
-                      className="w-1/3 py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
-                      <option value="06">RUC</option>
-                      <option value="04">CE</option>
-                    </select>
-                    <div className="relative w-2/3">
-                      <input type="text" value={busqueda}
-                        onChange={(e) => {
-                          setBusqueda(e.target.value); setShowDropdown(true);
-                          if (e.target.value.length < busqueda.length || e.target.value === '')
-                            setFactura(prev => ({ ...prev, cliente: undefined }));
-                        }}
-                        onFocus={() => setShowDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                        maxLength={tipoDoc === '06' ? 11 : 12}
-                        placeholder="Buscar por RUC o nombre..."
-                        className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
-                      />
-                      {loadingCliente && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
-                      {showDropdown && clientesFiltrados.length > 0 && (
-                        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                          {loadingClientes ? <p className="text-xs text-gray-400 px-4 py-3">Cargando...</p> : (
-                            clientesFiltrados.map(c => (
-                              <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
-                                <span className="text-sm text-gray-800">{c.numeroDocumento} - {c.razonSocialNombre}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <input type="text" disabled value={factura.cliente?.razonSocial ?? ''} placeholder="Razón social"
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
-                  {errorCliente && <p className="text-xs text-red-500">{errorCliente}</p>}
-                </div>
-
-                {/* Serie y correlativo — usa serieFactura / correlativoFactura */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Serie y Número</label>
                   <div className="flex gap-2">
@@ -914,6 +1081,121 @@ useEffect(() => {
                     />
                   </div>
                 </div>
+
+                {/*  */}
+                <div className="space-y-1.5">
+
+                </div>
+              </div>
+
+              {/* Fila 2: Cliente */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Columna izquierda: Tipo doc + Razón social */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Tipo y Nº Documento Cliente</label>
+                  <div className="flex gap-2">
+                    <select value={tipoDoc} onChange={(e) => { setTipoDoc(e.target.value); setBusqueda(''); setShowDropdown(false); setFactura(prev => ({ ...prev, cliente: undefined })); }}
+                      className="w-1/3 py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
+                      <option value="06">RUC</option>
+                      <option value="04">CE</option>
+                    </select>
+                    <div className="relative w-2/3">
+                      <input type="text" value={busqueda}
+                        onChange={(e) => {
+                          setBusqueda(e.target.value); setShowDropdown(true);
+                          if (e.target.value.length < busqueda.length || e.target.value === '')
+                            setFactura(prev => ({ ...prev, cliente: undefined }));
+                            setCorreoCliente('')
+                            setTelefonoCliente('')
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                        maxLength={tipoDoc === '06' ? 11 : 12}
+                        placeholder="Buscar por RUC o nombre..."
+                        className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+                      />
+                      {loadingCliente && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
+                      {showDropdown && clientesFiltrados.length > 0 && (
+                        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {loadingClientes ? <p className="text-xs text-gray-400 px-4 py-3">Cargando...</p> : (
+                            clientesFiltrados.map(c => (
+                              <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+                                <span className="text-sm text-gray-800">{c.numeroDocumento} - {c.razonSocialNombre}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Razón social */}
+                  <div className="flex items-center gap-2">
+                    <input type="text" disabled value={factura.cliente?.razonSocial ?? ''} placeholder="Razón social"
+                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
+                    {factura.cliente?.clienteId === null && factura.cliente?.razonSocial && (
+                      <button type="button" onClick={() => setShowModalCliente(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                        title="Guardar cliente en mi base de datos">+</button>
+                    )}
+                  </div>
+                  {errorCliente && <p className="text-xs text-red-500">{errorCliente}</p>}
+                </div>
+
+                {/* Columna derecha: Correo y Teléfono */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Contacto</label>
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
+                    ${enviarCorreo && !correoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                    <input type="email" value={correoCliente}
+                      onChange={(e) => {
+                        setCorreoCliente(e.target.value)
+                        if (!e.target.value) setEnviarCorreo(false)
+                      }}
+                      disabled={!factura.cliente?.razonSocial}
+                      placeholder="Correo del cliente"
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={enviarCorreo}
+                        onChange={(e) => setEnviarCorreo(e.target.checked)}
+                        disabled={!correoCliente}
+                        className="w-3.5 h-3.5 accent-brand-blue" />
+                      <span className="text-xs text-gray-500">Enviar</span>
+                    </label>
+                  </div>
+
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
+                    ${enviarWhatsapp && !telefonoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                    <input type="text" value={telefonoCliente}
+                        onChange={(e) => {
+                          setTelefonoCliente(e.target.value)
+                          if (!e.target.value) setEnviarWhatsapp(false)
+                        }}
+                      disabled={!factura.cliente?.razonSocial}
+                      placeholder="Teléfono / WhatsApp"
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={enviarWhatsapp}
+                        onChange={(e) => setEnviarWhatsapp(e.target.checked)}
+                        disabled={!telefonoCliente}
+                        className="w-3.5 h-3.5 accent-brand-blue" />
+                      <span className="text-xs text-gray-500">Enviar</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Dirección — ocupa ambas columnas */}
+                {factura.cliente?.razonSocial && (
+                  <div className="md:col-span-2">
+                    <input type="text" disabled
+                      value={factura.cliente?.direccionLineal ?? ''}
+                      placeholder="Dirección del cliente"
+                      className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500" />
+                  </div>
+                )}
+
               </div>
 
               {/* Fechas */}
@@ -922,6 +1204,8 @@ useEffect(() => {
                   <label className="text-xs font-bold text-gray-500 uppercase">Fecha y Hora de Emisión</label>
                   <input type="datetime-local"
                     value={fechaEmisionEditada ? (factura.fechaEmision?.slice(0, 16) ?? '') : horaDisplay.slice(0, 16)}
+                    min={(() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().slice(0, 16) })()}
+                    max={new Date().toISOString().slice(0, 16)}
                     onChange={(e) => { setFechaEmisionEditada(true); setFactura(prev => ({ ...prev, fechaEmision: e.target.value + ':00', horaEmision: e.target.value + ':00' })); }}
                     className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                   {fechaEmisionEditada && (
@@ -929,10 +1213,12 @@ useEffect(() => {
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Vencimiento</label>
-                  <input type="date" value={factura.fechaVencimiento?.slice(0, 10) ?? ''}
-                    onChange={(e) => setFactura(prev => ({ ...prev, fechaVencimiento: e.target.value }))}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                  <DatePickerLimitado
+                    label="Fecha de Vencimiento"
+                    modo="vencimiento"
+                    value={factura.fechaVencimiento ?? ''}
+                    onChange={(val) => setFactura(prev => ({ ...prev, fechaVencimiento: val }))}
+                  />
                 </div>
               </div>
 
@@ -1098,15 +1384,19 @@ useEffect(() => {
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] text-gray-400">Fecha Vencimiento</label>
-                          <input type="date" value={cuota.fechaVencimiento} onChange={(e) => {
-                            const nuevaFecha = e.target.value
-                            const fechasSiguientes = calcularFechasCuotas(nuevaFecha, cuotas.length - i)
-                            setCuotas(prev => prev.map((cuota, idx) => {
-                              if (idx < i) return cuota
-                              return { ...cuota, fechaVencimiento: fechasSiguientes[idx - i] }
-                            }))
-                          }}
-                            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue" />
+                          <DatePickerLimitado
+                            modo="cuota"
+                            fechaMinima={i > 0 ? cuotas[i - 1].fechaVencimiento : undefined}
+                            value={cuota.fechaVencimiento}
+                            onChange={(e) => {
+                              const nuevaFecha = e
+                              const fechasSiguientes = calcularFechasCuotas(nuevaFecha, cuotas.length - i)
+                              setCuotas(prev => prev.map((cuota, idx) => {
+                                if (idx < i) return cuota
+                                return { ...cuota, fechaVencimiento: fechasSiguientes[idx - i] }
+                              }))
+                            }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -1298,6 +1588,7 @@ useEffect(() => {
                               {/* Buscador producto */}
                               <td className="px-2 py-1.5" style={{ overflow: 'visible', position: 'relative' }}>
                                 <input ref={el => { inputRefs.current[i] = el; }} type="text" value={busquedaProducto[i] ?? ''}
+                                  disabled={!!d._esIcbper}
                                   onChange={(e) => {
                                     const nb = [...busquedaProducto]; nb[i] = e.target.value; setBusquedaProducto(nb);
                                     const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd);
@@ -1375,39 +1666,44 @@ useEffect(() => {
                               </td>
 
                               {/* Cantidad */}
-                              <td className="px-2 py-1.5">
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => actualizarCantidad(i, Math.max(1, (d.cantidad ?? 1) - 1))}
-                                      className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 text-sm font-bold transition-colors"
-                                    >−</button>
-                                    <input type="number" min={1}
-                                      max={d._tipoProducto === 'BIEN' ? (d._stockDisponible ?? undefined) : undefined}
-                                      value={d.cantidad ?? 1}
-                                      onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
-                                      className={`w-10 py-1 border rounded-lg text-xs text-center outline-none focus:border-brand-blue
-                                        ${d._tipoProducto === 'BIEN' && (d._stockDisponible ?? 0) > 0 && (d.cantidad ?? 1) > (d._stockDisponible ?? 0)
-                                          ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'}`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => actualizarCantidad(i, (d.cantidad ?? 1) + 1)}
-                                      className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 text-sm font-bold transition-colors"
-                                    >+</button>
-                                  </div>
-                                  {d._tipoProducto === 'BIEN' && d._stockDisponible != null && (
-                                    <p className={`text-[9px] text-center ${d._stockDisponible === 0 ? 'text-red-500' : (d.cantidad ?? 1) > d._stockDisponible ? 'text-red-400' : 'text-gray-400'}`}>
-                                      Stock: {d._stockDisponible}
-                                    </p>
+                                <td className="px-2 py-1.5">
+                                  {d._esIcbper ? (
+                                    <span className="text-xs text-gray-500 text-center block">{d.cantidad}</span>
+                                  ) : (
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => actualizarCantidad(i, Math.max(1, (d.cantidad ?? 1) - 1))}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 text-sm font-bold transition-colors"
+                                        >−</button>
+                                        <input type="number" min={1}
+                                          max={d._tipoProducto === 'BIEN' ? (d._stockDisponible ?? undefined) : undefined}
+                                          value={d.cantidad ?? 1}
+                                          onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
+                                          className={`w-10 py-1 border rounded-lg text-xs text-center outline-none focus:border-brand-blue
+                                            ${d._tipoProducto === 'BIEN' && (d._stockDisponible ?? 0) > 0 && (d.cantidad ?? 1) > (d._stockDisponible ?? 0)
+                                              ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'}`}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => actualizarCantidad(i, (d.cantidad ?? 1) + 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 text-sm font-bold transition-colors"
+                                        >+</button>
+                                      </div>
+                                      {d._tipoProducto === 'BIEN' && d._stockDisponible != null && (
+                                        <p className={`text-[9px] text-center ${d._stockDisponible === 0 ? 'text-red-500' : (d.cantidad ?? 1) > d._stockDisponible ? 'text-red-400' : 'text-gray-400'}`}>
+                                          Stock: {d._stockDisponible}
+                                        </p>
+                                      )}
+                                    </div>
                                   )}
-                                </div>
-                              </td>
+</td>
 
                               {/* Tipo afectación IGV — select con gratuitas */}
                               <td className="px-2 py-1.5">
                                 <select value={d.tipoAfectacionIGV ?? '10'}
+                                  disabled={!!d._esIcbper} 
                                   onChange={(e) => actualizarTipoAfectacion(i, e.target.value)}
                                   className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
                                     ${esGratuito ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200'}`}>
@@ -1434,6 +1730,7 @@ useEffect(() => {
                               <td className="px-2 py-1.5">
                                 {(d.tipoAfectacionIGV === '10' || d.tipoAfectacionIGV === '11') ? (
                                   <select value={d.porcentajeIGV ?? IGV_DEFAULT}
+                                    disabled={!!d._esIcbper} 
                                     onChange={(e) => actualizarPorcentajeIGV(i, Number(e.target.value))}
                                     className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
                                     <option value={18}>18%</option>
@@ -1448,9 +1745,9 @@ useEffect(() => {
                               <td className="px-2 py-1.5">
                                 <select value={d.codigoTipoDescuento ?? '01'}
                                   onChange={(e) => actualizarCodigoDescuento(i, e.target.value)}
-                                  disabled={esGratuito}
+                                  disabled={esGratuito || !!d._esIcbper}
                                   className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
-                                    ${esGratuito ? 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`}>
+                                    ${(esGratuito || d._esIcbper) ? 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`}>
                                   <option value="01">01 - No afecta base</option>
                                   <option value="00">00 - Afecta base</option>
                                 </select>
@@ -1460,7 +1757,7 @@ useEffect(() => {
                               <td className="px-2 py-1.5">
                                 <input type="number" min={0} step="0.01" value={d.descuentoUnitario ?? 0}
                                   onChange={(e) => actualizarDescuento(i, Number(e.target.value))}
-                                  disabled={esGratuito}
+                                  disabled={esGratuito || !!d._esIcbper}
                                   className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono
                                     ${esGratuito ? 'bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 border-gray-200'}`} />
                               </td>
@@ -1496,6 +1793,32 @@ useEffect(() => {
                     </span>
                   </div>
                 )}
+              </div>
+
+              {/* Bolsa ICBPER */}
+              <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-amber-800">🛍️ ¿Desea bolsa plástica?</span>
+                  <span className="text-[10px] text-amber-600">(S/ 0.20 c/u + ICBPER S/ {ICBPER_FACTOR})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCantidadBolsa(prev => Math.max(0, prev - 1))}
+                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors"
+                  >−</button>
+                  <span className="w-8 text-center text-sm font-semibold text-amber-900">{cantidadBolsa}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCantidadBolsa(prev => prev + 1)}
+                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors"
+                  >+</button>
+                  {cantidadBolsa > 0 && (
+                    <span className="text-[10px] text-amber-600 ml-1">
+                      ICBPER: S/ {(cantidadBolsa * ICBPER_FACTOR).toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Totales */}
@@ -1536,6 +1859,12 @@ useEffect(() => {
                     <div className="flex justify-end gap-8 text-sm text-gray-500">
                       <span>IGV:</span>
                       <span className="font-medium text-gray-900 w-24">{simbolo} {totales.igv.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {totales.totalIcbper > 0 && (
+                    <div className="flex justify-end gap-8 text-sm text-gray-500">
+                      <span>ICBPER (Bolsas):</span>
+                      <span className="font-medium text-amber-600 w-24">{simbolo} {totales.totalIcbper.toFixed(2)}</span>
                     </div>
                   )}
                   {totales.totalDescuentos > 0 && (
@@ -1612,6 +1941,24 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+        {/* Modal guardar cliente */}
+        {showModalCliente && factura.cliente && (
+          <ModalGuardarCliente
+            cliente={{
+              numeroDocumento: factura.cliente.numeroDocumento ?? '',
+              razonSocial: factura.cliente.razonSocial ?? '',
+              tipoDocumento: factura.cliente.tipoDocumento ?? '',
+              ubigeo: factura.cliente.ubigeo ?? '',
+              direccionLineal: factura.cliente.direccionLineal ?? '',
+              departamento: factura.cliente.departamento ?? '',
+              provincia: factura.cliente.provincia ?? '',
+              distrito: factura.cliente.distrito ?? '',
+            }}
+            onGuardar={guardarCliente}
+            onCerrar={() => setShowModalCliente(false)}
+          />
+        )}
     </div>
   );
 }
