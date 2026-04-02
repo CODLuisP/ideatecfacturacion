@@ -74,9 +74,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div>
                   <h2 className="text-2xl font-black text-gray-900 tracking-tight capitalize flex items-center gap-3">
                     <span className="w-1 h-6 bg-brand-red rounded-full" />
-                    <Button variant="ghost" onClick={() => router.push('/ideatecfactus/emision')} className="h-10 w-10 p-0 rounded-full">
-                      <ChevronLeft className="w-6 h-6" />
-                    </Button>
                     {activeView}
                   </h2>
                   <p className="text-gray-500 mt-1 text-[14px]">Gestiona tu facturación electrónica de manera eficiente.</p>

@@ -264,7 +264,8 @@ export default function ClientesPage() {
   const filtered = useMemo(() => clientes.filter(c => {
     const matchSearch =
       (c.razonSocialNombre ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.razonSocialNombre ?? "").includes(search);
+      (c.numeroDocumento ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.correo ?? "").includes(search);
     const estadoStr = c.estado ? 'Activo' : 'Inactivo';
     const matchStatus = filterStatus === 'Todos' || estadoStr === filterStatus;
     const matchTipo = filterTipo === 'Todos' || c.tipoDocumento.tipoDocumentoNombre === filterTipo;

@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from 'next/navigation';
-import { Plus, Printer, ShieldCheck, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Printer, ShieldCheck, Trash2, ChevronDown, ChevronUp, ChevronLeft } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Card } from '@/app/components/ui/Card';
 import { useAuth } from '@/context/AuthContext';
@@ -847,6 +847,9 @@ export default function BoletaPage() {
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <Button variant="ghost" onClick={() => router.push('/ideatecfactus/emision')} className="h-10 w-10 p-0 rounded-full">
+        <ChevronLeft className="w-6 h-6" />
+      </Button>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <Card title="Datos del Comprobante" subtitle="Completa la información requerida">

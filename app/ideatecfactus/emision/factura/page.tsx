@@ -270,37 +270,46 @@ export default function FacturaPage() {
   const [showDropdownProducto, setShowDropdownProducto] = useState<boolean[]>([]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // ── ICBPER bolsa plástica ────────────────────────────────────
+  // ── ICBPER y bolsa plástica ────────────────────────────────────
   const [cantidadBolsa, setCantidadBolsa] = useState(0)
+  const [tamañoBolsa, setTamañoBolsa] = useState<'pequeña' | 'mediana' | 'grande'>('mediana')
+  const [aplicarIcbper, setAplicarIcbper] = useState(false)
+  const [showBolsa, setShowBolsa] = useState(false)
+
+  const PRECIOS_BOLSA = { pequeña: 0.10, mediana: 0.20, grande: 0.30 }
   const ICBPER_FACTOR = 0.50
 
   useEffect(() => {
     if (productosSucursal.length === 0) return
-    
-    const productoBolsa = productosSucursal.find(p => p.productoId === 6) // ✅ declarar fuera del setDetalles
-    
-    const sinBolsaIdx = detalles.findIndex(d => d._esIcbper)
-    
+
+    const productoBolsa = productosSucursal.find(p => 
+      p.nomProducto.toUpperCase().includes('BOLSA PLASTICA')
+    )
+
     setDetalles(prev => {
       const sinBolsa = prev.filter(d => d._esIcbper !== true)
       if (cantidadBolsa === 0) return sinBolsa
 
-      const precioConIGV = productoBolsa?.sucursalProducto.precioUnitario ?? 0.20
-      const precioBase = parseFloat((precioConIGV / (1 + 18 / 100)).toFixed(6))
-      const icbper = parseFloat((cantidadBolsa * ICBPER_FACTOR).toFixed(2))
+      const precioConIGV = PRECIOS_BOLSA[tamañoBolsa]
+      const tipoAfectacion = productoBolsa?.tipoAfectacionIGV ?? '20'
+      // tipo 20 = exonerado, no tiene IGV
+      const precioBase = precioConIGV
       const baseIgv = parseFloat((precioBase * cantidadBolsa).toFixed(2))
-      const montoIGV = parseFloat((baseIgv * 0.18).toFixed(2))
+      const montoIGV = 0 // exonerado
+
+      const icbper = aplicarIcbper ? parseFloat((cantidadBolsa * ICBPER_FACTOR).toFixed(2)) : 0
+      const factorIcbper = aplicarIcbper ? ICBPER_FACTOR : 0
 
       const bolsaItem: DetalleLocal = {
         item: sinBolsa.length + 1,
         productoId: productoBolsa?.productoId ?? null,
         codigo: productoBolsa?.codigo ?? 'BOLSA',
-        descripcion: productoBolsa?.nomProducto ?? 'BOLSA ICBPER',
+        descripcion: `${productoBolsa?.nomProducto ?? 'BOLSA PLASTICA'} (${tamañoBolsa})`,
         cantidad: cantidadBolsa,
         unidadMedida: productoBolsa?.unidadMedida ?? 'NIU',
         precioUnitario: precioBase,
-        tipoAfectacionIGV: '10',
-        porcentajeIGV: 18,
+        tipoAfectacionIGV: tipoAfectacion,
+        porcentajeIGV: 0,
         baseIgv,
         montoIGV,
         codigoTipoDescuento: '01',
@@ -310,8 +319,8 @@ export default function FacturaPage() {
         precioVenta: precioConIGV,
         totalVentaItem: parseFloat((precioConIGV * cantidadBolsa + icbper).toFixed(2)),
         icbper,
-        factorIcbper: ICBPER_FACTOR,
-        _incluirIGV: true,
+        factorIcbper,
+        _incluirIGV: false,
         _precioBase: precioBase,
         _precioVentaConIGV: precioConIGV,
         _precioBaseOriginal: precioBase,
@@ -323,14 +332,13 @@ export default function FacturaPage() {
       return [...sinBolsa, bolsaItem]
     })
 
-    // ✅ actualizar busquedaProducto
     setBusquedaProducto(prev => {
       const sinBolsa = prev.filter((_, i) => !detalles[i]?._esIcbper)
       if (cantidadBolsa === 0) return sinBolsa
-      return [...sinBolsa, productoBolsa?.nomProducto ?? 'BOLSA ICBPER']
+      return [...sinBolsa, `BOLSA PLASTICA (${tamañoBolsa})`]
     })
 
-  }, [cantidadBolsa, productosSucursal])
+  }, [cantidadBolsa, productosSucursal, tamañoBolsa, aplicarIcbper])
 
   // ── Descuento global ─────────────────────────────────────────
   const [descuentoGlobal, setDescuentoGlobal] = useState(0);
@@ -684,16 +692,27 @@ export default function FacturaPage() {
 
   // ── Agregar fila ─────────────────────────────────────────────
   const agregarFila = () => {
-    setDetalles(prev => [...prev, {
-      item: prev.length + 1, productoId: null, codigo: null, descripcion: '', cantidad: 1, unidadMedida: 'NIU',
-      precioUnitario: 0, tipoAfectacionIGV: '10', porcentajeIGV: IGV_DEFAULT,
-      montoIGV: 0, baseIgv: 0, codigoTipoDescuento: '01', descuentoUnitario: 0,
-      descuentoTotal: 0, valorVenta: 0, precioVenta: 0, totalVentaItem: 0,
-      icbper: 0, factorIcbper: 0, _incluirIGV: false, _precioBase: 0, _precioVentaConIGV: 0,
-    }]);
-    setBusquedaProducto(prev => [...prev, '']);
-    setShowDropdownProducto(prev => [...prev, false]);
-    inputRefs.current = [...inputRefs.current, null];
+    setDetalles(prev => {
+      const sinBolsa = prev.filter(d => !d._esIcbper)
+      const bolsa = prev.filter(d => d._esIcbper)
+      const nuevaFila: DetalleLocal = {
+        item: sinBolsa.length + 1, productoId: null, codigo: null, descripcion: '', cantidad: 1, unidadMedida: 'NIU',
+        precioUnitario: 0, tipoAfectacionIGV: '10', porcentajeIGV: IGV_DEFAULT,
+        montoIGV: 0, baseIgv: 0, codigoTipoDescuento: '01', descuentoUnitario: 0,
+        descuentoTotal: 0, valorVenta: 0, precioVenta: 0, totalVentaItem: 0,
+        icbper: 0, factorIcbper: 0, _incluirIGV: false, _precioBase: 0, _precioVentaConIGV: 0,
+      }
+      return [...sinBolsa, nuevaFila, ...bolsa]  // ✅ bolsa siempre al final
+    });
+    setBusquedaProducto(prev => {
+      const sinBolsa = prev.filter((_, i) => !detalles[i]?._esIcbper)
+      return [...sinBolsa, '', ...prev.filter((_, i) => detalles[i]?._esIcbper)]
+    });
+    setShowDropdownProducto(prev => {
+      const sinBolsa = prev.filter((_, i) => !detalles[i]?._esIcbper)
+      return [...sinBolsa, false, ...prev.filter((_, i) => detalles[i]?._esIcbper)]
+    });
+    inputRefs.current = [...inputRefs.current.filter((_, i) => !detalles[i]?._esIcbper), null, ...inputRefs.current.filter((_, i) => detalles[i]?._esIcbper)];
   };
 
   // ── Seleccionar producto ─────────────────────────────────────
@@ -702,6 +721,27 @@ export default function FacturaPage() {
     const precioEnMoneda = factura.tipoMoneda === 'USD'
       ? parseFloat((precioSistema / tipoCambio).toFixed(6))
       : precioSistema
+
+        // ✅ verificar si el producto ya existe en otro ítem
+  const indexExistente = detalles.findIndex(
+    (d, i) => i !== index && d.productoId === producto.productoId && !d._esIcbper
+  )
+
+  if (indexExistente !== -1) {
+    // ✅ ya existe — sumar cantidad y eliminar la fila actual
+    const cantidadActual = detalles[indexExistente].cantidad ?? 1
+    const cantidadNueva = cantidadActual + (detalles[index]?.cantidad ?? 1)
+    actualizarCantidad(indexExistente, cantidadNueva)
+
+    // eliminar la fila vacía donde se estaba buscando
+    setDetalles(prev => prev.filter((_, i) => i !== index))
+    setBusquedaProducto(prev => prev.filter((_, i) => i !== index))
+    setShowDropdownProducto(prev => prev.filter((_, i) => i !== index))
+    inputRefs.current = inputRefs.current.filter((_, i) => i !== index)
+
+    showToast(`Cantidad actualizada en ítem ${indexExistente + 1}`, 'success')
+    return
+  }
 
     const esGratuito = TIPOS_GRATUITOS.includes(producto.tipoAfectacionIGV)
     const porcentajeExistente = detalles[index]?.porcentajeIGV
@@ -998,6 +1038,8 @@ export default function FacturaPage() {
       setAplicarDetraccion(false)
       setDetraccion({ codigoBienDetraccion: '014', codigoMedioPago: '001', cuentaBancoDetraccion: '', porcentajeDetraccion: 4, montoDetraccion: 0, observacion: '' })
       setCantidadBolsa(0)
+      setShowBolsa(false)
+      setAplicarIcbper(false)
       setCorreoCliente('')
       setTelefonoCliente('')
       setEnviarCorreo(false)
@@ -1588,7 +1630,7 @@ export default function FacturaPage() {
                               {/* Buscador producto */}
                               <td className="px-2 py-1.5" style={{ overflow: 'visible', position: 'relative' }}>
                                 <input ref={el => { inputRefs.current[i] = el; }} type="text" value={busquedaProducto[i] ?? ''}
-                                  disabled={!!d._esIcbper}
+                                  disabled={!!d._esIcbper || !!d.productoId}
                                   onChange={(e) => {
                                     const nb = [...busquedaProducto]; nb[i] = e.target.value; setBusquedaProducto(nb);
                                     const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd);
@@ -1605,6 +1647,7 @@ export default function FacturaPage() {
                                       setDetalles(nuevos)
                                     }
                                   }}
+                                  
                                   placeholder="Buscar o agrega producto..."
                                   className="w-full py-1 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
                                 />
@@ -1795,31 +1838,59 @@ export default function FacturaPage() {
                 )}
               </div>
 
-              {/* Bolsa ICBPER */}
-              <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-amber-800">🛍️ ¿Desea bolsa plástica?</span>
-                  <span className="text-[10px] text-amber-600">(S/ 0.20 c/u + ICBPER S/ {ICBPER_FACTOR})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCantidadBolsa(prev => Math.max(0, prev - 1))}
-                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors"
-                  >−</button>
-                  <span className="w-8 text-center text-sm font-semibold text-amber-900">{cantidadBolsa}</span>
-                  <button
-                    type="button"
-                    onClick={() => setCantidadBolsa(prev => prev + 1)}
-                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors"
-                  >+</button>
-                  {cantidadBolsa > 0 && (
-                    <span className="text-[10px] text-amber-600 ml-1">
-                      ICBPER: S/ {(cantidadBolsa * ICBPER_FACTOR).toFixed(2)}
-                    </span>
-                  )}
-                </div>
-              </div>
+              {/* Bolsa Plástica */}
+<div className="border border-gray-100 rounded-xl p-3 bg-amber-50/50 space-y-3">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-bold text-amber-800">🛍️ ¿Desea bolsa plástica?</span>
+      <button type="button" onClick={() => setShowBolsa(!showBolsa)}
+        className="flex items-center gap-0.5 text-[10px] text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 bg-white rounded-lg px-2 py-0.5">
+        <span>Opciones</span>
+        {showBolsa ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+      </button>
+    </div>
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={() => setCantidadBolsa(prev => Math.max(0, prev - 1))}
+        className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors">−</button>
+      <span className="w-8 text-center text-sm font-semibold text-amber-900">{cantidadBolsa}</span>
+      <button type="button" onClick={() => setCantidadBolsa(prev => prev + 1)}
+        className="w-7 h-7 flex items-center justify-center bg-white hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-700 font-bold transition-colors">+</button>
+    </div>
+  </div>
+
+  {showBolsa && (
+    <div className="space-y-2">
+      {/* Tamaño */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-amber-700 font-medium w-14">Tamaño:</span>
+        <div className="flex gap-1.5">
+          {(['pequeña', 'mediana', 'grande'] as const).map(t => (
+            <button key={t} type="button"
+              onClick={() => setTamañoBolsa(t)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors border
+                ${tamañoBolsa === t 
+                  ? 'bg-amber-500 text-white border-amber-500' 
+                  : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-100'}`}>
+              {t.charAt(0).toUpperCase() + t.slice(1)} · S/ {PRECIOS_BOLSA[t].toFixed(2)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ICBPER checkbox */}
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={aplicarIcbper}
+            onChange={(e) => setAplicarIcbper(e.target.checked)}
+            className="w-3.5 h-3.5 accent-amber-500" />
+          <span className="text-[10px] text-amber-700">
+            Aplicar ICBPER (S/ {ICBPER_FACTOR} por bolsa) — Total ICBPER: S/ {(cantidadBolsa * ICBPER_FACTOR).toFixed(2)}
+          </span>
+        </label>
+      </div>
+    </div>
+  )}
+</div>
 
               {/* Totales */}
               <div className="flex justify-between items-end pt-4 border-t border-gray-100">

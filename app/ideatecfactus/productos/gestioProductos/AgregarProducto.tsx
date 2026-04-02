@@ -8,6 +8,8 @@ import { InputBase } from "@/app/components/ui/InputBase";
 import { Categoria, NuevoProducto, ProductoBase, ProductoSucursal } from "./Producto";
 import { useToast } from "@/app/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
+import { generarCodigoProducto } from "./generarCodigoProducto";
+import { useProductosEmpresaLista } from "./useProductosEmpresaLista";
 
 interface Props {
   isOpen: boolean;
@@ -65,11 +67,20 @@ export default function AgregarProducto({
     }
   }, [isOpen, sucursalId]);
 
+  const { productosEmpresa } = useProductosEmpresaLista()
+
+  // REEMPLAZA ESTA FUNCIÓN COMPLETA:
   const handleNomProductoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setForm((prev) => ({ ...prev, nomProducto: value }));
+
+    // 👇 genera código automático usando el componente
+    const codigoAuto = value.trim().length > 0
+      ? generarCodigoProducto(value, productosEmpresa.length + 1)
+      : "";
+
+    setForm((prev) => ({ ...prev, nomProducto: value, codigo: codigoAuto }));
     setProductoExistente(null);
-    // ─── limpiar error ───
+
     if (errors.nomProducto) setErrors((prev) => ({ ...prev, nomProducto: false }));
 
     if (value.trim().length === 0) {
@@ -146,7 +157,6 @@ export default function AgregarProducto({
     if (form.precioUnitario <= 0) newErrors.precioUnitario = true;
 
     if (!soloSucursal) {
-      if (!form.codigo.trim()) newErrors.codigo = true;
       if (form.categoriaId === 0) newErrors.categoriaId = true;
     }
 
@@ -310,15 +320,15 @@ export default function AgregarProducto({
                 onChange={handleFormChange("codigoSunat")}
                 placeholder="Ej: 43211503"
               />
+
               <InputBase
                 label="Código"
+                labelOptional="(auto)"
                 value={form.codigo}
-                onChange={(e) => {
-                  handleFormChange("codigo")(e);
-                  if (errors.codigo) setErrors((prev) => ({ ...prev, codigo: false }));
-                }}
-                placeholder="PROD-001"
-                showError={!!errors.codigo}
+                readOnly
+                placeholder="Se genera automáticamente"
+                showError={false}
+                className="bg-gray-100 text-gray-500 cursor-not-allowed"
               />
             </div>
           </>
