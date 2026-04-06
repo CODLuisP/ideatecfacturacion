@@ -354,6 +354,12 @@ export default function FacturaPage() {
     fechaVencimiento: fecha, tipoPago: "Contado",
   });
 
+  //GENERAR Y CARGAR PDF
+  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null)
+  const [tamanoPdf, setTamanoPdf] = useState<string>('A4')
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [cargandoPdf, setCargandoPdf] = useState(false)
+
   // ── Effects de inicialización ────────────────────────────────
   useEffect(() => { if (!empresa) return; setFactura(prev => ({ ...prev, company: empresa })); }, [empresa]);
   useEffect(() => { 
@@ -969,6 +975,8 @@ export default function FacturaPage() {
 
       if (respuesta.exitoso) {
         showToast(respuesta.mensaje ?? 'Factura emitida correctamente.', 'success')
+        setComprobanteIdEmitido(comprobanteId)
+        await cargarPdf(comprobanteId, tamanoPdf)
         // enviar por correo
         if (enviarCorreo && correoCliente) {
           try {
@@ -1045,6 +1053,7 @@ export default function FacturaPage() {
       setEnviarCorreo(false)
       setEnviarWhatsapp(false)
 
+
     } catch (err: any) {
       const data = err?.response?.data
       const mensaje = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante'
@@ -1056,6 +1065,29 @@ export default function FacturaPage() {
       setEmitiendo(false)
     }
   }
+
+  //cargar pdf
+  const cargarPdf = async (comprobanteId: number, tamano: string) => {
+    setCargandoPdf(true)
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=${tamano}`,
+        { headers: { Authorization: `Bearer ${accessToken}` }, responseType: 'blob' }
+      )
+      const blob = new Blob([res.data], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      setPdfUrl(url)
+    } catch {
+      showToast('Error al cargar el PDF', 'error')
+    } finally {
+      setCargandoPdf(false)
+    }
+  }
+   //RECARGAR PDF SEGUN TAMAÑO
+  useEffect(() => {
+    if (!comprobanteIdEmitido) return
+    cargarPdf(comprobanteIdEmitido, tamanoPdf)
+  }, [tamanoPdf, comprobanteIdEmitido])
 
   const montoRestante = (index: number) => {
     const pagado = pagos.reduce((acc, p, i) => i < index ? acc + (Number(p.monto) || 0) : acc, 0)
@@ -1982,28 +2014,70 @@ export default function FacturaPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           <Card title="Vista Previa" subtitle="Representación gráfica del comprobante">
-            <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
-              <div className="p-4 rounded-full bg-white shadow-sm">
-                <Printer className="w-8 h-8 text-gray-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
-                <p className="text-xs text-gray-400 mt-1">Se generará automáticamente al emitir</p>
-              </div>
-            </div>
-            <div className="mt-6 space-y-3">
-              <Button className="w-full py-3 text-base" type="button" onClick={emitirComprobante} disabled={emitiendo}>
-                {emitiendo ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Emitiendo...
-                  </span>
-                ) : 'Emitir Factura'}
-              </Button>
-              {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
-              <Button variant="outline" className="w-full" type="button">Guardar como Borrador</Button>
-            </div>
-          </Card>
+  {/* Selector tamaño */}
+  <div className="mb-3">
+    <select value={tamanoPdf} onChange={(e) => setTamanoPdf(e.target.value)}
+      className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-brand-blue">
+      <option value="A4">A4</option>
+      <option value="Carta">Carta</option>
+      <option value="Ticket80mm">Ticket 80mm</option>
+      <option value="Ticket58mm">Ticket 58mm</option>
+      <option value="MediaCarta">Media Carta</option>
+    </select>
+  </div>
+
+  {pdfUrl ? (
+    <div className="space-y-3">
+      {cargandoPdf ? (
+        <div className="w-full h-96 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
+          <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <iframe src={pdfUrl} className="w-full rounded-lg border border-gray-200" style={{ height: '400px' }} />
+      )}
+      <div className="flex gap-2">
+        <button type="button"
+          onClick={() => window.open(pdfUrl, '_blank')}
+          className="flex-1 py-2 text-center text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+          🔗 Abrir
+        </button>
+        <button type="button"
+          onClick={() => {
+            const a = document.createElement('a')
+            a.href = pdfUrl
+            a.download = `factura-${comprobanteIdEmitido}.pdf`
+            a.click()
+          }}
+          className="flex-1 py-2 text-center text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+          ⬇️ Descargar
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+      <div className="p-4 rounded-full bg-white shadow-sm">
+        <Printer className="w-8 h-8 text-gray-400" />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
+        <p className="text-xs text-gray-400 mt-1">Se generará automáticamente al emitir</p>
+      </div>
+    </div>
+  )}
+
+  <div className="mt-6 space-y-3">
+    <Button className="w-full py-3 text-base" type="button" onClick={emitirComprobante} disabled={emitiendo}>
+      {emitiendo ? (
+        <span className="flex items-center justify-center gap-2">
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          Emitiendo...
+        </span>
+      ) : 'Emitir Factura'}
+    </Button>
+    {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
+    <Button variant="outline" className="w-full" type="button">Guardar como Borrador</Button>
+  </div>
+</Card>
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
             <ShieldCheck className="w-5 h-5 text-brand-blue shrink-0" />
             <p className="text-xs text-blue-800 leading-relaxed">
