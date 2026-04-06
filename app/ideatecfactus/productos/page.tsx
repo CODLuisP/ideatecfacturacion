@@ -18,6 +18,7 @@ import { useCategoriasLista } from "./gestioProductos/useCategoriasLista";
 import { useAuth } from "@/context/AuthContext";
 import { useProductosBaseDisponiblesLista } from "./gestioProductos/useProductosBaseDisponiblesLista";
 import { useToast } from "@/app/components/ui/Toast";
+import { useProductosEmpresaLista } from "./gestioProductos/useProductosEmpresaLista";
 
 // 🔥 TODO: reemplazar con el sucursalId real del contexto/sesión
 const SUCURSAL_ID = 1;
@@ -28,8 +29,20 @@ export default function ProductosPage() {
 
   const { productosBase } = useProductosBaseDisponiblesLista();
   const { productosSucursal, loadingSucursal, setProductosSucursal } = useProductosSucursal();
+  const { productosEmpresa, loadingEmpresa, setProductosEmpresa } = useProductosEmpresaLista();
+
+  const isSuperAdmin = user?.rol === "superadmin";
+  const productos = isSuperAdmin ? productosEmpresa : productosSucursal;
+  const loadingProductos = isSuperAdmin ? loadingEmpresa : loadingSucursal;
+  const setProductos = isSuperAdmin ? setProductosEmpresa : setProductosSucursal;
 
   const { categorias } = useCategoriasLista()
+
+  // AFiltros avanzados
+  const [showFiltrosAvanzados, setShowFiltrosAvanzados] = useState(false);
+  const [filtroStock, setFiltroStock] = useState(false);
+  const [filtroAfectacion, setFiltroAfectacion] = useState<string[]>([]);
+  const [filtroTipoProducto, setFiltroTipoProducto] = useState<string[]>([]);
 
   const [search, setSearch] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("Todos");
@@ -44,14 +57,34 @@ export default function ProductosPage() {
 
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  const filtered = productosSucursal.filter(p =>
-    (p.nomProducto.toLowerCase().includes(search.toLowerCase()) ||
-    p.codigo.toLowerCase().includes(search.toLowerCase())) &&
-    (filterCategoria === "Todos" || p.categoria?.categoriaNombre === filterCategoria)
-  );
+  // REEMPLAZA el bloque filtered:
+  const filtrosAvanzadosActivos =
+    filtroStock || filtroAfectacion.length > 0 || filtroTipoProducto.length > 0;
+
+  const filtered = productos.filter((p) => {
+    const matchSearch =
+      p.nomProducto.toLowerCase().includes(search.toLowerCase()) ||
+      p.codigo.toLowerCase().includes(search.toLowerCase());
+
+    const matchCategoria =
+      filterCategoria === "Todos" ||
+      p.categoria?.categoriaNombre === filterCategoria;
+
+    const matchStock = !filtroStock || p.sucursalProducto.stock === 0;
+
+    const matchAfectacion =
+      filtroAfectacion.length === 0 ||
+      filtroAfectacion.includes(p.tipoAfectacionIGV);
+
+    const matchTipo =
+      filtroTipoProducto.length === 0 ||
+      filtroTipoProducto.includes(p.tipoProducto ?? "");
+
+    return matchSearch && matchCategoria && matchStock && matchAfectacion && matchTipo;
+  });
 
   const handleProductoEditado = (productoEditado: ProductoSucursal) => {
-    setProductosSucursal((prev) =>
+    setProductos((prev) =>
       prev.map((p) =>
         p.productoId === productoEditado.productoId ? productoEditado : p
       )
@@ -77,7 +110,7 @@ export default function ProductosPage() {
         }
       );
       showToast('Producto eliminado correctamente.', 'success');
-      setProductosSucursal((prev) =>
+      setProductos((prev) =>
         prev.filter((p) => p.productoId !== deleteTarget.productoId)
       );
       setDeleteTarget(null);
@@ -114,51 +147,196 @@ export default function ProductosPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar productos por código o nombre..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm"
-          />
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-        </div>
-        <div className="flex gap-2"></div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <select
-              value={filterCategoria}
-              onChange={e => setFilterCategoria(e.target.value)}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+
+          {/* Buscador — izquierda */}
+          <div className="relative flex-1 max-w-md">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar productos por código o nombre..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm"
+            />
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          </div>
+
+          {/* Filtros + acciones — derecha */}
+          <div className="flex items-center gap-2">
+
+            {/* Categoría */}
+            <div className="relative">
+              <select
+                value={filterCategoria}
+                onChange={(e) => setFilterCategoria(e.target.value)}
+                className={cn(
+                  "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                  filterCategoria !== "Todos"
+                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    : "bg-white border-gray-200 text-gray-600"
+                )}
+              >
+                <option value="Todos">Categoría: Todos</option>
+                {categorias.map((cat) => (
+                  <option key={cat.categoriaId} value={cat.categoriaNombre}>
+                    {cat.categoriaNombre}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Filtros Avanzados */}
+            <button
+              onClick={() => setShowFiltrosAvanzados((prev) => !prev)}
               className={cn(
-                "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
-                filterCategoria !== 'Todos'
-                  ? 'bg-blue-50 border-blue-300 text-blue-700'
-                  : 'bg-white border-gray-200 text-gray-600'
+                "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-xl transition-all whitespace-nowrap",
+                filtrosAvanzadosActivos
+                  ? "bg-violet-50 border-violet-300 text-violet-700"
+                  : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
               )}
             >
-              <option value="Todos">Categoría: Todos</option>
-              {categorias.map(cat => (
-                <option key={cat.categoriaId} value={cat.categoriaNombre}>
-                  {cat.categoriaNombre}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+              </svg>
+              Filtros avanzados
+              {filtrosAvanzadosActivos && (
+                <span className="bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {[filtroStock, ...filtroAfectacion, ...filtroTipoProducto].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
+            {/* Separador */}
+            <div className="w-px h-6 bg-gray-200" />
+
+            {/* Botones acción */}
+            <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+              <Upload className="w-4 h-4" /> Importar
+            </Button>
+            <Button onClick={() => setIsNewOpen(true)}>
+              <Plus className="w-4 h-4" /> Nuevo Producto
+            </Button>
           </div>
-          <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-            <Upload className="w-4 h-4" /> Importar
-          </Button>
-          <Button onClick={() => setIsNewOpen(true)}>
-            <Plus className="w-4 h-4" /> Nuevo Producto
-          </Button>
         </div>
+
+        {/* Panel filtros avanzados — barra full width compacta */}
+        {showFiltrosAvanzados && (
+          <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 animate-in fade-in duration-200">
+            
+            {/* Label */}
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">
+              Filtrar por
+            </span>
+
+            <div className="w-px h-4 bg-gray-200 shrink-0" />
+
+            {/* Stock */}
+            <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={filtroStock}
+                onChange={(e) => setFiltroStock(e.target.checked)}
+                className="w-3.5 h-3.5 accent-violet-600"
+              />
+              <span className="text-xs font-medium text-gray-600 flex items-center gap-1 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                Sin stock
+              </span>
+            </label>
+
+            <div className="w-px h-4 bg-gray-200 shrink-0" />
+
+            {/* Afectación IGV */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">IGV</span>
+              <div className="flex gap-1">
+                {[
+                  { value: "10", label: "Gravado",   color: "bg-blue-100 text-blue-700 border-blue-300" },
+                  { value: "20", label: "Exonerado", color: "bg-green-100 text-green-700 border-green-300" },
+                  { value: "30", label: "Inafecto",  color: "bg-amber-100 text-amber-700 border-amber-300" },
+                ].map(({ value, label, color }) => {
+                  const active = filtroAfectacion.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() =>
+                        setFiltroAfectacion((prev) =>
+                          active ? prev.filter((v) => v !== value) : [...prev, value]
+                        )
+                      }
+                      className={cn(
+                        "px-2.5 py-1 text-xs font-semibold border rounded-lg transition-all whitespace-nowrap",
+                        active ? color : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="w-px h-4 bg-gray-200 shrink-0" />
+
+            {/* Tipo Producto */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">Tipo</span>
+              <div className="flex gap-1">
+                {[
+                  { value: "BIEN",     label: "📦 Bien" },
+                  { value: "SERVICIO", label: "⚙️ Servicio" },
+                ].map(({ value, label }) => {
+                  const active = filtroTipoProducto.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() =>
+                        setFiltroTipoProducto((prev) =>
+                          active ? prev.filter((v) => v !== value) : [...prev, value]
+                        )
+                      }
+                      className={cn(
+                        "px-2.5 py-1 text-xs font-semibold border rounded-lg transition-all whitespace-nowrap",
+                        active
+                          ? "bg-violet-50 border-violet-300 text-violet-700"
+                          : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Limpiar — empujado a la derecha */}
+            {filtrosAvanzadosActivos && (
+              <>
+                <div className="flex-1" />
+                <button
+                  onClick={() => {
+                    setFiltroStock(false);
+                    setFiltroAfectacion([]);
+                    setFiltroTipoProducto([]);
+                  }}
+                  className="text-xs text-gray-400 hover:text-rose-500 font-medium transition-colors whitespace-nowrap shrink-0"
+                >
+                  ✕ Limpiar filtros
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loadingSucursal && (
+        {loadingProductos  && (
           Array.from({ length: 9 }).map((_, i) => (
             <div key={i} className="animate-pulse border border-gray-200 rounded-xl p-4 space-y-4">
               <div className="h-3 bg-gray-200 rounded w-1/3" />
@@ -178,13 +356,13 @@ export default function ProductosPage() {
           ))
         )}
 
-        {!loadingSucursal && filtered.length === 0 && (
+        {!loadingProductos  && filtered.length === 0 && (
           <p className="text-gray-400 col-span-3 text-center py-12">
             No se encontraron productos.
           </p>
         )}
 
-        {!loadingSucursal && filtered.map((prod) => (
+        {!loadingProductos  && filtered.map((prod) => (
           <Card key={prod.productoId} className="group hover:border-brand-blue transition-all">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
@@ -251,9 +429,7 @@ export default function ProductosPage() {
       <AgregarProducto
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)}
-        onProductoAgregado={(producto) =>
-          setProductosSucursal((prev) => [...prev, producto])
-        }
+        onProductoAgregado={(producto) => setProductos((prev) => [...prev, producto])}
         categorias={categorias}
         productosBase={productosBase}
         sucursalId={SUCURSAL_ID}

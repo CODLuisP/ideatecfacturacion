@@ -31,6 +31,6 @@ export function useProductosSucursal() {
     if (accessToken) fetchProductosSucursal()
   }, [accessToken])
 
-  return { productosSucursal, loadingSucursal, setProductosSucursal }
+  return { productosSucursal, loadingSucursal, setProductosSucursal, fetchProductosSucursal }
 }
 

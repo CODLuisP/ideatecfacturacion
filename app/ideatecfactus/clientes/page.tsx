@@ -264,7 +264,8 @@ export default function ClientesPage() {
   const filtered = useMemo(() => clientes.filter(c => {
     const matchSearch =
       (c.razonSocialNombre ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.razonSocialNombre ?? "").includes(search);
+      (c.numeroDocumento ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (c.correo ?? "").includes(search);
     const estadoStr = c.estado ? 'Activo' : 'Inactivo';
     const matchStatus = filterStatus === 'Todos' || estadoStr === filterStatus;
     const matchTipo = filterTipo === 'Todos' || c.tipoDocumento.tipoDocumentoNombre === filterTipo;
@@ -410,8 +411,11 @@ export default function ClientesPage() {
             <tbody className="divide-y divide-gray-100">
               {loadingClientes ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-gray-400">
-                    Cargando clientes...
+                  <td colSpan={9} className="px-6 py-16 text-center">
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                      <div className="w-5 h-5 border-2 border-gray-300 border-t-brand-blue rounded-full animate-spin" />
+                      Cargando clientes...
+                    </div>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (

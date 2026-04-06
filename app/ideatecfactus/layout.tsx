@@ -4,7 +4,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FileText, Users, Package,
   BarChart3, Zap, Settings, UserCircle, Download, Plus, FileBox,
-  Building2
+  Building2,
+  ChevronLeft
 } from 'lucide-react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Topbar } from '../components/layout/Topbar';

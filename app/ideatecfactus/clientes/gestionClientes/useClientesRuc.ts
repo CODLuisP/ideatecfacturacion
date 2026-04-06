@@ -20,6 +20,7 @@ export function useClientesRuc() {
         }
       )
       setClientes(res.data)
+      return res.data
     } catch {
       showToast("Error al cargar clientes", "error");
     } finally {
@@ -31,5 +32,5 @@ export function useClientesRuc() {
     if (accessToken) fetchClientes()
   }, [accessToken])
 
-  return { clientes, loadingClientes, setClientes }
+  return { clientes, loadingClientes, setClientes, fetchClientes }
 }
