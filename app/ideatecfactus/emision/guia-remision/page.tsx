@@ -13,6 +13,24 @@ import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
+import { useToast } from "@/app/components/ui/Toast";
+import ModalPuntoDireccion, {
+  DireccionSeleccionada,
+} from "@/app/components/guia/ModalPuntoDireccion";
+import ModalConductor, {
+  ConductorData,
+} from "@/app/components/guia/ModalConductor";
+import ModalVehiculo, {
+  VehiculoData,
+} from "@/app/components/guia/ModalVehiculo";
+import ModalTransportistaPublico, {
+  TransportistaPublicoData,
+} from "@/app/components/guia/ModalTransportistaPublico";
+import ModalDocumentoRelacionado, {
+  DocumentoRelacionado,
+  DetalleComprobante,
+} from "@/app/components/guia/ModalDocumentoRelacionado";
+import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -45,17 +63,22 @@ interface Cliente {
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-
 const MOTIVOS_TRASLADO = [
   { codigo: "01", label: "Venta" },
   { codigo: "02", label: "Compra" },
-  { codigo: "03", label: "Traslado entre establecimientos" },
+  { codigo: "14", label: "Venta con entrega a terceros" },
+  {
+    codigo: "03",
+    label: "Traslado entre establecimientos de la misma empresa",
+  },
   { codigo: "04", label: "Consignación" },
   { codigo: "05", label: "Devolución" },
-  { codigo: "06", label: "Traslado por emisor itinerante" },
-  { codigo: "07", label: "Traslado zona primaria" },
+  { codigo: "10", label: "Recojo de bienes transformados" },
   { codigo: "08", label: "Importación" },
   { codigo: "09", label: "Exportación" },
+  { codigo: "11", label: "Venta sujeta a confirmación del comprador" },
+  { codigo: "12", label: "Traslado de bienes para transformación" },
+  { codigo: "06", label: "Traslado emisor itinerante de comprobantes de pago" },
   { codigo: "13", label: "Otros" },
 ];
 
@@ -70,6 +93,7 @@ const labelClass = "text-xs font-bold text-gray-500 uppercase";
 export default function GuiaRemisionPage() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
+  const { showToast } = useToast();
 
   // — Estado: tipo de guía
   const [tipoGuia, setTipoGuia] = useState<TipoGuia>("remitente");
@@ -91,32 +115,169 @@ export default function GuiaRemisionPage() {
   const [destinatarioSeleccionado, setDestinatarioSeleccionado] =
     useState<Cliente | null>(null);
   const [loadingDestinatario, setLoadingDestinatario] = useState(false);
+  const [destinatarioSunatResultado, setDestinatarioSunatResultado] =
+    useState<Cliente | null>(null);
+  const [destinatarioSunatHint, setDestinatarioSunatHint] = useState<{
+    text: string;
+    color: string;
+  } | null>(null);
+  const [loadingSunat, setLoadingSunat] = useState(false);
 
-  // ── API 1: Cargar sucursal ──────────────────────────────────────────────────
+  const [modalGuardarCliente, setModalGuardarCliente] = useState(false);
+  const [clienteNuevoTelefono, setClienteNuevoTelefono] = useState("");
+  const [clienteNuevoCorreo, setClienteNuevoCorreo] = useState("");
+  const [guardandoCliente, setGuardandoCliente] = useState(false);
+
+  const [modalPartida, setModalPartida] = useState(false);
+  const [modalLlegada, setModalLlegada] = useState(false);
+  const [puntoPartida, setPuntoPartida] =
+    useState<DireccionSeleccionada | null>(null);
+  const [puntoLlegada, setPuntoLlegada] =
+    useState<DireccionSeleccionada | null>(null);
+  const [observaciones, setObservaciones] = useState("");
+  const [documentosRelacionados, setDocumentosRelacionados] = useState<
+    DocumentoRelacionado[]
+  >([]);
+  const [modalDocumento, setModalDocumento] = useState(false);
+  const [avisoSpotVisible, setAvisoSpotVisible] = useState(true);
+  // Bienes precargados desde comprobante — se usará en la tabla de productos
+  const [bienesPreCargados, setBienesPreCargados] = useState<
+    DetalleComprobante[]
+  >([]);
+  const [bienes, setBienes] = useState<BienGuia[]>([]);
+  const [modalBien, setModalBien] = useState(false);
+
+  // Transporte privado
+  const [transbordo, setTransbordo] = useState(false);
+  const [vehiculoM1L, setVehiculoM1L] = useState(false);
+  const [vehiculos, setVehiculos] = useState<VehiculoData[]>([]);
+  const [conductores, setConductores] = useState<ConductorData[]>([]);
+  const [modalVehiculo, setModalVehiculo] = useState(false);
+  const [modalConductor, setModalConductor] = useState(false);
+
+  // Transporte público
+  const [transportistaPublico, setTransportistaPublico] =
+    useState<TransportistaPublicoData | null>(null);
+  const [modalTransportistaPublico, setModalTransportistaPublico] =
+    useState(false);
+
+  const [emitiendo, setEmitiendo] = useState(false);
+  const [errorEmision, setErrorEmision] = useState<string | null>(null);
+  const [guiaEmitida, setGuiaEmitida] = useState<any>(null);
+
+  const [refreshSucursal, setRefreshSucursal] = useState(0);
+
+  // — Estados nuevos para superadmin
+  const [sucursales, setSucursales] = useState<any[]>([]);
+  const [sucursalSeleccionadaId, setSucursalSeleccionadaId] = useState<
+    number | null
+  >(null);
+
+  const [errorGuardarCliente, setErrorGuardarCliente] = useState<string | null>(
+    null,
+  );
+
+  const isSuperAdmin = user?.rol === "superadmin";
+
+  const resetFormulario = () => {
+    // Tipo y serie
+    setTipoGuia("remitente");
+
+    // Formulario
+    setModalidad("01");
+    setMotivoCodigo("01");
+    setMotivoOtros("");
+
+    // Destinatario
+    setDestinatarioQuery("");
+    setDestinatarioResultados([]);
+    setDestinatarioSeleccionado(null);
+    setDestinatarioSunatResultado(null);
+    setDestinatarioSunatHint(null);
+
+    // Puntos
+    setPuntoPartida(null);
+    setPuntoLlegada(null);
+
+    // Transporte
+    setTransbordo(false);
+    setVehiculoM1L(false);
+    setVehiculos([]);
+    setConductores([]);
+    setTransportistaPublico(null);
+
+    // Documentos y bienes
+    setDocumentosRelacionados([]);
+    setBienesPreCargados([]);
+    setBienes([]);
+
+    // Observaciones y avisos
+    setObservaciones("");
+    setAvisoSpotVisible(true);
+
+    // Errores
+    setErrorEmision(null);
+    setGuiaEmitida(null);
+
+    // Recargar sucursal para obtener nuevo correlativo
+    setLoadingSucursal(true);
+    setSucursal(null);
+    setRefreshSucursal((prev) => prev + 1);
+  };
+
+  // ── API 1: Cargar sucursal(es) ─────────────────────────────────────────────
   useEffect(() => {
-    if (!user?.sucursalID || !accessToken) return;
+    if (!accessToken || !user?.ruc) return;
 
     const fetchSucursal = async () => {
       setLoadingSucursal(true);
       setErrorSucursal(null);
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user.sucursalID}`,
-          {
-            headers: {
-              accept: "*/*",
-              Authorization: `Bearer ${accessToken}`,
+        if (isSuperAdmin) {
+          // Superadmin: trae todas las sucursales por RUC
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal?ruc=${user.ruc}`,
+            {
+              headers: {
+                accept: "*/*",
+                Authorization: `Bearer ${accessToken}`,
+              },
             },
-          },
-        );
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        setSucursal({
-          serieGuiaRemision: data.serieGuiaRemision,
-          correlativoGuiaRemision: data.correlativoGuiaRemision,
-          serieGuiaTransportista: data.serieGuiaTransportista,
-          correlativoGuiaTransportista: data.correlativoGuiaTransportista,
-        });
+          );
+          if (!res.ok) throw new Error(`Error ${res.status}`);
+          const data = await res.json(); // array
+          setSucursales(data);
+          // Precarga la primera sucursal
+          if (data.length > 0) {
+            setSucursalSeleccionadaId(data[0].sucursalId);
+            setSucursal({
+              serieGuiaRemision: data[0].serieGuiaRemision,
+              correlativoGuiaRemision: data[0].correlativoGuiaRemision,
+              serieGuiaTransportista: data[0].serieGuiaTransportista,
+              correlativoGuiaTransportista:
+                data[0].correlativoGuiaTransportista,
+            });
+          }
+        } else {
+          // Rol normal: trae su sucursal directamente
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user.sucursalID}`,
+            {
+              headers: {
+                accept: "*/*",
+                Authorization: `Bearer ${accessToken}`,
+              },
+            },
+          );
+          if (!res.ok) throw new Error(`Error ${res.status}`);
+          const data = await res.json();
+          setSucursal({
+            serieGuiaRemision: data.serieGuiaRemision,
+            correlativoGuiaRemision: data.correlativoGuiaRemision,
+            serieGuiaTransportista: data.serieGuiaTransportista,
+            correlativoGuiaTransportista: data.correlativoGuiaTransportista,
+          });
+        }
       } catch (err: any) {
         setErrorSucursal("No se pudo cargar la serie. Intenta recargar.");
         console.error("Error fetching sucursal:", err);
@@ -126,7 +287,7 @@ export default function GuiaRemisionPage() {
     };
 
     fetchSucursal();
-  }, [user?.sucursalID, accessToken]);
+  }, [user?.sucursalID, user?.ruc, accessToken, isSuperAdmin, refreshSucursal]);
 
   // ── API 2: Buscar destinatario (cliente) ──────────────────────────────────
   useEffect(() => {
@@ -163,6 +324,23 @@ export default function GuiaRemisionPage() {
     return () => clearTimeout(delay);
   }, [destinatarioQuery, user?.ruc, accessToken]);
 
+  useEffect(() => {
+    if (bienesPreCargados.length === 0) return;
+    const nuevos: BienGuia[] = bienesPreCargados.map((b) => ({
+      productoId: b.productoId,
+      codigo: b.codigo,
+      descripcion: b.descripcion,
+      cantidad: b.cantidad,
+      unidadMedida: b.unidadMedida,
+      pesoKg: 0,
+    }));
+    setBienes((prev) => {
+      // Evitar duplicados por productoId
+      const ids = new Set(prev.map((b) => b.productoId));
+      return [...prev, ...nuevos.filter((b) => !ids.has(b.productoId))];
+    });
+  }, [bienesPreCargados]);
+
   // — Derivados según tipo de guía seleccionado
   const serieActual =
     tipoGuia === "remitente"
@@ -177,6 +355,509 @@ export default function GuiaRemisionPage() {
   const correlativoFormateado = correlativoActual
     ? String(correlativoActual).padStart(7, "0")
     : "-------";
+
+  const handleDestinatarioSunat = async (val: string) => {
+    setDestinatarioSunatResultado(null);
+
+    if (val.length === 8) {
+      // Consulta DNI
+      setLoadingSunat(true);
+      setDestinatarioSunatHint({
+        text: "Consultando DNI...",
+        color: "#185FA5",
+      });
+      try {
+        const res = await fetch(
+          `https://dniruc.apisperu.com/api/v1/dni/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
+        );
+        const data = await res.json();
+        if (data.success) {
+          const nombre =
+            `${data.apellidoPaterno} ${data.apellidoMaterno} ${data.nombres}`.trim();
+          setDestinatarioSunatResultado({
+            clienteId: 0,
+            razonSocialNombre: nombre,
+            numeroDocumento: val,
+            tipoDocumento: {
+              tipoDocumentoId: "01",
+              tipoDocumentoNombre: "DNI",
+            },
+            direccion: [],
+          });
+          setDestinatarioSunatHint({ text: `✓ ${nombre}`, color: "#15803d" });
+        } else {
+          setDestinatarioSunatHint({
+            text: "DNI no encontrado",
+            color: "#DC2626",
+          });
+        }
+      } catch {
+        setDestinatarioSunatHint({
+          text: "Error al consultar DNI",
+          color: "#DC2626",
+        });
+      } finally {
+        setLoadingSunat(false);
+      }
+    } else if (val.length === 11) {
+      // Consulta RUC
+      setLoadingSunat(true);
+      setDestinatarioSunatHint({
+        text: "Consultando RUC...",
+        color: "#185FA5",
+      });
+      try {
+        const res = await fetch(
+          `https://dniruc.apisperu.com/api/v1/ruc/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
+        );
+        const data = await res.json();
+        if (data.ruc) {
+          setDestinatarioSunatResultado({
+            clienteId: 0,
+            razonSocialNombre: data.razonSocial,
+            numeroDocumento: val,
+            tipoDocumento: {
+              tipoDocumentoId: "06",
+              tipoDocumentoNombre: "RUC",
+            },
+            direccion: data.direccion
+              ? [
+                  {
+                    direccionId: 0,
+                    direccionLineal: data.direccion,
+                    ubigeo: data.ubigeo ?? "",
+                    departamento: data.departamento ?? "",
+                    provincia: data.provincia ?? "",
+                    distrito: data.distrito ?? "",
+                    tipoDireccion: "fiscal",
+                  },
+                ]
+              : [],
+          });
+          setDestinatarioSunatHint({
+            text: `✓ ${data.razonSocial}`,
+            color: "#15803d",
+          });
+        } else {
+          setDestinatarioSunatHint({
+            text: "RUC no encontrado",
+            color: "#DC2626",
+          });
+        }
+      } catch {
+        setDestinatarioSunatHint({
+          text: "Error al consultar RUC",
+          color: "#DC2626",
+        });
+      } finally {
+        setLoadingSunat(false);
+      }
+    } else if (val.length > 0) {
+      setDestinatarioSunatHint({
+        text: `${val.length}/8 DNI · ${val.length}/11 RUC`,
+        color: "#B45309",
+      });
+    } else {
+      setDestinatarioSunatHint(null);
+    }
+  };
+
+  const handleGuardarClienteNuevo = async () => {
+    if (!destinatarioSeleccionado || !accessToken) return;
+    setGuardandoCliente(true);
+    setErrorGuardarCliente(null);
+    try {
+      const sucursalID = isSuperAdmin
+        ? sucursalSeleccionadaId
+        : Number(user?.sucursalID);
+
+      const body = {
+        sucursalID,
+        numeroDocumento: destinatarioSeleccionado.numeroDocumento,
+        razonSocialNombre: destinatarioSeleccionado.razonSocialNombre,
+        nombreComercial: "",
+        telefono: clienteNuevoTelefono,
+        correo: clienteNuevoCorreo,
+        tipoDocumentoId: destinatarioSeleccionado.tipoDocumento.tipoDocumentoId,
+        direccion: destinatarioSeleccionado.direccion[0]
+          ? {
+              ubigeo: destinatarioSeleccionado.direccion[0].ubigeo,
+              direccionLineal:
+                destinatarioSeleccionado.direccion[0].direccionLineal,
+              departamento: destinatarioSeleccionado.direccion[0].departamento,
+              provincia: destinatarioSeleccionado.direccion[0].provincia,
+              distrito: destinatarioSeleccionado.direccion[0].distrito,
+              tipoDireccion: "fiscal",
+            }
+          : {
+              ubigeo: "",
+              direccionLineal: "",
+              departamento: "",
+              provincia: "",
+              distrito: "",
+              tipoDireccion: "fiscal",
+            },
+      };
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        },
+      );
+
+      if (res.status === 409) {
+        setErrorGuardarCliente("Este cliente ya está registrado.");
+        return;
+      }
+
+      if (!res.ok) {
+        setErrorGuardarCliente(
+          "Ocurrió un error al guardar. Intenta de nuevo.",
+        );
+        return;
+      }
+
+      // Éxito — cerrar modal y limpiar
+      setModalGuardarCliente(false);
+      setClienteNuevoTelefono("");
+      setClienteNuevoCorreo("");
+      setErrorGuardarCliente(null);
+      showToast("Cliente guardado correctamente.", "success");
+    } catch (err) {
+      console.error("Error guardando cliente:", err);
+      setErrorGuardarCliente("Error de conexión. Verifica tu red.");
+    } finally {
+      setGuardandoCliente(false);
+    }
+  };
+
+  const mapearTipoDocSunat = (tipoDocumentoId: string): string => {
+    const mapa: Record<string, string> = {
+      "01": "1", // DNI
+      "06": "6", // RUC
+      "04": "4", // Carnet de extranjería
+      "07": "7", // Pasaporte
+      "00": "0", // Sin documento
+    };
+    return mapa[tipoDocumentoId] ?? tipoDocumentoId;
+  };
+
+  const handleEmitir = async () => {
+    // ── Validaciones básicas ───────────────────────────────────────────
+    if (!destinatarioSeleccionado) {
+      setErrorEmision("Debes seleccionar un destinatario.");
+      return;
+    }
+    if (bienes.length === 0) {
+      setErrorEmision("Debes agregar al menos un bien.");
+      return;
+    }
+    if (!puntoPartida) {
+      setErrorEmision("Debes agregar el punto de partida.");
+      return;
+    }
+    if (!puntoLlegada) {
+      setErrorEmision("Debes agregar el punto de llegada.");
+      return;
+    }
+    if (modalidad === "01" && !transportistaPublico && !vehiculoM1L) {
+      setErrorEmision("Debes agregar el transportista.");
+      return;
+    }
+    if (modalidad === "02" && !vehiculoM1L && vehiculos.length === 0) {
+      setErrorEmision("Debes agregar al menos un vehículo.");
+      return;
+    }
+
+    setErrorEmision(null);
+    setEmitiendo(true);
+
+    try {
+      // ── Datos de la empresa ────────────────────────────────────────────
+      const resEmpresa = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/companies/${user?.ruc}`,
+        { headers: { accept: "*/*", Authorization: `Bearer ${accessToken}` } },
+      );
+      const empresa = await resEmpresa.json();
+
+      // ── Conductor principal (transporte privado) ───────────────────────
+      const conductorPrincipal = conductores[0] ?? null;
+      const conductorSecundario = conductores[1] ?? null;
+      const conductorSecundario2 = conductores[2] ?? null;
+
+      // ── Documento relacionado (primer doc si existe) ───────────────────
+      const docRel = documentosRelacionados[0] ?? null;
+
+      // ── Peso total ─────────────────────────────────────────────────────
+      const pesoTotal = bienes.reduce((acc, b) => acc + b.pesoKg, 0);
+
+      // ── Validación peso ────────────────────────────────────────────────────
+      if (pesoTotal === 0) {
+        setErrorEmision("El peso bruto total debe ser mayor a 0 kg.");
+        return;
+      }
+
+      // ── Placa M1/L ─────────────────────────────────────────────────────
+      const placaM1L = vehiculoM1L
+        ? ((
+            document.querySelector(
+              'input[placeholder="Ej. ABC-123"]',
+            ) as HTMLInputElement
+          )?.value ?? "")
+        : null;
+
+      // ── Payload ────────────────────────────────────────────────────────
+      const payload = {
+        version: 1,
+        tipoDoc: tipoGuia === "remitente" ? "09" : "31",
+        serie: serieActual ?? "",
+        correlativo: String(correlativoActual ?? ""),
+        fechaEmision: new Date().toISOString(),
+
+        company: {
+          ruc: empresa.ruc,
+          razonSocial: empresa.razonSocial,
+          nombreComercial: empresa.nombreComercial ?? "",
+          address: {
+            ubigueo: empresa.ubigeo ?? "",
+            direccion: empresa.direccion ?? "",
+            provincia: empresa.provincia ?? "",
+            departamento: empresa.departamento ?? "",
+            distrito: empresa.distrito ?? "",
+          },
+        },
+
+        destinatario: {
+          tipoDoc: mapearTipoDocSunat(
+            destinatarioSeleccionado.tipoDocumento.tipoDocumentoId,
+          ),
+          numDoc: destinatarioSeleccionado.numeroDocumento,
+          rznSocial: destinatarioSeleccionado.razonSocialNombre,
+        },
+
+        // Tercero: en guía transportista es el remitente original
+        tercero:
+          tipoGuia === "transportista"
+            ? {
+                tipoDoc: "6",
+                numDoc: empresa.ruc,
+                rznSocial: empresa.razonSocial,
+              }
+            : null,
+
+        observacion: observaciones || null,
+
+        relDoc: docRel
+          ? {
+              tipoDoc: docRel.tipoDocumento,
+              nroDoc: docRel.numeroCompleto,
+            }
+          : null,
+
+        docBaja: null,
+
+        envio: {
+          codTraslado: motivoCodigo,
+          desTraslado:
+            MOTIVOS_TRASLADO.find((m) => m.codigo === motivoCodigo)?.label ??
+            "",
+          modTraslado: modalidad,
+          fecTraslado: new Date().toISOString(),
+          codPuerto: null,
+          indTransbordo: transbordo,
+          pesoTotal,
+          undPesoTotal: "KGM",
+          numContenedor: null,
+          matPeligrosoClase: null,
+          matPeligrosoNroONU: null,
+
+          llegada: {
+            ubigueo: puntoLlegada.ubigeo,
+            direccion: puntoLlegada.direccionLineal,
+            provincia: puntoLlegada.provincia,
+            departamento: puntoLlegada.departamento,
+            distrito: puntoLlegada.distrito,
+          },
+
+          partida: {
+            ubigueo: puntoPartida.ubigeo,
+            direccion: puntoPartida.direccionLineal,
+            provincia: puntoPartida.provincia,
+            departamento: puntoPartida.departamento,
+            distrito: puntoPartida.distrito,
+          },
+
+          transportista: vehiculoM1L
+            ? {
+                // M1/L: solo placa, sin conductor
+                tipoDoc: "",
+                numDoc: "",
+                rznSocial: "",
+                indVehiculoM1L: vehiculoM1L,
+                placa: placaM1L?.replace(/-/g, "") ?? null,
+                placaSecundaria1: null,
+                placaSecundaria2: null,
+                placaSecundaria3: null,
+                choferTipoDoc: null,
+                choferDoc: null,
+                choferNombres: null,
+                choferApellidos: null,
+                choferLicencia: null,
+                choferSecundarioTipoDoc: null,
+                choferSecundarioDoc: null,
+                choferSecundarioNombres: null,
+                choferSecundarioApellidos: null,
+                choferSecundarioLicencia: null,
+                choferSecundario2TipoDoc: null,
+                choferSecundario2Doc: null,
+                choferSecundario2Nombres: null,
+                choferSecundario2Apellidos: null,
+                choferSecundario2Licencia: null,
+              }
+            : modalidad === "01"
+              ? {
+                  // Transporte público
+                  tipoDoc: "6",
+                  numDoc: transportistaPublico?.ruc ?? "",
+                  rznSocial: transportistaPublico?.razonSocial ?? "",
+                  placa: vehiculos[0]?.placa?.replace(/-/g, "") ?? null,
+                  autorizacionVehiculoEntidad:
+                    transportistaPublico?.entidadAutorizacion ?? null,
+                  autorizacionVehiculoNumero:
+                    transportistaPublico?.numeroAutorizacion ?? null,
+                  placaSecundaria1:
+                    vehiculos[1]?.placa?.replace(/-/g, "") ?? null,
+                  placaSecundaria2:
+                    vehiculos[2]?.placa?.replace(/-/g, "") ?? null,
+                  placaSecundaria3:
+                    vehiculos[3]?.placa?.replace(/-/g, "") ?? null,
+                  choferTipoDoc: null,
+                  choferDoc: null,
+                  choferNombres: null,
+                  choferApellidos: null,
+                  choferLicencia: null,
+                  choferSecundarioTipoDoc: null,
+                  choferSecundarioDoc: null,
+                  choferSecundarioNombres: null,
+                  choferSecundarioApellidos: null,
+                  choferSecundarioLicencia: null,
+                  choferSecundario2TipoDoc: null,
+                  choferSecundario2Doc: null,
+                  choferSecundario2Nombres: null,
+                  choferSecundario2Apellidos: null,
+                  choferSecundario2Licencia: null,
+                }
+              : {
+                  // Transporte privado
+                  tipoDoc: null,
+                  numDoc: null,
+                  rznSocial: null,
+                  placa: vehiculos[0]?.placa?.replace(/-/g, "") ?? null,
+                  autorizacionVehiculoEntidad: vehiculos[0]?.entidadAutorizacion ?? null,
+                  autorizacionVehiculoNumero: vehiculos[0]?.numeroAutorizacion ?? null,
+                  placaSecundaria1:
+                    vehiculos[1]?.placa?.replace(/-/g, "") ?? null,
+                  placaSecundaria2:
+                    vehiculos[2]?.placa?.replace(/-/g, "") ?? null,
+                  placaSecundaria3:
+                    vehiculos[3]?.placa?.replace(/-/g, "") ?? null,
+                  choferTipoDoc: mapearTipoDocSunat(
+                    conductorPrincipal?.tipoDocumento ?? "1",
+                  ),
+                  choferDoc: conductorPrincipal?.numeroDocumento ?? null,
+                  choferNombres: conductorPrincipal?.nombres ?? null,
+                  choferApellidos: conductorPrincipal?.apellidos ?? null,
+                  choferLicencia: conductorPrincipal?.licencia ?? null,
+                  choferSecundarioTipoDoc: conductorSecundario
+                    ? mapearTipoDocSunat(conductorSecundario.tipoDocumento)
+                    : null,
+                  choferSecundarioDoc:
+                    conductorSecundario?.numeroDocumento ?? null,
+                  choferSecundarioNombres: conductorSecundario?.nombres ?? null,
+                  choferSecundarioApellidos:
+                    conductorSecundario?.apellidos ?? null,
+                  choferSecundarioLicencia:
+                    conductorSecundario?.licencia ?? null,
+                  choferSecundario2TipoDoc: conductorSecundario2
+                    ? mapearTipoDocSunat(conductorSecundario2.tipoDocumento)
+                    : null,
+                  choferSecundario2Doc:
+                    conductorSecundario2?.numeroDocumento ?? null,
+                  choferSecundario2Nombres:
+                    conductorSecundario2?.nombres ?? null,
+                  choferSecundario2Apellidos:
+                    conductorSecundario2?.apellidos ?? null,
+                  choferSecundario2Licencia:
+                    conductorSecundario2?.licencia ?? null,
+                },
+        },
+
+        details: bienes.map((b) => ({
+          cantidad: b.cantidad,
+          unidad: b.unidadMedida,
+          descripcion: b.descripcion,
+          codigo: b.codigo || "",
+        })),
+      };
+
+      // ── POST /api/guias — crear en DB ──────────────────────────────────
+      const resCrear = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/guias`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!resCrear.ok) {
+        const err = await resCrear.json();
+        console.error("Error detalle:", JSON.stringify(err, null, 2)); // 👈 agrega esto
+        setErrorEmision(err?.message ?? err?.title ?? JSON.stringify(err));
+        return;
+      }
+
+      const guiaCreada = await resCrear.json();
+
+      // ── POST /api/guias/{id}/send — enviar a SUNAT ─────────────────────
+      const resEnviar = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${guiaCreada.guiaId}/send`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+      );
+
+      const guiaEnviada = await resEnviar.json();
+      setGuiaEmitida(guiaEnviada);
+      if (guiaEnviada.estadoSunat === "ACEPTADO") {
+        showToast(
+          `✓ Guía ${guiaEnviada.numeroCompleto} aceptada por SUNAT`,
+          "success",
+        );
+        resetFormulario();
+      } else {
+        showToast(
+          `Guía ${guiaEnviada.numeroCompleto} — ${guiaEnviada.estadoSunat}`,
+          "info",
+        );
+      }
+    } catch (err) {
+      console.error("Error emitiendo guía:", err);
+      setErrorEmision("Error de conexión. Verifica tu red.");
+    } finally {
+      setEmitiendo(false);
+    }
+  };
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
@@ -285,10 +966,45 @@ export default function GuiaRemisionPage() {
             <form className="space-y-6">
               {/* Serie y número */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Select de sucursal — solo superadmin */}
+                {isSuperAdmin && sucursales.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className={labelClass}>Sucursal</label>
+                    <select
+                      className={selectClass}
+                      value={sucursalSeleccionadaId ?? ""}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        setSucursalSeleccionadaId(id);
+                        const found = sucursales.find(
+                          (s) => s.sucursalId === id,
+                        );
+                        if (found) {
+                          setSucursal({
+                            serieGuiaRemision: found.serieGuiaRemision,
+                            correlativoGuiaRemision:
+                              found.correlativoGuiaRemision,
+                            serieGuiaTransportista:
+                              found.serieGuiaTransportista,
+                            correlativoGuiaTransportista:
+                              found.correlativoGuiaTransportista,
+                          });
+                        }
+                      }}
+                    >
+                      {sucursales.map((s) => (
+                        <option key={s.sucursalId} value={s.sucursalId}>
+                          {s.nombre} — {s.codEstablecimiento}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Serie y correlativo — siempre visible */}
                 <div className="space-y-1.5">
                   <label className={labelClass}>Serie y Número</label>
                   <div className="flex gap-2">
-                    {/* Serie: deshabilitada, viene de la sucursal */}
                     <div
                       className={`w-1/3 py-2.5 px-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm flex items-center ${
                         loadingSucursal ? "animate-pulse" : ""
@@ -296,7 +1012,6 @@ export default function GuiaRemisionPage() {
                     >
                       {loadingSucursal ? "..." : (serieActual ?? "—")}
                     </div>
-                    {/* Correlativo: deshabilitado, autoincremental */}
                     <input
                       type="text"
                       disabled
@@ -311,8 +1026,13 @@ export default function GuiaRemisionPage() {
                   )}
                 </div>
 
+                {/* Fecha de traslado — fuera del grid, label dinámico según modalidad */}
                 <div className="space-y-1.5">
-                  <label className={labelClass}>Fecha de Traslado</label>
+                  <label className={labelClass}>
+                    {modalidad === "01"
+                      ? "Fecha de entrega al transportista"
+                      : "Fecha de inicio de traslado"}
+                  </label>
                   <input
                     type="date"
                     defaultValue={new Date().toISOString().split("T")[0]}
@@ -354,9 +1074,16 @@ export default function GuiaRemisionPage() {
                   <select
                     className={selectClass}
                     value={modalidad}
-                    onChange={(e) =>
-                      setModalidad(e.target.value as ModalidadTraslado)
-                    }
+                    onChange={(e) => {
+                      const nuevaModalidad = e.target
+                        .value as ModalidadTraslado;
+                      setModalidad(nuevaModalidad);
+                      if (nuevaModalidad === "01") {
+                        setVehiculoM1L(false); // reset M1/L si cambia a público
+                        setVehiculos([]);
+                        setConductores([]);
+                      }
+                    }}
                   >
                     <option value="01">01 - Transporte público</option>
                     <option value="02">02 - Transporte privado</option>
@@ -366,77 +1093,270 @@ export default function GuiaRemisionPage() {
 
               {/* Puntos de partida y llegada */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Partida */}
                 <div className="space-y-1.5">
                   <label className={labelClass}>Punto de Partida</label>
-                  <input
-                    type="text"
-                    placeholder="Dirección de origen..."
-                    className={inputClass}
-                  />
+                  {puntoPartida ? (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        {puntoPartida.resumen}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setPuntoPartida(null)}
+                        className="text-xs text-gray-400 hover:text-red-500 ml-3 shrink-0"
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setModalPartida(true)}
+                      className="w-full py-2.5 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
+                    >
+                      + Agregar punto de partida
+                    </button>
+                  )}
                 </div>
+
+                {/* Llegada */}
                 <div className="space-y-1.5">
                   <label className={labelClass}>Punto de Llegada</label>
-                  <input
-                    type="text"
-                    placeholder="Dirección de destino..."
-                    className={inputClass}
-                  />
+                  {puntoLlegada ? (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        {puntoLlegada.resumen}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setPuntoLlegada(null)}
+                        className="text-xs text-gray-400 hover:text-red-500 ml-3 shrink-0"
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setModalLlegada(true)}
+                      className="w-full py-2.5 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
+                    >
+                      + Agregar punto de llegada
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* ── Sección Transportista (condicional por modalidad) ──────── */}
-              {modalidad === "01" ? (
-                /* Transporte PÚBLICO: empresa transportista externa */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className={labelClass}>Transportista (RUC)</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Buscar transportista..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
-                      />
-                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    </div>
-                    {/* Aquí se mostrará el nombre al seleccionar — API 3 */}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className={labelClass}>N° de Placa</label>
+              {/* Checkboxes globales de transporte */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={transbordo}
+                    onChange={(e) => setTransbordo(e.target.checked)}
+                    className="accent-brand-blue w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Realiza transbordo programado
+                  </span>
+                </label>
+
+                {/* M1/L solo para transporte privado */}
+                {modalidad === "02" && (
+                  <label className="flex items-center gap-3 cursor-pointer">
                     <input
-                      type="text"
-                      placeholder="Ej. ABC-123"
-                      className={inputClass}
+                      type="checkbox"
+                      checked={vehiculoM1L}
+                      onChange={(e) => {
+                        setVehiculoM1L(e.target.checked);
+                        setVehiculos([]);
+                        setConductores([]);
+                        setTransportistaPublico(null);
+                      }}
+                      className="accent-brand-blue w-4 h-4"
                     />
+                    <span className="text-sm text-gray-700">
+                      Traslado en vehículos de categoría M1 o L
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              {/* ── Sección Transporte ───────────────────────────────────── */}
+              {vehiculoM1L ? (
+                /* — M1/L: solo placa, sin importar modalidad — */
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Número de placa</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. ABC-123"
+                    className={inputClass}
+                  />
+                  <p className="text-xs text-gray-400 pl-1">
+                    Vehículo ligero (auto, SUV, moto) — no requiere datos de
+                    conductor ni autorización MTC.
+                  </p>
+                </div>
+              ) : modalidad === "02" ? (
+                /* — TRANSPORTE PRIVADO — */
+                <div className="space-y-4">
+                  {/* Vehículos */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-gray-500 uppercase">
+                        Datos de vehículos
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8 text-xs text-brand-blue"
+                        onClick={() => setModalVehiculo(true)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Agregar
+                      </Button>
+                    </div>
+                    {vehiculos.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">
+                        Sin vehículos agregados.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {vehiculos.map((v, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">
+                                {v.placa}
+                              </p>
+                              {v.entidadAutorizacion && (
+                                <p className="text-xs text-gray-500">
+                                  Aut. especial: {v.entidadAutorizacion}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setVehiculos(
+                                  vehiculos.filter((_, j) => j !== i),
+                                )
+                              }
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conductores */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-gray-500 uppercase">
+                        Datos de conductores
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8 text-xs text-brand-blue"
+                        onClick={() => setModalConductor(true)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Agregar
+                      </Button>
+                    </div>
+                    {conductores.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">
+                        Sin conductores agregados.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {conductores.map((c, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">
+                                {c.apellidos} {c.nombres}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Licencia: {c.licencia} · DNI:{" "}
+                                {c.numeroDocumento}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setConductores(
+                                  conductores.filter((_, j) => j !== i),
+                                )
+                              }
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                /* Transporte PRIVADO: conductor propio */
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label className={labelClass}>DNI del Conductor</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. 12345678"
-                      maxLength={8}
-                      className={inputClass}
-                    />
+                /* — TRANSPORTE PÚBLICO — */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-500 uppercase">
+                      Transportista
+                    </p>
+                    {!transportistaPublico && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8 text-xs text-brand-blue"
+                        onClick={() => setModalTransportistaPublico(true)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Agregar
+                      </Button>
+                    )}
                   </div>
-                  <div className="space-y-1.5 md:col-span-2">
-                    <label className={labelClass}>Nombre del Conductor</label>
-                    <input
-                      type="text"
-                      placeholder="Apellidos y nombres..."
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className={labelClass}>N° de Placa</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. ABC-123"
-                      className={inputClass}
-                    />
-                  </div>
+                  {transportistaPublico ? (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {transportistaPublico.razonSocial}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          RUC: {transportistaPublico.ruc}
+                          {transportistaPublico.registroMTC && (
+                            <> · MTC: {transportistaPublico.registroMTC}</>
+                          )}
+                        </p>
+                        {/* Autorización especial */}
+                        {transportistaPublico.entidadAutorizacion && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Aut. especial:{" "}
+                            {transportistaPublico.entidadAutorizacion}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTransportistaPublico(null)}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-4"
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">
+                      Sin transportista agregado.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -469,61 +1389,223 @@ export default function GuiaRemisionPage() {
                         )}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDestinatarioSeleccionado(null);
-                        setDestinatarioQuery("");
-                      }}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-4"
-                    >
-                      Cambiar
-                    </button>
+                    <div className="flex items-center gap-3 ml-4 shrink-0">
+                      {/* Botón guardar — solo si vino de apisperu */}
+                      {destinatarioSeleccionado.clienteId === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalGuardarCliente(true);
+                            setErrorGuardarCliente(null); // 👈
+                          }}
+                          className="text-xs text-brand-blue hover:underline transition-colors"
+                        >
+                          Guardar en sistema
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDestinatarioSeleccionado(null);
+                          setDestinatarioQuery("");
+                          setDestinatarioSunatResultado(null);
+                          setDestinatarioSunatHint(null);
+                        }}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        Cambiar
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  /* — Estado: buscando — */
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Buscar por nombre, RUC o DNI..."
-                      value={destinatarioQuery}
-                      onChange={(e) => setDestinatarioQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
-                    />
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  /* — Búsqueda — */
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre, RUC o DNI..."
+                        value={destinatarioQuery}
+                        onChange={(e) => {
+                          setDestinatarioQuery(e.target.value);
+                          // Limpiar resultado SUNAT previo al volver a escribir
+                          setDestinatarioSunatResultado(null);
+                          setDestinatarioSunatHint(null);
+                        }}
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
+                      />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                    {/* Dropdown de resultados */}
-                    {(destinatarioResultados.length > 0 ||
-                      loadingDestinatario) && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                        {loadingDestinatario ? (
-                          <div className="px-4 py-3 text-sm text-gray-400">
-                            Buscando...
-                          </div>
-                        ) : (
-                          destinatarioResultados.map((cliente) => (
-                            <button
-                              key={cliente.clienteId}
-                              type="button"
-                              onClick={() => {
-                                setDestinatarioSeleccionado(cliente);
-                                setDestinatarioQuery("");
-                                setDestinatarioResultados([]);
-                              }}
-                              className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                            >
-                              <p className="text-sm font-medium text-gray-800">
-                                {cliente.razonSocialNombre}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                {cliente.tipoDocumento.tipoDocumentoNombre}:{" "}
-                                {cliente.numeroDocumento}
-                              </p>
-                            </button>
-                          ))
-                        )}
-                      </div>
+                      {/* Dropdown resultados DB */}
+                      {(destinatarioResultados.length > 0 ||
+                        loadingDestinatario) && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                          {loadingDestinatario ? (
+                            <div className="px-4 py-3 text-sm text-gray-400">
+                              Buscando...
+                            </div>
+                          ) : (
+                            destinatarioResultados.map((cliente) => (
+                              <button
+                                key={cliente.clienteId}
+                                type="button"
+                                onClick={() => {
+                                  setDestinatarioSeleccionado(cliente);
+                                  setDestinatarioQuery("");
+                                  setDestinatarioResultados([]);
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                              >
+                                <p className="text-sm font-medium text-gray-800">
+                                  {cliente.razonSocialNombre}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {cliente.tipoDocumento.tipoDocumentoNombre}:{" "}
+                                  {cliente.numeroDocumento}
+                                </p>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Botón SUNAT — aparece solo si buscó y no encontró nada en DB */}
+                    {destinatarioQuery.length >= 2 &&
+                      !loadingDestinatario &&
+                      destinatarioResultados.length === 0 && (
+                        <button
+                          type="button"
+                          disabled={loadingSunat}
+                          onClick={() =>
+                            handleDestinatarioSunat(
+                              destinatarioQuery.replace(/\D/g, ""),
+                            )
+                          }
+                          className="w-full py-2.5 px-4 text-sm text-brand-blue border border-dashed border-brand-blue/40 rounded-xl hover:bg-brand-blue/5 transition-colors disabled:opacity-50"
+                        >
+                          {loadingSunat
+                            ? "Consultando SUNAT..."
+                            : `No registrado — Buscar "${destinatarioQuery}" en SUNAT`}
+                        </button>
+                      )}
+
+                    {/* Resultado SUNAT encontrado */}
+                    {destinatarioSunatResultado && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDestinatarioSeleccionado(
+                            destinatarioSunatResultado,
+                          );
+                          setDestinatarioSunatResultado(null);
+                          setDestinatarioSunatHint(null);
+                          setDestinatarioQuery("");
+                        }}
+                        className="w-full text-left px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
+                      >
+                        <p className="text-sm font-medium text-gray-800">
+                          {destinatarioSunatResultado.razonSocialNombre}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {
+                            destinatarioSunatResultado.tipoDocumento
+                              .tipoDocumentoNombre
+                          }
+                          : {destinatarioSunatResultado.numeroDocumento}
+                        </p>
+                        <p className="text-xs text-brand-blue mt-1">
+                          Toca para seleccionar →
+                        </p>
+                      </button>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Documentos relacionados */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className={labelClass}>
+                    Documentos relacionados
+                    <span className="text-gray-400 normal-case font-normal ml-1">
+                      (opcional)
+                    </span>
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 text-xs text-brand-blue"
+                    onClick={() => setModalDocumento(true)}
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Agregar
+                  </Button>
+                </div>
+
+                {/* Aviso SPOT/IVAP */}
+                {avisoSpotVisible && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                    <p className="text-sm text-amber-800 leading-relaxed">
+                      Le recordamos que si va a trasladar bienes afectos al{" "}
+                      <strong>SPOT</strong> o al <strong>IVAP</strong> se debe
+                      consignar los números de las Constancias de Depósito
+                      respectivas en esta sección.
+                    </p>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setAvisoSpotVisible(false)}
+                        className="px-4 py-1.5 text-xs font-medium text-amber-800 bg-amber-100 border border-amber-300 rounded-lg hover:bg-amber-200 transition-colors"
+                      >
+                        Entendido
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de documentos agregados */}
+                {documentosRelacionados.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">
+                    Sin documentos relacionados.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {documentosRelacionados.map((doc, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">
+                            {doc.numeroCompleto}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {doc.tipoDocumentoLabel}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 ml-4 shrink-0">
+                          {/* Placeholder visualizar PDF — se implementa al final */}
+                          <button
+                            type="button"
+                            className="text-xs text-brand-blue hover:underline transition-colors"
+                          >
+                            Visualizar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDocumentosRelacionados(
+                                documentosRelacionados.filter(
+                                  (_, j) => j !== i,
+                                ),
+                              )
+                            }
+                            className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -532,10 +1614,11 @@ export default function GuiaRemisionPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>Bienes a Trasladar</label>
-                  {/* onClick se conectará con el buscador de productos — API 4 */}
                   <Button
+                    type="button"
                     variant="ghost"
                     className="h-8 text-xs text-brand-blue"
+                    onClick={() => setModalBien(true)}
                   >
                     <Plus className="w-3 h-3 mr-1" /> Agregar bien
                   </Button>
@@ -559,16 +1642,59 @@ export default function GuiaRemisionPage() {
                         <th className="px-4 py-2 text-right font-medium text-gray-500">
                           Peso (kg)
                         </th>
-                        <th className="px-4 py-2 text-right font-medium text-gray-500"></th>
+                        <th className="px-4 py-2"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {/* Fila de ejemplo — se reemplazará con estado dinámico */}
-                      <tr className="text-gray-400 italic">
-                        <td className="px-4 py-4 text-center" colSpan={6}>
-                          Agrega bienes usando el botón superior
-                        </td>
-                      </tr>
+                      {bienes.length === 0 ? (
+                        <tr className="text-gray-400 italic">
+                          <td className="px-4 py-4 text-center" colSpan={6}>
+                            Agrega bienes usando el botón superior
+                          </td>
+                        </tr>
+                      ) : (
+                        bienes.map((b, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                              {b.codigo || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-gray-800">
+                              {b.descripcion}
+                            </td>
+                            <td className="px-4 py-3 text-center text-gray-700">
+                              {b.cantidad}
+                            </td>
+                            <td className="px-4 py-3 text-center text-gray-500">
+                              {b.unidadMedida}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={b.pesoKg}
+                                onChange={(e) => {
+                                  const nuevos = [...bienes];
+                                  nuevos[i].pesoKg = Number(e.target.value);
+                                  setBienes(nuevos);
+                                }}
+                                className="w-20 py-1 px-2 text-right text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-brand-blue"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setBienes(bienes.filter((_, j) => j !== i))
+                                }
+                                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                              >
+                                Quitar
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -585,13 +1711,35 @@ export default function GuiaRemisionPage() {
                 <div className="space-y-2 text-right">
                   <div className="flex justify-end gap-8 text-sm text-gray-500">
                     <span>Total bultos:</span>
-                    <span className="font-medium text-gray-900">0</span>
+                    <span className="font-medium text-gray-900">
+                      {bienes.reduce((acc, b) => acc + b.cantidad, 0)}
+                    </span>
                   </div>
                   <div className="flex justify-end gap-8 text-lg font-bold text-brand-blue">
                     <span>Peso bruto total:</span>
-                    <span>0.00 kg</span>
+                    <span>
+                      {bienes.reduce((acc, b) => acc + b.pesoKg, 0).toFixed(2)}{" "}
+                      kg
+                    </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Observaciones */}
+              <div className="space-y-1.5">
+                <label className={labelClass}>
+                  Observaciones{" "}
+                  <span className="text-gray-400 normal-case font-normal">
+                    (opcional)
+                  </span>
+                </label>
+                <textarea
+                  placeholder="Observaciones adicionales sobre el traslado..."
+                  rows={3}
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm resize-none"
+                />
               </div>
             </form>
           </Card>
@@ -617,10 +1765,19 @@ export default function GuiaRemisionPage() {
               </div>
             </div>
             <div className="mt-6 space-y-3">
-              <Button className="w-full py-3 text-base">
-                Emitir Guía de Remisión
+              {errorEmision && (
+                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-sm text-red-600">{errorEmision}</p>
+                </div>
+              )}
+              <Button
+                className="w-full py-3 text-base"
+                disabled={emitiendo}
+                onClick={handleEmitir}
+              >
+                {emitiendo ? "Emitiendo..." : "Emitir Guía de Remisión"}
               </Button>
-              <Button variant="outline" className="w-full">
+              <Button type="button" variant="outline" className="w-full">
                 Guardar como Borrador
               </Button>
             </div>
@@ -634,6 +1791,169 @@ export default function GuiaRemisionPage() {
             </p>
           </div>
         </div>
+
+        {/* Modales */}
+        {modalPartida && (
+          <ModalPuntoDireccion
+            titulo="Punto de partida"
+            mostrarRemitente={true}
+            onAgregar={(dir) => setPuntoPartida(dir)}
+            onCerrar={() => setModalPartida(false)}
+          />
+        )}
+        {modalLlegada && (
+          <ModalPuntoDireccion
+            titulo="Punto de llegada"
+            mostrarRemitente={false}
+            onAgregar={(dir) => setPuntoLlegada(dir)}
+            onCerrar={() => setModalLlegada(false)}
+          />
+        )}
+
+        {/* Modal guardar cliente */}
+        {modalGuardarCliente && destinatarioSeleccionado && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-5">
+              {/* Header */}
+              <div>
+                <h4 className="text-base font-bold text-gray-900">
+                  Guardar en mi sistema
+                </h4>
+                <p className="text-sm text-gray-500 mt-1">
+                  Completa los datos opcionales para registrar este cliente.
+                </p>
+              </div>
+
+              {/* Datos prellenados (solo lectura) */}
+              <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                <p className="text-sm font-medium text-gray-800">
+                  {destinatarioSeleccionado.razonSocialNombre}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {destinatarioSeleccionado.tipoDocumento.tipoDocumentoNombre}:{" "}
+                  {destinatarioSeleccionado.numeroDocumento}
+                </p>
+                {destinatarioSeleccionado.direccion[0] && (
+                  <p className="text-xs text-gray-500">
+                    {destinatarioSeleccionado.direccion[0].direccionLineal}
+                  </p>
+                )}
+              </div>
+
+              {/* Teléfono */}
+              <div className="space-y-1.5">
+                <label className={labelClass}>
+                  Teléfono{" "}
+                  <span className="text-gray-400 normal-case font-normal">
+                    (opcional)
+                  </span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Ej. 987654321"
+                  value={clienteNuevoTelefono}
+                  onChange={(e) => setClienteNuevoTelefono(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Correo */}
+              <div className="space-y-1.5">
+                <label className={labelClass}>
+                  Correo electrónico{" "}
+                  <span className="text-gray-400 normal-case font-normal">
+                    (opcional)
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="Ej. contacto@empresa.com"
+                  value={clienteNuevoCorreo}
+                  onChange={(e) => setClienteNuevoCorreo(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              {errorGuardarCliente && (
+                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-sm text-red-600">{errorGuardarCliente}</p>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div className="flex gap-3 pt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setModalGuardarCliente(false);
+                    setClienteNuevoTelefono("");
+                    setClienteNuevoCorreo("");
+                    setErrorGuardarCliente(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleGuardarClienteNuevo}
+                  disabled={guardandoCliente}
+                >
+                  {guardandoCliente ? "Guardando..." : "Guardar cliente"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modales de transporte */}
+        {modalVehiculo && (
+          <ModalVehiculo
+            onAgregar={(v) => setVehiculos([...vehiculos, v])}
+            onCerrar={() => setModalVehiculo(false)}
+          />
+        )}
+        {modalConductor && (
+          <ModalConductor
+            onAgregar={(c) => setConductores([...conductores, c])}
+            onCerrar={() => setModalConductor(false)}
+          />
+        )}
+        {modalTransportistaPublico && (
+          <ModalTransportistaPublico
+            onAgregar={(t) => setTransportistaPublico(t)}
+            onCerrar={() => setModalTransportistaPublico(false)}
+          />
+        )}
+
+        {/* Modal documento relacionado */}
+        {modalDocumento && (
+          <ModalDocumentoRelacionado
+            ruc={user?.ruc ?? ""}
+            accessToken={accessToken ?? ""}
+            onAgregar={(doc) => {
+              setDocumentosRelacionados([...documentosRelacionados, doc]);
+              // Precargar bienes si el comprobante tiene detalles
+              if (doc.detalles && doc.detalles.length > 0) {
+                setBienesPreCargados((prev) => [...prev, ...doc.detalles!]);
+              }
+            }}
+            onCerrar={() => setModalDocumento(false)}
+          />
+        )}
+
+        {modalBien && (
+          <ModalBienGuia
+            sucursalID={
+              isSuperAdmin
+                ? (sucursalSeleccionadaId ?? user?.sucursalID ?? 1)
+                : (user?.sucursalID ?? 1)
+            }
+            accessToken={accessToken ?? ""}
+            onAgregar={(b) => setBienes([...bienes, b])}
+            onCerrar={() => setModalBien(false)}
+          />
+        )}
       </div>
     </div>
   );

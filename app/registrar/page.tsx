@@ -82,8 +82,8 @@ export default function Page() {
       return;
     }
     if (!empresaData) {
-        showToast("El RUC no es válido o no fue encontrado en SUNAT.", "error");
-        return;
+      showToast("El RUC no es válido o no fue encontrado en SUNAT.", "error");
+      return;
     }
     setShowModal(true);
     setClave("");
@@ -101,22 +101,7 @@ export default function Page() {
     setLoading(true);
 
     try {
-      // 1. Registrar usuario
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/register`,
-        {
-          username: usuario,
-          email: email,
-          password: "12345678",
-          ruc: ruc,
-          rol: "admin",
-          sucursalID: "1",
-          nombreSucursal: "Principal",
-        },
-      );
-      showToast("Usuario registrado correctamente", "success");
-
-      // 2. Crear empresa
+      // 1. Crear empresa → el trigger crea automáticamente la sucursal Principal
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/companies`, {
         ruc: ruc,
         razonSocial: empresaData?.razonSocial ?? "",
@@ -141,7 +126,27 @@ export default function Page() {
       });
       showToast("Empresa registrada correctamente", "success");
 
-      // 3. Enviar correo de bienvenida
+      // 2. Obtener el ID real de la sucursal Principal recién creada por el trigger
+      const sucursalRes = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal?ruc=${ruc}`,
+      );
+      const sucursalID = sucursalRes.data[0].sucursalId;
+
+      // 3. Registrar usuario con el sucursalID real
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/register`,
+        {
+          username: usuario,
+          email: email,
+          password: "12345678",
+          ruc: ruc,
+          rol: "admin",
+          sucursalID: String(sucursalID),
+        },
+      );
+      showToast("Usuario registrado correctamente", "success");
+
+      // 4. Enviar correo de bienvenida
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Email/send`, {
         toEmail: email,
         toName: usuario,
@@ -153,7 +158,8 @@ export default function Page() {
 
       setSuccess(true);
     } catch (error: any) {
-      const msg = error.response?.data?.message || error.message || "Error inesperado";
+      const msg =
+        error.response?.data?.message || error.message || "Error inesperado";
       const lower = msg.toLowerCase();
       if (lower.includes("username") || lower.includes("usuario")) {
         showToast("El nombre de usuario ya está registrado", "error");
