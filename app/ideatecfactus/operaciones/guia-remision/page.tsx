@@ -1029,7 +1029,7 @@ export default function GuiaRemisionPage() {
       <div className="flex items-center gap-4 mb-2">
         <Button
           variant="ghost"
-          onClick={() => router.push("/ideatecfactus/emision")}
+          onClick={() => router.push("/ideatecfactus/operaciones")}
           className="h-10 w-10 p-0 rounded-full"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -1927,13 +1927,7 @@ export default function GuiaRemisionPage() {
               </div>
 
               {/* Footer del formulario */}
-              <div className="flex justify-between items-end pt-4 border-t border-gray-100">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/emision")}
-                >
-                  Cancelar
-                </Button>
+              <div className="flex justify-end items-end pt-4 border-t border-gray-100">
                 <div className="space-y-2 text-right">
                   <div className="flex justify-end gap-8 text-sm text-gray-500">
                     <span>Total bultos:</span>

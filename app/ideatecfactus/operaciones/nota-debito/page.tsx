@@ -10,7 +10,7 @@ export default function NotaDebitoPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center gap-4 mb-2">
-        <Button variant="ghost" onClick={() => router.push('/ideatecfactus/emision')} className="h-10 w-10 p-0 rounded-full">
+        <Button variant="ghost" onClick={() => router.push('/ideatecfactus/operaciones')} className="h-10 w-10 p-0 rounded-full">
           <ChevronLeft className="w-6 h-6" />
         </Button>
         <div>
@@ -74,8 +74,7 @@ export default function NotaDebitoPage() {
                 <textarea rows={3} placeholder="Describe el motivo de la nota de débito..." className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all resize-none" />
               </div>
 
-              <div className="flex justify-between items-end pt-4 border-t border-gray-100">
-                <Button variant="outline" onClick={() => router.push('/emision')}>Cancelar</Button>
+              <div className="flex justify-end items-end pt-4 border-t border-gray-100">
                 <div className="space-y-2 text-right">
                   <div className="flex justify-end gap-8 text-lg font-bold text-brand-blue">
                     <span>Monto adicional:</span>
