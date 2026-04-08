@@ -70,6 +70,9 @@ export default function EmisionRapidaPage() {
   // ── Tipo comprobante ───────────────────────────────────────
   const [tipo, setTipo] = useState<TipoComprobante>('boleta');
 
+  //emitir nueva factura 
+  const [emitido, setEmitido] = useState(false);
+
   // ── Hooks cliente ──────────────────────────────────────────
   const { cliente: clienteBoleta, loadingCliente: loadingB, errorCliente: errorB, buscarCliente: buscarB } = useClienteBoleta();
   const { cliente: clienteFactura, loadingCliente: loadingF, errorCliente: errorF, buscarCliente: buscarF } = useClienteFactura();
@@ -568,48 +571,92 @@ export default function EmisionRapidaPage() {
       if (resSunat.data.exitoso) {
         showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
         setComprobanteIdEmitido(comprobanteId);
-        if (enviarCorreo && correoCliente) {
-          try {
-            const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
-            const serieNum = `${serie}-${corrNum}`;
-            const esBoleta = tipo === 'boleta';
+        if (enviarCorreo && correoCliente || enviarWhatsapp && telefonoCliente) {
+        try {
+          const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
+          const serieNum = `${serie}-${corrNum}`;
+          const esBoleta = tipo === 'boleta';
 
-            // 1. Obtener PDF en memoria
-            const resPdf = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
-            const pdfBlob = await resPdf.blob();
-            const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`, { type: 'application/pdf' });
+          // ── PDF una sola vez ──
+          const resPdf = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
+          const pdfBlob = await resPdf.blob();
+          const pdfFile = new File(
+            [pdfBlob],
+            `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
+            { type: 'application/pdf' }
+          );
 
-            // 2. Enviar correo con PDF adjunto
-            const formData = new FormData();
-            formData.append('toEmail', correoCliente);
-            formData.append('toName', clienteSeleccionado?.razonSocial ?? 'Cliente');
-            formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
-            formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
-            formData.append('tipo', esBoleta ? '3' : '1');
-            formData.append('adjunto', pdfFile);
+          // ── Correo ──
+          if (enviarCorreo && correoCliente) {
+            try {
+              const formData = new FormData();
+              formData.append('toEmail', correoCliente);
+              formData.append('toName', clienteSeleccionado?.razonSocial ?? 'Cliente');
+              formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
+              formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
+              formData.append('tipo', esBoleta ? '3' : '1');
+              formData.append('adjunto', pdfFile);
 
-            const resCorreo = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-              {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${accessToken}` },
-                body: formData,
-              }
-            );
-            if (!resCorreo.ok) throw new Error('Error al enviar el correo');
-            showToast('Comprobante enviado por correo', 'success');
-          } catch { 
-            showToast('Error al enviar por correo', 'error'); 
+              const resCorreo = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+                {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                  body: formData,
+                }
+              );
+              if (!resCorreo.ok) throw new Error('Error al enviar el correo');
+              showToast('Comprobante enviado por correo', 'success');
+            } catch { showToast('Error al enviar por correo', 'error'); }
           }
-        }
-        if (enviarWhatsapp && telefonoCliente) {
-          try { await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-whatsapp`, { telefono: telefonoCliente }, { headers: { Authorization: `Bearer ${accessToken}` } }); showToast('Enviado por WhatsApp', 'success'); }
-          catch { showToast('Error al enviar por WhatsApp', 'error'); }
-        }
+
+          // ── WhatsApp ──
+          if (enviarWhatsapp && telefonoCliente) {
+            try {
+              const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+              const whatsappBase = 'https://do.velsat.pe:8443/whatsapp';
+
+              const uploadForm = new FormData();
+              uploadForm.append('file', pdfFile);
+              const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+                method: 'POST',
+                headers: { 'x-api-key': whatsappApiKey },
+                body: uploadForm,
+              });
+              if (!resUpload.ok) throw new Error('No se pudo subir el PDF');
+              const uploadData = await resUpload.json();
+              const fileUrl = uploadData.datos.url;
+
+              const numeroFormateado = telefonoCliente.startsWith('51')
+                ? telefonoCliente
+                : `51${telefonoCliente}`;
+
+              const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': whatsappApiKey,
+                },
+                body: JSON.stringify({
+                  phone: numeroFormateado,
+                  type: 'documento',
+                  file_url: fileUrl,
+                  filename: `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
+                  mime_type: 'application/pdf',
+                  text: `Estimado(a) ${clienteSeleccionado?.razonSocial ?? ''}, adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica ${serieNum}.`,
+                }),
+              });
+              if (!resWsp.ok) throw new Error('Error al enviar por WhatsApp');
+              showToast('Documento enviado por WhatsApp', 'success');
+            } catch { showToast('Error al enviar por WhatsApp', 'error'); }
+          }
+
+        } catch { showToast('Error al procesar envíos', 'error'); }
+      }
       } else {
         showToast('Comprobante generado pero rechazado por SUNAT', 'error');
       }
@@ -662,7 +709,7 @@ export default function EmisionRapidaPage() {
         }
       }
 
-      resetForm();
+      setEmitido(true);
     } catch (err: any) {
       const data = err?.response?.data;
       const msg = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante';
@@ -675,12 +722,28 @@ export default function EmisionRapidaPage() {
   };
 
   const resetForm = () => {
+    // ── Items ──────────────────────────────────────
     setItems([]); setBusquedaProducto([]); setShowDropdownProducto([]); inputRefs.current = [];
+    setPorConsumo(false);
+
+    // ── Cliente ────────────────────────────────────
     setClienteSeleccionado(null); setBusqueda(''); setClienteVarios(false);
-    setCorreoCliente(''); setTelefonoCliente(''); setNoEncontrado(false); setClienteManual('');
+    setNoEncontrado(false); setClienteManual('');
+
+    // ── Contacto ───────────────────────────────────
+    setCorreoCliente(''); setTelefonoCliente('');
     setEnviarCorreo(false); setEnviarWhatsapp(false);
+
+    // ── Bolsa ──────────────────────────────────────
     setCantidadBolsa(0); setAplicarIcbper(false); setTamañoBolsa('mediana');
-    setErrorEmision(null); setMedioPago('Efectivo'); setPorConsumo(false);
+
+    // ── Pago ───────────────────────────────────────
+    setMedioPago('Efectivo');
+
+    // ── Emisión ────────────────────────────────────
+    setErrorEmision(null); setComprobanteIdEmitido(null); setEmitido(false);
+
+    // ── Sucursal (solo superadmin) ─────────────────
     if (isSuperAdmin) {
       setSucursalActual(null);
       setCorrelativoActual(null);
@@ -1252,12 +1315,16 @@ export default function EmisionRapidaPage() {
             </div>
 
             {/* Botón emitir */}
-            <button type="button" onClick={emitirComprobante} disabled={emitiendo || sinSucursal}
+            <button type="button"
+              onClick={emitido ? () => { resetForm(); } : emitirComprobante}
+              disabled={emitiendo || sinSucursal}
               className="w-full py-2.5 bg-brand-blue hover:bg-blue-700 disabled:opacity-60 text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100 hover:shadow-blue-200">
               {emitiendo ? (
                 <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Emitiendo...</>
+              ) : emitido ? (
+                `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
               ) : (
-                <> Emitir {tipo === 'boleta' ? 'Boleta' : 'Factura'}</>
+                `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
               )}
             </button>
 

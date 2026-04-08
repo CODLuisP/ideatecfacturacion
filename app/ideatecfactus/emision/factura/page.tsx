@@ -323,8 +323,9 @@ export default function FacturaPage() {
       setShowDropdownProducto([false]);
     } else {
       setDetalles(prev => prev.filter(d => d._id !== 'por-consumo'));
-      setBusquedaProducto(prev => prev.filter((_, i) => (detalles[i] as any)?.id !== 'por-consumo'));
-      setShowDropdownProducto(prev => prev.filter((_, i) => (detalles[i] as any)?.id !== 'por-consumo'));
+      setBusquedaProducto([]);
+      setShowDropdownProducto([]);
+      inputRefs.current = [];
     }
   }, [porConsumo]);
 
@@ -1052,28 +1053,105 @@ export default function FacturaPage() {
         showToast(resSunat.data.mensaje ?? 'Factura emitida correctamente.', 'success');
         setComprobanteIdEmitido(comprobanteId);
         await cargarPdf(comprobanteId, tamanoPdf);
+        
+      // ── Correo y WhatsApp ──
+      if (enviarCorreo && correoCliente || enviarWhatsapp && telefonoCliente) {
+        try {
+          const corrNum = String(correlativoActual ?? 1).padStart(8, '0');
+          const serieNum = `${factura.serie}-${corrNum}`;
 
-        if (enviarCorreo && correoCliente) {
-          try {
-            await axios.post(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-correo`,
-              { correo: correoCliente },
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            showToast('Comprobante enviado por correo', 'success');
-          } catch { showToast('Error al enviar por correo', 'error'); }
-        }
+          // Obtener PDF una sola vez para ambos
+          const resPdf = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
+          const pdfBlob = await resPdf.blob();
+          const pdfFile = new File(
+            [pdfBlob],
+            `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`,
+            { type: 'application/pdf' }
+          );
 
-        if (enviarWhatsapp && telefonoCliente) {
-          try {
-            await axios.post(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-whatsapp`,
-              { telefono: telefonoCliente },
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            showToast('Comprobante enviado por WhatsApp', 'success');
-          } catch { showToast('Error al enviar por WhatsApp', 'error'); }
-        }
+          // Correo
+          if (enviarCorreo && correoCliente) {
+            try {
+              const formData = new FormData();
+              formData.append('toEmail', correoCliente);
+              formData.append('toName', factura.cliente?.razonSocial ?? 'Cliente');
+              formData.append('subject', `Factura Electrónica ${serieNum}`);
+              formData.append('body', 'Se emitió la factura electrónica por los productos/servicios indicados.');
+              formData.append('tipo', '1');
+              formData.append('comprobanteJson', JSON.stringify({
+                serieNumero: serieNum,
+                estadoSunat: 'ACEPTADO',
+                items: detalles.map(d => ({
+                  descripcion: d.descripcion ?? '',
+                  cantidad: d.cantidad ?? 1,
+                  precioUnitario: d.precioUnitario ?? 0,
+                })),
+                igv: totales.igv,
+                total: totales.importeTotal,
+              }));
+              formData.append('adjunto', pdfFile);
+
+              const resCorreo = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+                { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
+              );
+              if (!resCorreo.ok) {
+                const err = await resCorreo.text();
+                console.error('Error email:', err);
+                throw new Error('Error al enviar correo');
+              }
+              showToast('Comprobante enviado por correo', 'success');
+            } catch { showToast('Error al enviar por correo', 'error'); }
+          }
+
+          // WhatsApp
+          if (enviarWhatsapp && telefonoCliente) {
+            try {
+              const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+              const whatsappBase = 'https://do.velsat.pe:8443/whatsapp';
+
+              const uploadForm = new FormData();
+              uploadForm.append('file', pdfFile);
+              const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+                method: 'POST',
+                headers: { 'x-api-key': whatsappApiKey },
+                body: uploadForm,
+              });
+              if (!resUpload.ok) throw new Error('No se pudo subir el PDF');
+              const uploadData = await resUpload.json();
+              const fileUrl = uploadData.datos.url;
+
+              const numeroFormateado = telefonoCliente.startsWith('51')
+                ? telefonoCliente
+                : `51${telefonoCliente}`;
+
+              const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': whatsappApiKey,
+                },
+                body: JSON.stringify({
+                  phone: numeroFormateado,
+                  type: 'documento',
+                  file_url: fileUrl,
+                  filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`,
+                  mime_type: 'application/pdf',
+                  text: `Estimado(a) ${factura.cliente?.razonSocial ?? ''}, adjuntamos su factura electrónica ${serieNum}.`,
+                }),
+              });
+              if (!resWsp.ok) throw new Error('Error al enviar por WhatsApp');
+              showToast('Comprobante enviado por WhatsApp', 'success');
+            } catch { showToast('Error al enviar por WhatsApp', 'error'); }
+          }
+
+        } catch { showToast('Error al procesar envíos', 'error'); }
+      }
+      
         setEmitido(true); //nueva factura
       } else {
         showToast(`Factura ${facturaFinal.serie}-${facturaFinal.correlativo} generada pero rechazada por SUNAT`, 'error');
@@ -1984,7 +2062,7 @@ export default function FacturaPage() {
               <div className="border border-amber-100 rounded-xl p-3 bg-amber-50/50 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-amber-800">🛍️ ¿Desea bolsa plástica?</span>
+                    <span className="text-xs font-bold text-amber-800">¿Desea bolsa plástica?</span>
                     <button type="button" onClick={() => setShowBolsa(!showBolsa)}
                       className="flex items-center gap-0.5 text-[10px] text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 bg-white rounded-lg px-2 py-0.5">
                       <span>Opciones</span>
