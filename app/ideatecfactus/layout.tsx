@@ -42,6 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'emisionRapida', label: 'Emisión Rapida', icon: FileText },
     { id: 'emision', label: 'Emisión', icon: FileText },
     { id: 'ver-comprobantes', label: 'Comprobantes', icon: FileBox },
     { id: 'clientes', label: 'Clientes', icon: Users },
@@ -68,9 +69,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             activeView={activeView}
           />
-          <main className="flex-1 px-6 py-6 overflow-y-auto overflow-x-hidden custom-scrollbar">
+          <main className="flex-1 px-6 py-3 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className=" mx-auto">
-              <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                {activeView != 'emisionRapida' && (
                 <div>
                   <h2 className="text-2xl font-black text-gray-900 tracking-tight capitalize flex items-center gap-3">
                     <span className="w-1 h-6 bg-brand-red rounded-full" />
@@ -78,6 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </h2>
                   <p className="text-gray-500 mt-1 text-[14px]">Gestiona tu facturación electrónica de manera eficiente.</p>
                 </div>
+                )}
                 {activeView === 'dashboard' && (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleExport}><Download className="w-4 h-4" /> Exportar Reporte</Button>

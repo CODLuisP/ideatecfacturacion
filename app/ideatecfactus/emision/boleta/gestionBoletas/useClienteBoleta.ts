@@ -32,6 +32,8 @@ export function useClienteBoleta() {
             provincia: '',
             distrito: '',
           })
+        } else {
+          setErrorCliente('No se encontró el DNI.')
         }
       } else if (tipoDoc === '06') {
         // RUC

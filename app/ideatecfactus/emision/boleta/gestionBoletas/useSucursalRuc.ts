@@ -4,7 +4,7 @@ import { Sucursal } from './Boleta'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 
-export function useSucursalRuc() {
+export function useSucursalRuc( enabled: boolean = true ) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
@@ -29,8 +29,8 @@ export function useSucursalRuc() {
   }
 
   useEffect(() => {
-    if (accessToken) fetchSucursales()
-  }, [accessToken])
+    if (accessToken && enabled) fetchSucursales()
+  }, [accessToken, enabled])
 
   return { sucursales, loadingSucursales, fetchSucursales }
 }

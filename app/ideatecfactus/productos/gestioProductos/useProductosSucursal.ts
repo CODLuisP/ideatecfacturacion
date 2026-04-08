@@ -4,23 +4,23 @@ import { ProductoSucursal } from './Producto'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 
-export function useProductosSucursal() {
+export function useProductosSucursal(sucursalIdOverride?: number | null) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const [productosSucursal, setProductosSucursal] = useState<ProductoSucursal[]>([])
   const [loadingSucursal, setLoadingSucursal] = useState(false)
 
-  const fetchProductosSucursal = async () => {
+  const fetchProductosSucursal = async (id?: number | null) => {
+    const sucursalId = id ?? sucursalIdOverride ?? user?.sucursalID;
+    if (!sucursalId) return;
     setLoadingSucursal(true)
     try {
       const res = await axios.get<ProductoSucursal[]>(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/productos/${user?.sucursalID}`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
+        `${process.env.NEXT_PUBLIC_API_URL}/api/productos/${sucursalId}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       )
       setProductosSucursal(res.data)
-    } catch (err) {
+    } catch {
       showToast("Error al cargar productos", "error");
     } finally {
       setLoadingSucursal(false)
@@ -29,8 +29,7 @@ export function useProductosSucursal() {
 
   useEffect(() => {
     if (accessToken) fetchProductosSucursal()
-  }, [accessToken])
+  }, [accessToken, sucursalIdOverride])
 
   return { productosSucursal, loadingSucursal, setProductosSucursal, fetchProductosSucursal }
 }
-
