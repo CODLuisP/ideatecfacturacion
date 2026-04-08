@@ -95,6 +95,7 @@ export default function ModalPuntoDireccion({
   const [provId, setProvId] = useState<number | null>(null);
   const [distId, setDistId] = useState<number | null>(null);
   const [direccionLineal, setDireccionLineal] = useState("");
+  const [terceroDireccionEditable, setTerceroDireccionEditable] = useState("");
 
   // Derivados cascada
   const provinciasFiltradas = deptoId
@@ -136,6 +137,7 @@ export default function ModalPuntoDireccion({
   const handleTerceroRuc = async (val: string) => {
     setTerceroRuc(val);
     setTerceroData(null);
+    setTerceroDireccionEditable("");
     if (val.length === 11) {
       setLoadingTercero(true);
       setTerceroHint({ text: "Consultando RUC...", color: "#185FA5" });
@@ -146,6 +148,7 @@ export default function ModalPuntoDireccion({
         const data = await res.json();
         if (data.ruc) {
           setTerceroData(data);
+          setTerceroDireccionEditable(data.direccion ?? "");
           setTerceroHint({ text: `✓ ${data.razonSocial}`, color: "#15803d" });
         } else {
           setTerceroHint({ text: "RUC no encontrado", color: "#DC2626" });
@@ -184,7 +187,8 @@ export default function ModalPuntoDireccion({
   // ── Validación y submit ───────────────────────────────────────────────────
   const puedeAgregar = (() => {
     if (opcion === "remitente") return !!empresa;
-    if (opcion === "tercero") return !!terceroData;
+    if (opcion === "tercero")
+      return !!terceroData && !!terceroDireccionEditable.trim();
     if (opcion === "otra")
       return !!deptoSel && !!provSel && !!distSel && !!direccionLineal.trim();
     return false;
@@ -208,12 +212,12 @@ export default function ModalPuntoDireccion({
       resultado = {
         tipo: "tercero",
         ubigeo: terceroData.ubigeo ?? "",
-        direccionLineal: terceroData.direccion ?? "",
+        direccionLineal: terceroDireccionEditable.trim(), // ← cambia esto
         departamento: terceroData.departamento ?? "",
         provincia: terceroData.provincia ?? "",
         distrito: terceroData.distrito ?? "",
         tipoDireccion: "DOMICILIO FISCAL",
-        resumen: `${terceroData.razonSocial} — ${terceroData.direccion}`,
+        resumen: `${terceroData.razonSocial} — ${terceroDireccionEditable.trim()}`, // ← y esto
       };
     } else {
       // Otra dirección
@@ -359,7 +363,7 @@ export default function ModalPuntoDireccion({
 
               {/* Dirección encontrada — tarjeta simple */}
               {terceroData && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
                   <p className="text-xs font-bold text-gray-500 uppercase">
                     Domicilio fiscal
                   </p>
@@ -369,9 +373,20 @@ export default function ModalPuntoDireccion({
                   <p className="text-xs text-gray-500 font-mono">
                     {terceroData.ubigeo}
                   </p>
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    {terceroData.direccion}
-                  </p>
+                  <input
+                    type="text"
+                    placeholder="Escribe la dirección manualmente..."
+                    value={terceroDireccionEditable}
+                    onChange={(e) =>
+                      setTerceroDireccionEditable(e.target.value)
+                    }
+                    className={inputClass}
+                  />
+                  {!terceroDireccionEditable && (
+                    <p className="text-xs text-amber-600">
+                      Sin dirección registrada — ingrésala manualmente.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

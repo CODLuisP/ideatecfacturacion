@@ -60,8 +60,9 @@ interface Cliente {
   numeroDocumento: string;
   tipoDocumento: { tipoDocumentoId: string; tipoDocumentoNombre: string };
   direccion: DireccionCliente[];
+  telefono?: string; // ← agrega
+  correo?: string; // ← agrega
 }
-
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const MOTIVOS_TRASLADO = [
   { codigo: "01", label: "Venta" },
@@ -166,6 +167,9 @@ export default function GuiaRemisionPage() {
   const [guiaEmitida, setGuiaEmitida] = useState<any>(null);
 
   const [refreshSucursal, setRefreshSucursal] = useState(0);
+  const [guiaEmitidaId, setGuiaEmitidaId] = useState<number | null>(null);
+  const [telefonoEnvio, setTelefonoEnvio] = useState("");
+  const [correoEnvio, setCorreoEnvio] = useState("");
 
   // — Estados nuevos para superadmin
   const [sucursales, setSucursales] = useState<any[]>([]);
@@ -176,6 +180,12 @@ export default function GuiaRemisionPage() {
   const [errorGuardarCliente, setErrorGuardarCliente] = useState<string | null>(
     null,
   );
+
+  const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  const [envioExitoso, setEnvioExitoso] = useState(false);
+  const [enviarWhatsapp, setEnviarWhatsapp] = useState(false);
+  const [enviarCorreo, setEnviarCorreo] = useState(false);
 
   const isSuperAdmin = user?.rol === "superadmin";
 
@@ -323,6 +333,23 @@ export default function GuiaRemisionPage() {
 
     return () => clearTimeout(delay);
   }, [destinatarioQuery, user?.ruc, accessToken]);
+
+  useEffect(() => {
+    if (!destinatarioSeleccionado) return;
+    if (destinatarioSeleccionado.telefono) {
+      setTelefonoEnvio(destinatarioSeleccionado.telefono);
+    } else {
+      setTelefonoEnvio("");
+    }
+    if (destinatarioSeleccionado.correo) {
+      setCorreoEnvio(destinatarioSeleccionado.correo);
+    } else {
+      setCorreoEnvio("");
+    }
+    // checkboxes siempre inician desmarcados
+    setEnviarWhatsapp(false);
+    setEnviarCorreo(false);
+  }, [destinatarioSeleccionado]);
 
   useEffect(() => {
     if (bienesPreCargados.length === 0) return;
@@ -529,6 +556,8 @@ export default function GuiaRemisionPage() {
       setClienteNuevoCorreo("");
       setErrorGuardarCliente(null);
       showToast("Cliente guardado correctamente.", "success");
+      if (clienteNuevoTelefono) setTelefonoEnvio(clienteNuevoTelefono);
+      if (clienteNuevoCorreo) setCorreoEnvio(clienteNuevoCorreo);
     } catch (err) {
       console.error("Error guardando cliente:", err);
       setErrorGuardarCliente("Error de conexión. Verifica tu red.");
@@ -546,6 +575,15 @@ export default function GuiaRemisionPage() {
       "00": "0", // Sin documento
     };
     return mapa[tipoDocumentoId] ?? tipoDocumentoId;
+  };
+
+  const handleNuevaGuia = () => {
+    setGuiaEmitidaId(null);
+    setTelefonoEnvio("");
+    setCorreoEnvio("");
+    setErrorEnvio(null);
+    setEnvioExitoso(false);
+    resetFormulario();
   };
 
   const handleEmitir = async () => {
@@ -614,6 +652,9 @@ export default function GuiaRemisionPage() {
 
       // ── Payload ────────────────────────────────────────────────────────
       const payload = {
+        sucursalId: isSuperAdmin
+          ? sucursalSeleccionadaId
+          : Number(user?.sucursalID),
         version: 1,
         tipoDoc: tipoGuia === "remitente" ? "09" : "31",
         serie: serieActual ?? "",
@@ -726,6 +767,7 @@ export default function GuiaRemisionPage() {
                   tipoDoc: "6",
                   numDoc: transportistaPublico?.ruc ?? "",
                   rznSocial: transportistaPublico?.razonSocial ?? "",
+                  registroMTC: transportistaPublico?.registroMTC ?? null,
                   placa: vehiculos[0]?.placa?.replace(/-/g, "") ?? null,
                   autorizacionVehiculoEntidad:
                     transportistaPublico?.entidadAutorizacion ?? null,
@@ -759,8 +801,10 @@ export default function GuiaRemisionPage() {
                   numDoc: null,
                   rznSocial: null,
                   placa: vehiculos[0]?.placa?.replace(/-/g, "") ?? null,
-                  autorizacionVehiculoEntidad: vehiculos[0]?.entidadAutorizacion ?? null,
-                  autorizacionVehiculoNumero: vehiculos[0]?.numeroAutorizacion ?? null,
+                  autorizacionVehiculoEntidad:
+                    vehiculos[0]?.entidadAutorizacion ?? null,
+                  autorizacionVehiculoNumero:
+                    vehiculos[0]?.numeroAutorizacion ?? null,
                   placaSecundaria1:
                     vehiculos[1]?.placa?.replace(/-/g, "") ?? null,
                   placaSecundaria2:
@@ -821,7 +865,6 @@ export default function GuiaRemisionPage() {
 
       if (!resCrear.ok) {
         const err = await resCrear.json();
-        console.error("Error detalle:", JSON.stringify(err, null, 2)); // 👈 agrega esto
         setErrorEmision(err?.message ?? err?.title ?? JSON.stringify(err));
         return;
       }
@@ -844,18 +887,138 @@ export default function GuiaRemisionPage() {
           `✓ Guía ${guiaEnviada.numeroCompleto} aceptada por SUNAT`,
           "success",
         );
-        resetFormulario();
+        setGuiaEmitidaId(guiaEnviada.guiaId);
       } else {
         showToast(
           `Guía ${guiaEnviada.numeroCompleto} — ${guiaEnviada.estadoSunat}`,
           "info",
         );
       }
+
+      // — Envío automático por canales marcados
+      const hayWhatsapp = enviarWhatsapp && telefonoEnvio.trim();
+      const hayCorreo = enviarCorreo && correoEnvio.trim();
+
+      if (hayWhatsapp || hayCorreo) {
+        try {
+          // reutiliza handleEnviar pero con el id recién creado
+          await handleEnviarConId(guiaEnviada.guiaId, guiaEnviada);
+
+          if (hayWhatsapp && hayCorreo) {
+            showToast("Guía enviada por WhatsApp y correo", "success");
+          } else if (hayWhatsapp) {
+            showToast("Guía enviada por WhatsApp", "success");
+          } else {
+            showToast("Guía enviada por correo", "success");
+          }
+        } catch {
+          showToast("Guía emitida, pero hubo un error al enviar", "info");
+        }
+      }
     } catch (err) {
       console.error("Error emitiendo guía:", err);
       setErrorEmision("Error de conexión. Verifica tu red.");
     } finally {
       setEmitiendo(false);
+    }
+  };
+
+  const handleEnviarConId = async (idGuia: number, guiaData: any) => {
+    const resPdf = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${idGuia}/pdf`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+    const pdfBlob = await resPdf.blob();
+    const pdfFile = new File(
+      [pdfBlob],
+      `${guiaData?.numeroCompleto ?? idGuia}.pdf`,
+      { type: "application/pdf" },
+    );
+
+    if (enviarCorreo && correoEnvio.trim()) {
+      const formData = new FormData();
+      formData.append("toEmail", correoEnvio);
+      formData.append(
+        "toName",
+        destinatarioSeleccionado?.razonSocialNombre ?? "",
+      );
+      formData.append(
+        "subject",
+        `Guía de Remisión ${guiaData?.numeroCompleto ?? ""}`,
+      );
+      formData.append(
+        "body",
+        "Se emitió la guía de remisión para el traslado de los bienes indicados.",
+      );
+      formData.append("tipo", "9");
+      formData.append(
+        "guiaJson",
+        JSON.stringify({
+          serieNumero: guiaData?.numeroCompleto ?? "",
+          estadoSunat: guiaData?.estadoSunat ?? "EMITIDO",
+          motivoTraslado: guiaData?.desTraslado ?? "",
+          fechaTraslado: guiaData?.fecTraslado
+            ? new Date(guiaData.fecTraslado).toLocaleDateString("es-PE")
+            : "",
+          direccionPartida: guiaData?.partidaDireccion ?? "",
+          direccionLlegada: guiaData?.llegadaDireccion ?? "",
+          bienes:
+            guiaData?.details?.map((b: any) => ({
+              descripcion: b.descripcion,
+              cantidad: b.cantidad,
+              unidad: b.unidad,
+            })) ?? [],
+        }),
+      );
+      formData.append("adjunto", pdfFile);
+
+      const resCorreo = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: formData,
+        },
+      );
+      if (!resCorreo.ok) throw new Error("Error al enviar el correo");
+    }
+
+    if (enviarWhatsapp && telefonoEnvio.trim()) {
+      const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+      const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+
+      const uploadForm = new FormData();
+      uploadForm.append("file", pdfFile);
+      const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+        method: "POST",
+        headers: { "x-api-key": whatsappApiKey },
+        body: uploadForm,
+      });
+      if (!resUpload.ok) throw new Error("No se pudo subir el PDF a WhatsApp");
+      const uploadData = await resUpload.json();
+      const fileUrl = uploadData.datos.url;
+
+      const numeroFormateado = telefonoEnvio.startsWith("51")
+        ? telefonoEnvio
+        : `51${telefonoEnvio}`;
+
+      const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": whatsappApiKey,
+        },
+        body: JSON.stringify({
+          phone: numeroFormateado,
+          type: "documento",
+          file_url: fileUrl,
+          filename: `${guiaData?.numeroCompleto ?? idGuia}.pdf`,
+          mime_type: "application/pdf",
+          text: `Estimado(a) ${destinatarioSeleccionado?.razonSocialNombre ?? ""}, adjuntamos la guía de remisión electrónica ${guiaData?.numeroCompleto ?? ""}.`,
+        }),
+      });
+      if (!resWsp.ok) throw new Error("Error al enviar por WhatsApp");
     }
   };
 
@@ -919,7 +1082,13 @@ export default function GuiaRemisionPage() {
 
         <button
           type="button"
-          onClick={() => setTipoGuia("transportista")}
+          onClick={() => {
+            setTipoGuia("transportista");
+            setModalidad("01");
+            setVehiculoM1L(false);
+            setVehiculos([]);
+            setConductores([]);
+          }}
           className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
             tipoGuia === "transportista"
               ? "border-brand-blue bg-brand-blue/5"
@@ -1079,14 +1248,17 @@ export default function GuiaRemisionPage() {
                         .value as ModalidadTraslado;
                       setModalidad(nuevaModalidad);
                       if (nuevaModalidad === "01") {
-                        setVehiculoM1L(false); // reset M1/L si cambia a público
+                        setVehiculoM1L(false);
                         setVehiculos([]);
                         setConductores([]);
                       }
                     }}
                   >
                     <option value="01">01 - Transporte público</option>
-                    <option value="02">02 - Transporte privado</option>
+                    {/* Transporte privado solo para guía remitente */}
+                    {tipoGuia === "remitente" && (
+                      <option value="02">02 - Transporte privado</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -1150,20 +1322,23 @@ export default function GuiaRemisionPage() {
 
               {/* Checkboxes globales de transporte */}
               <div className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={transbordo}
-                    onChange={(e) => setTransbordo(e.target.checked)}
-                    className="accent-brand-blue w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Realiza transbordo programado
-                  </span>
-                </label>
+                {/* Transbordo solo para guía remitente */}
+                {tipoGuia === "remitente" && (
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={transbordo}
+                      onChange={(e) => setTransbordo(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Realiza transbordo programado
+                    </span>
+                  </label>
+                )}
 
-                {/* M1/L solo para transporte privado */}
-                {modalidad === "02" && (
+                {/* M1/L solo para transporte privado en guía remitente */}
+                {tipoGuia === "remitente" && modalidad === "02" && (
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1522,6 +1697,61 @@ export default function GuiaRemisionPage() {
                 )}
               </div>
 
+              {/* Contacto para envío */}
+              {destinatarioSeleccionado && (
+                <div className="space-y-3">
+                  <label className={labelClass}>Enviar comprobante a</label>
+
+                  {/* WhatsApp */}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="chk-whatsapp"
+                      checked={enviarWhatsapp}
+                      onChange={(e) => setEnviarWhatsapp(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4 shrink-0"
+                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="tel"
+                        placeholder="WhatsApp: 987654321"
+                        value={telefonoEnvio}
+                        onChange={(e) => setTelefonoEnvio(e.target.value)}
+                        disabled={!enviarWhatsapp}
+                        className={`${inputClass} text-xs py-2 ${!enviarWhatsapp ? "opacity-40 cursor-not-allowed" : ""}`}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        WhatsApp
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Correo */}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="chk-correo"
+                      checked={enviarCorreo}
+                      onChange={(e) => setEnviarCorreo(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4 shrink-0"
+                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="email"
+                        placeholder="Correo: ejemplo@gmail.com"
+                        value={correoEnvio}
+                        onChange={(e) => setCorreoEnvio(e.target.value)}
+                        disabled={!enviarCorreo}
+                        className={`${inputClass} text-xs py-2 ${!enviarCorreo ? "opacity-40 cursor-not-allowed" : ""}`}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        Email
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Documentos relacionados */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1583,22 +1813,18 @@ export default function GuiaRemisionPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3 ml-4 shrink-0">
-                          {/* Placeholder visualizar PDF — se implementa al final */}
                           <button
                             type="button"
-                            className="text-xs text-brand-blue hover:underline transition-colors"
-                          >
-                            Visualizar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
+                            onClick={() => {
                               setDocumentosRelacionados(
                                 documentosRelacionados.filter(
                                   (_, j) => j !== i,
                                 ),
-                              )
-                            }
+                              );
+                              // 👈 limpiar bienes precargados al quitar el documento
+                              setBienesPreCargados([]);
+                              setBienes([]);
+                            }}
                             className="text-xs text-gray-400 hover:text-red-500 transition-colors"
                           >
                             Quitar
@@ -1751,36 +1977,73 @@ export default function GuiaRemisionPage() {
             title="Vista Previa"
             subtitle="Representación gráfica de la guía"
           >
-            <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
-              <div className="p-4 rounded-full bg-white shadow-sm">
-                <Printer className="w-8 h-8 text-gray-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Previsualización del PDF
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Se generará automáticamente al emitir
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 space-y-3">
-              {errorEmision && (
-                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
-                  <p className="text-sm text-red-600">{errorEmision}</p>
+            {guiaEmitidaId ? (
+              /* — PDF generado — */
+              <div className="space-y-3">
+                <iframe
+                  src={`${process.env.NEXT_PUBLIC_API_URL}/api/guias/${guiaEmitidaId}/pdf`}
+                  className="w-full rounded-lg border border-gray-200"
+                  style={{ height: "420px" }}
+                  title="Vista previa guía"
+                />
+                {/* Botón principal — Descargar PDF */}
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL}/api/guias/${guiaEmitidaId}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                >
+                  <Button className="w-full py-3 text-base">
+                    Descargar PDF
+                  </Button>
+                </a>
+                {/* Botones secundarios */}
+                <div className="space-y-3">
+                  <div className="w-full py-3 text-base">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleNuevaGuia}
+                    >
+                      Nueva Guía
+                    </Button>
+                  </div>
                 </div>
-              )}
-              <Button
-                className="w-full py-3 text-base"
-                disabled={emitiendo}
-                onClick={handleEmitir}
-              >
-                {emitiendo ? "Emitiendo..." : "Emitir Guía de Remisión"}
-              </Button>
-              <Button type="button" variant="outline" className="w-full">
-                Guardar como Borrador
-              </Button>
-            </div>
+              </div>
+            ) : (
+              /* — Sin emitir aún — */
+              <div className="space-y-3">
+                <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                  <div className="p-4 rounded-full bg-white shadow-sm">
+                    <Printer className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      Previsualización del PDF
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Se generará automáticamente al emitir
+                    </p>
+                  </div>
+                </div>
+                {errorEmision && (
+                  <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-sm text-red-600">{errorEmision}</p>
+                  </div>
+                )}
+                <Button
+                  className="w-full py-3 text-base"
+                  disabled={emitiendo}
+                  onClick={handleEmitir}
+                >
+                  {emitiendo ? "Emitiendo..." : "Emitir Guía de Remisión"}
+                </Button>
+                <Button type="button" variant="outline" className="w-full">
+                  Enviar
+                </Button>
+              </div>
+            )}
           </Card>
 
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
@@ -1931,6 +2194,8 @@ export default function GuiaRemisionPage() {
           <ModalDocumentoRelacionado
             ruc={user?.ruc ?? ""}
             accessToken={accessToken ?? ""}
+            userRol={user?.rol ?? ""}
+            sucursalID={Number(user?.sucursalID ?? 1)}
             onAgregar={(doc) => {
               setDocumentosRelacionados([...documentosRelacionados, doc]);
               // Precargar bienes si el comprobante tiene detalles
