@@ -4,17 +4,21 @@ import { ProductoBase } from './Producto'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 
-export function useProductosBaseDisponiblesLista() {
+export function useProductosBaseDisponiblesLista(sucursalId?: number) {
+  
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const [productosBase, setProductosBase] = useState<ProductoBase[]>([])
   const [loadingBase, setLoadingBase] = useState(false)
 
+  const idToUse = sucursalId ?? parseInt(user?.sucursalID ?? "0");
+
   const fetchProductosBase = async () => {
+    if (!idToUse) return;
     setLoadingBase(true)
     try {
       const res = await axios.get<ProductoBase[]>(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/productos/disponibles/${user?.sucursalID}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/productos/disponibles/${idToUse}`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
@@ -29,7 +33,7 @@ export function useProductosBaseDisponiblesLista() {
 
   useEffect(() => {
     if (accessToken) fetchProductosBase()
-  }, [accessToken])
+  }, [accessToken, idToUse])  // ✅ re-fetcha si cambia la sucursal
 
-  return { productosBase, loadingBase }
+  return { productosBase, loadingBase, fetchProductosBase }
 }

@@ -10,14 +10,14 @@ import { useToast } from "@/app/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { generarCodigoProducto } from "./generarCodigoProducto";
 import { useProductosEmpresaLista } from "./useProductosEmpresaLista";
+import { useSucursalRuc } from "../../operaciones/boleta/gestionBoletas/useSucursalRuc";
+import { useProductosBaseDisponiblesLista } from "./useProductosBaseDisponiblesLista";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onProductoAgregado: (producto: ProductoSucursal) => void;
   categorias: Categoria[];
-  productosBase: ProductoBase[];
-  sucursalId: number;
 }
 
 const emptyForm: NuevoProducto = {
@@ -39,11 +39,11 @@ export default function AgregarProducto({
   onClose,
   onProductoAgregado,
   categorias,
-  productosBase,
-  sucursalId,
 }: Props) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
+  const isSuperAdmin = user?.rol === "admin";
+
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [productoExistente, setProductoExistente] = React.useState<ProductoBase | null>(null);
 
@@ -51,21 +51,33 @@ export default function AgregarProducto({
   const [showSugerencias, setShowSugerencias] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  //seleccionar sucursal para agregar si es superadmin
+  const { sucursales } = useSucursalRuc(isSuperAdmin);
+
+  const [sucursalSeleccionada, setSucursalSeleccionada] = React.useState<number>(0);
+  const sucursalIdEfectivo = isSuperAdmin
+    ? sucursalSeleccionada
+    : parseInt(user?.sucursalID ?? "0");
+
+  //Producto base sin estock ni precio de una empresa que no estan sucursal actual
+  const { productosBase } = useProductosBaseDisponiblesLista(sucursalIdEfectivo);
+
   // ─── NUEVO: estado de errores ─────────────────────────────
   const [errors, setErrors] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
+    const sid = sucursalIdEfectivo;
     if (isOpen) {
-      setForm({ ...emptyForm, sucursalId });
+      setForm({ ...emptyForm, sucursalId: sid });
       setErrors({});
     } else {
-      setForm({ ...emptyForm, sucursalId });
+      setForm({ ...emptyForm, sucursalId: sid });
       setProductoExistente(null);
       setSugerencias([]);
       setShowSugerencias(false);
       setErrors({});
     }
-  }, [isOpen, sucursalId]);
+  }, [isOpen, sucursalSeleccionada]);
 
   const { productosEmpresa } = useProductosEmpresaLista()
 
@@ -153,6 +165,7 @@ export default function AgregarProducto({
     const newErrors: Record<string, boolean> = {};
     const soloSucursal = !!productoExistente;
 
+    if (isSuperAdmin && form.sucursalId === 0) newErrors.sucursalId = true; 
     if (!form.nomProducto.trim()) newErrors.nomProducto = true;
     if (form.precioUnitario <= 0) newErrors.precioUnitario = true;
 
@@ -169,21 +182,24 @@ export default function AgregarProducto({
 
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validar()) return; // ─── NUEVO: corta si hay errores
+    if (!validar()) return;
     if (isSubmitting) return;
     setIsSubmitting(true);
-    console.log("producto a enviar: ", form);
+    const formConSucursal = { ...form, sucursalId: sucursalIdEfectivo };
+    console.log("producto a enviar: ", formConSucursal);
+
     try {
       const response = await axios.post<ProductoSucursal>(
         `${process.env.NEXT_PUBLIC_API_URL}/api/productos`,
-        form, 
+        formConSucursal, 
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         },
       );
       showToast("Producto guardado exitosamente.", "success");
       onProductoAgregado(response.data);
-      setForm({ ...emptyForm, sucursalId });
+      console.log("producto respuesta: ", response.data)
+      setForm({ ...emptyForm, sucursalId: sucursalIdEfectivo });
       onClose();
     } catch (error) {
       console.error("Error guardando producto:", error);
@@ -209,6 +225,36 @@ export default function AgregarProducto({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Registrar Nuevo Producto">
       <form className="space-y-4" onSubmit={handleGuardar}>
+
+        {/* ── Selector sucursal (solo superAdmin) ── */}
+        {isSuperAdmin && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+              Sucursal <span className="text-rose-500">*</span>
+            </label>
+            <select
+              value={sucursalSeleccionada}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setSucursalSeleccionada(id);
+                if (errors.sucursalId) setErrors((prev) => ({ ...prev, sucursalId: false }));
+              }}
+              className={`w-full px-4 py-2 bg-gray-50 border rounded-xl outline-none focus:border-brand-blue ${
+                errors.sucursalId ? "border-rose-400" : "border-gray-200"
+              }`}
+            >
+              <option value={0}>Seleccione una sucursal</option>
+              {sucursales.map((s) => (
+                <option key={s.sucursalId} value={s.sucursalId}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+            {errors.sucursalId && (
+              <p className="text-xs text-rose-500 font-medium">Debe seleccionar una sucursal</p>
+            )}
+          </div>
+        )}
 
         {/* ── Nombre con búsqueda ── */}
         <div className="relative space-y-1.5">

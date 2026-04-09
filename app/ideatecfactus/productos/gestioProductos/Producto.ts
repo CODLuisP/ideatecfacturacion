@@ -7,6 +7,7 @@ export interface Categoria {
 // ─── SucursalProducto (precio y stock por sucursal) ──────────
 export interface SucursalProducto {
   sucursalProductoId: number;
+  nomSucursal: string | null;
   precioUnitario: number;
   stock: number | null;
 }

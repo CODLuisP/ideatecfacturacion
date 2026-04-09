@@ -16,25 +16,28 @@ import EditarProducto from "./gestioProductos/EditarProducto";
 import { useProductosSucursal } from "./gestioProductos/useProductosSucursal";
 import { useCategoriasLista } from "./gestioProductos/useCategoriasLista";
 import { useAuth } from "@/context/AuthContext";
-import { useProductosBaseDisponiblesLista } from "./gestioProductos/useProductosBaseDisponiblesLista";
 import { useToast } from "@/app/components/ui/Toast";
 import { useProductosEmpresaLista } from "./gestioProductos/useProductosEmpresaLista";
-
-// 🔥 TODO: reemplazar con el sucursalId real del contexto/sesión
-const SUCURSAL_ID = 1;
+import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 
 export default function ProductosPage() {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
 
-  const { productosBase } = useProductosBaseDisponiblesLista();
+  //Productos de la sucursal actual
   const { productosSucursal, loadingSucursal, setProductosSucursal } = useProductosSucursal();
+
+  //Todos los productos de la emoresa o todas las sucursales 
   const { productosEmpresa, loadingEmpresa, setProductosEmpresa } = useProductosEmpresaLista();
 
-  const isSuperAdmin = user?.rol === "superadmin";
+  const isSuperAdmin = user?.rol === "admin";
   const productos = isSuperAdmin ? productosEmpresa : productosSucursal;
   const loadingProductos = isSuperAdmin ? loadingEmpresa : loadingSucursal;
   const setProductos = isSuperAdmin ? setProductosEmpresa : setProductosSucursal;
+
+  //filtro para superadmin
+  const { sucursales } = useSucursalRuc(isSuperAdmin); // solo fetcha si es superAdmin
+  const [filtroSucursal, setFiltroSucursal] = useState<string>("");
 
   const { categorias } = useCategoriasLista()
 
@@ -59,7 +62,7 @@ export default function ProductosPage() {
 
   // REEMPLAZA el bloque filtered:
   const filtrosAvanzadosActivos =
-    filtroStock || filtroAfectacion.length > 0 || filtroTipoProducto.length > 0;
+    filtroStock || filtroAfectacion.length > 0 || filtroTipoProducto.length > 0 || !!filtroSucursal;
 
   const filtered = productos.filter((p) => {
     const matchSearch =
@@ -80,7 +83,10 @@ export default function ProductosPage() {
       filtroTipoProducto.length === 0 ||
       filtroTipoProducto.includes(p.tipoProducto ?? "");
 
-    return matchSearch && matchCategoria && matchStock && matchAfectacion && matchTipo;
+    const matchSucursal =
+    !filtroSucursal || p.sucursalProducto.nomSucursal === filtroSucursal;
+
+    return matchSearch && matchCategoria && matchStock && matchAfectacion && matchTipo && matchSucursal;
   });
 
   const handleProductoEditado = (productoEditado: ProductoSucursal) => {
@@ -313,6 +319,39 @@ export default function ProductosPage() {
                 })}
               </div>
             </div>
+              
+            {/* filtro por suscursal si es superadmin */}
+            {isSuperAdmin && (
+            <>
+              <div className="w-px h-4 bg-gray-200 shrink-0" />
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">
+                  Sucursal
+                </span>
+                <div className="relative">
+                  <select
+                    value={filtroSucursal}
+                    onChange={(e) => setFiltroSucursal(e.target.value)}
+                    className={cn(
+                      "appearance-none pl-3 pr-8 py-1 text-xs font-medium border rounded-lg outline-none cursor-pointer transition-all",
+                      filtroSucursal
+                        ? "bg-blue-50 border-blue-300 text-blue-700"
+                        : "bg-white border-gray-200 text-gray-500"
+                    )}
+                  >
+                    <option value="">Todas</option>
+                    {sucursales.map((s) => (
+                      <option key={s.sucursalId} value={s.nombre}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            </>
+          )}
 
             {/* Limpiar — empujado a la derecha */}
             {filtrosAvanzadosActivos && (
@@ -323,6 +362,7 @@ export default function ProductosPage() {
                     setFiltroStock(false);
                     setFiltroAfectacion([]);
                     setFiltroTipoProducto([]);
+                    setFiltroSucursal("");
                   }}
                   className="text-xs text-gray-400 hover:text-rose-500 font-medium transition-colors whitespace-nowrap shrink-0"
                 >
@@ -363,7 +403,7 @@ export default function ProductosPage() {
         )}
 
         {!loadingProductos  && filtered.map((prod) => (
-          <Card key={prod.productoId} className="group hover:border-brand-blue transition-all">
+          <Card key={prod.sucursalProducto.sucursalProductoId} className="group hover:border-brand-blue transition-all">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -376,6 +416,13 @@ export default function ProductosPage() {
                 <p className="text-xs text-gray-500">
                   {prod.categoria?.categoriaNombre}
                 </p>
+                {
+                  isSuperAdmin && (
+                    <p className="text-xs text-gray-500 flex">
+                      <span className="font-bold">Sucursal: &nbsp; </span> {prod.sucursalProducto.nomSucursal}
+                    </p>
+                  )
+                }
               </div>
 
               <div className="flex gap-1">
@@ -431,8 +478,6 @@ export default function ProductosPage() {
         onClose={() => setIsNewOpen(false)}
         onProductoAgregado={(producto) => setProductos((prev) => [...prev, producto])}
         categorias={categorias}
-        productosBase={productosBase}
-        sucursalId={SUCURSAL_ID}
       />
       <EditarProducto
         isOpen={isEditOpen}
@@ -482,6 +527,3 @@ export default function ProductosPage() {
   );
 }
 
-function useProductosBaseLista(): { productosBase: any; } {
-  throw new Error("Function not implemented.");
-}
