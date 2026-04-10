@@ -4,7 +4,7 @@ import { ProductoSucursal } from './Producto'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 
-export function useProductosSucursal(sucursalIdOverride?: number | null) {
+export function useProductosSucursal(sucursalIdOverride?: number | null, enabled: boolean = true) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const [productosSucursal, setProductosSucursal] = useState<ProductoSucursal[]>([])
@@ -28,8 +28,8 @@ export function useProductosSucursal(sucursalIdOverride?: number | null) {
   }
 
   useEffect(() => {
-    if (accessToken) fetchProductosSucursal()
-  }, [accessToken, sucursalIdOverride])
+    if (accessToken && enabled) fetchProductosSucursal()
+  }, [accessToken, sucursalIdOverride, enabled])
 
   return { productosSucursal, loadingSucursal, setProductosSucursal, fetchProductosSucursal }
 }

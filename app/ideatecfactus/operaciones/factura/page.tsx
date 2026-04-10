@@ -12,6 +12,7 @@ import {
   UserRound,
   ClipboardList,
   ChevronLeft,
+  Info,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
@@ -741,21 +742,27 @@ export default function FacturaPage() {
 
   // ── Auto-calcular cuotas ─────────────────────────────────────
   useEffect(() => {
-    if (factura.tipoPago !== "Credito" && factura.tipoPago !== "CreditoInicial")
-      return;
+    if (factura.tipoPago !== 'Credito' && factura.tipoPago !== 'CreditoInicial') return;
     if (totales.total === 0) {
-      setCuotas((prev) => prev.map((c) => ({ ...c, monto: "" })));
+      setCuotas(prev => prev.map(c => ({ ...c, monto: '' })));
       return;
     }
-    const baseCalculo =
-      factura.tipoPago === "CreditoInicial"
-        ? Math.max(0, totales.total - totalPagado)
-        : totales.total;
+
+    // Restar detracción si aplica (solo en crédito)
+    const baseDetraccion = aplicarDetraccion ? detraccion.montoDetraccion : 0;
+    const basePagoInicial = factura.tipoPago === 'CreditoInicial' ? totalPagado : 0;
+    const baseCalculo = Math.max(0, totales.total - basePagoInicial - baseDetraccion);
+
+    // Distribuir uniformemente y ajustar última cuota para evitar error de redondeo
     const montoPorCuota = parseFloat((baseCalculo / numeroCuotas).toFixed(2));
-    setCuotas((prev) =>
-      prev.map((cuota) => ({ ...cuota, monto: String(montoPorCuota) })),
-    );
-  }, [totales.total, numeroCuotas, factura.tipoPago, totalPagado]);
+    const sumaAnterior = parseFloat((montoPorCuota * (numeroCuotas - 1)).toFixed(2));
+    const ultimaCuota = parseFloat((baseCalculo - sumaAnterior).toFixed(2));
+
+    setCuotas(prev => prev.map((cuota, idx) => ({
+      ...cuota,
+      monto: String(idx === numeroCuotas - 1 ? ultimaCuota : montoPorCuota),
+    })));
+  }, [totales.total, numeroCuotas, factura.tipoPago, totalPagado, aplicarDetraccion, detraccion.montoDetraccion]);
 
   // ── Sincronizar totales en factura ───────────────────────────
   useEffect(() => {
@@ -1365,33 +1372,33 @@ export default function FacturaPage() {
   };
 
   // ── Preparar y emitir ────────────────────────────────────────
-  const prepararFactura = () => ({
-    ...factura,
-    cliente: factura.cliente
-      ? {
-          ...factura.cliente,
-          tipoDocumento:
-            factura.cliente.tipoDocumento === "06"
-              ? "6"
-              : factura.cliente.tipoDocumento,
-        }
-      : factura.cliente,
-    tipoPago:
-      factura.tipoPago === "CreditoInicial" ? "Credito" : factura.tipoPago,
-    fechaEmision: fechaEmisionEditada
-      ? factura.fechaEmision
-      : formatoFechaActual().fechaHora,
-    horaEmision: fechaEmisionEditada
-      ? factura.horaEmision
-      : formatoFechaActual().fechaHora,
-    company: {
-      ...factura.company,
-      establecimientoAnexo:
-        sucursal?.codEstablecimiento ??
-        factura.company?.establecimientoAnexo ??
-        "0000",
-    },
-  });
+  const prepararFactura = () => {
+    const esCredito = factura.tipoPago === 'Credito' || factura.tipoPago === 'CreditoInicial';
+    const esCreditoInicial = factura.tipoPago === 'CreditoInicial';
+
+    // Base neta = total - pago inicial (si aplica) - detracción (si aplica)
+    const baseDetraccion = (esCredito && aplicarDetraccion) ? detraccion.montoDetraccion : 0;
+    const basePagoInicial = esCreditoInicial ? totalPagado : 0;
+    
+    const montoCredito = esCredito
+      ? parseFloat(Math.max(0, totales.total - basePagoInicial - baseDetraccion).toFixed(2))
+      : 0;
+
+    return {
+      ...factura,
+      cliente: factura.cliente
+        ? { ...factura.cliente, tipoDocumento: factura.cliente.tipoDocumento === '06' ? '6' : factura.cliente.tipoDocumento }
+        : factura.cliente,
+      tipoPago: factura.tipoPago === 'CreditoInicial' ? 'Credito' : factura.tipoPago,
+      fechaEmision: fechaEmisionEditada ? factura.fechaEmision : formatoFechaActual().fechaHora,
+      horaEmision: fechaEmisionEditada ? factura.horaEmision : formatoFechaActual().fechaHora,
+      company: {
+        ...factura.company,
+        establecimientoAnexo: sucursal?.codEstablecimiento ?? factura.company?.establecimientoAnexo ?? '0000',
+      },
+      montoCredito,
+    };
+  };
 
   const emitirComprobante = async () => {
     if (!detalles.length) {
@@ -2280,13 +2287,10 @@ export default function FacturaPage() {
                                       actualizarPago(i, "monto", "");
                                     }
                                   }}
-                                  disabled={
-                                    pago.medioPago === "Efectivo" &&
-                                    pagos.length === 1
-                                  }
                                   placeholder={montoRestante(i)}
+                                  disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial'}
                                   className={`w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
-                                  ${pago.medioPago === "Efectivo" && pagos.length === 1 ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+                                    ${pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                                 />
                                 {pagos.length > 1 && (
                                   <button
@@ -2850,7 +2854,7 @@ export default function FacturaPage() {
                           return (
                             <tr
                               key={i}
-                              className={`hover:bg-gray-50/50 ${esGratuito ? "bg-purple-50/30" : ""}`}
+                              className={`hover:bg-gray-50/50 ${esGratuito ? "bg-green-50/30" : ""}`}
                             >
                               <td className="px-2 py-1.5 text-gray-400">
                                 {i + 1}
@@ -3108,7 +3112,7 @@ export default function FacturaPage() {
                                     actualizarTipoAfectacion(i, e.target.value)
                                   }
                                   className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
-                                    ${esGratuito ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-gray-50 border-gray-200"}`}
+                                    ${esGratuito ? "bg-green-50 border-green-200 text-green-700" : "bg-gray-50 border-gray-200"}`}
                                 >
                                   <option value="10">10 - Gravado</option>
                                   <option value="20">20 - Exonerado</option>
@@ -3213,7 +3217,7 @@ export default function FacturaPage() {
                               {/* Precio final */}
                               <td className="px-2 py-1.5 text-right font-mono text-gray-700 text-xs">
                                 {esGratuito ? (
-                                  <span className="text-purple-500 text-[10px]">
+                                  <span className="text-green-500 text-[10px]">
                                     GRATUITO
                                   </span>
                                 ) : (
@@ -3247,14 +3251,15 @@ export default function FacturaPage() {
 
                 {/* Aviso gratuitas */}
                 {totales.hayGratuitas && (
-                  <div className="flex items-center gap-2 p-2.5 bg-purple-50 border border-purple-100 rounded-lg">
-                    <span className="text-[10px] text-purple-700">
-                      ℹ️ Los ítems gratuitos (11, 21, 31) tienen precio de venta{" "}
-                      <strong>S/ 0.00</strong>. El IGV del tipo 11 se informa a
-                      SUNAT pero no se cobra.
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-100 rounded-lg">
+                  <Info size={14} className="text-green-700 shrink-0" />
+                  <span className="text-[10px] text-green-700">
+                    Los ítems gratuitos (11, 21, 31) tienen precio de venta{" "}
+                    <strong>S/ 0.00</strong>. El IGV del tipo 11 se informa a
+                    SUNAT pero no se cobra.
+                  </span>
+                </div>
+              )}
               </div>
 
               {/* ── Bolsa Plástica — req 5 ── */}
@@ -3370,7 +3375,7 @@ export default function FacturaPage() {
                   {totales.gratuitas > 0 && (
                     <div className="flex justify-end gap-8 text-sm text-gray-500">
                       <span>Op. Gratuitas:</span>
-                      <span className="font-medium text-purple-600 w-24">
+                      <span className="font-medium text-green-600 w-24">
                         {simbolo} {totales.gratuitas.toFixed(2)}
                       </span>
                     </div>
@@ -3378,7 +3383,7 @@ export default function FacturaPage() {
                   {totales.igvGratuitas > 0 && (
                     <div className="flex justify-end gap-8 text-sm text-gray-500">
                       <span>IGV (Gratuito):</span>
-                      <span className="font-medium text-purple-500 w-24">
+                      <span className="font-medium text-green-500 w-24">
                         {simbolo} {totales.igvGratuitas.toFixed(2)}
                       </span>
                     </div>

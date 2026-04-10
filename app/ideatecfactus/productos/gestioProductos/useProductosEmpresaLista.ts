@@ -6,7 +6,7 @@ import { ProductoSucursal } from './Producto'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/app/components/ui/Toast'
 
-export function useProductosEmpresaLista() {
+export function useProductosEmpresaLista( enabled: boolean = true ) {
   const { showToast } = useToast()
   const { accessToken, user } = useAuth()
   const [productosEmpresa, setProductosEmpresa] = useState<ProductoSucursal[]>([])
@@ -30,8 +30,8 @@ export function useProductosEmpresaLista() {
   }
 
   useEffect(() => {
-    if (accessToken && user?.ruc) fetchProductosEmpresa()
-  }, [accessToken, user?.ruc])
+    if (accessToken && user?.ruc && enabled) fetchProductosEmpresa()
+  }, [accessToken, user?.ruc, enabled])
 
   return { productosEmpresa, loadingEmpresa, setProductosEmpresa, fetchProductosEmpresa }
 }

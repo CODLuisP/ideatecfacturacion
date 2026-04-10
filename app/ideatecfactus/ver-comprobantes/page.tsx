@@ -140,7 +140,7 @@ const DropdownFiltro = ({ label, value, options, onChange, colorMap }: DropdownF
             </button>
 
             {open && (
-                <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-[180px]">
+                <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-45">
                     {options.map(opt => (
                         <button
                             key={opt}

@@ -1,8 +1,8 @@
 "use client";
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo,  } from 'react';
 import axios from 'axios';
 import {
-  Search, Plus, Eye, Send, Edit2, Trash2, X,
+  Search, Plus, Send, Edit2, Trash2, X,
   ChevronDown
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
@@ -17,6 +17,8 @@ import { Direccion, Cliente } from './gestionClientes/Cliente';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 import { useClientesRuc } from './gestionClientes/useClientesRuc';
+import { useClientesSucursal } from './gestionClientes/useClientesSucursal';
+import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursalRuc';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const formatDireccion = (direcciones: Direccion[], tipoDocumentoId: string): string => {
@@ -46,12 +48,15 @@ const formatFecha = (fecha: string | null): string => {
 export default function ClientesPage() {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
-  //  TODO: reemplazar con el empresaruc real del contexto/sesión
-  const EMPRESA_RUC = "20601737583";
-  const SUCURSAL_ID = 1;
+  const isSuperAdmin = user?.rol === "superadmin";
 
-    // ── Cargar clientes desde la API ──
-  const { clientes, setClientes, loadingClientes } = useClientesRuc();
+  // Hook correcto según rol
+  const { clientes: clientesEmpresa, setClientes: setClientesEmpresa, loadingClientes: loadingEmpresa } = useClientesRuc(isSuperAdmin);
+  const { clientes: clientesSucursal, setClientes: setClientesSucursal, loadingClientes: loadingSucursal } = useClientesSucursal(undefined, !isSuperAdmin);
+
+  const clientes = isSuperAdmin ? clientesEmpresa : clientesSucursal;
+  const loadingClientes = isSuperAdmin ? loadingEmpresa : loadingSucursal;
+  const setClientes = isSuperAdmin ? setClientesEmpresa : setClientesSucursal;
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Activo' | 'Inactivo'>('Todos');
@@ -62,9 +67,20 @@ export default function ClientesPage() {
   const [clienteEditar, setClienteEditar] = useState<Cliente | null>(null);  
   const [eliminarCliente, setEliminarCliente] = useState<Cliente | null>(null);
 
+  //sucursal para superadmin
+  const { sucursales } = useSucursalRuc(isSuperAdmin);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number>(0);
+
+  //filtro por sucursales
+  const [filtroSucursal, setFiltroSucursal] = useState<number>(0);
+
+  const sucursalIdEfectivo = isSuperAdmin
+    ? sucursalSeleccionada
+    : parseInt(user?.sucursalID ?? "0");
+
   // ── Nuevo cliente form ──
   const nuevoClienteInicial = {
-    sucursalID: SUCURSAL_ID,
+    sucursalID: sucursalIdEfectivo ,
     tipoDocumentoId: '01',
     numeroDocumento: '',
     razonSocialNombre: '',
@@ -109,6 +125,10 @@ export default function ClientesPage() {
     const newErrors: Record<string, boolean> = {};
     const newLengthErrors: Record<string, string> = {};
 
+    if (isSuperAdmin && sucursalIdEfectivo === 0) {
+      newErrors.sucursalId = true;
+    }
+
     requiredFields.forEach(field => {
       const value = field.key.includes('.')
         ? field.key.split('.').reduce((o: any, k) => o?.[k], nuevoCliente)
@@ -149,7 +169,7 @@ export default function ClientesPage() {
         numeroDocumento: nuevoCliente.numeroDocumento,
         razonSocialNombre: nuevoCliente.razonSocialNombre,
         tipoDocumentoId: nuevoCliente.tipoDocumentoId,
-        sucursalID: SUCURSAL_ID
+        sucursalID: sucursalIdEfectivo
       };
 
       // ── DNI ──
@@ -191,12 +211,13 @@ export default function ClientesPage() {
           }
         };
       }
-      console.log("Cliente a enviar:", JSON.stringify(payload, null, 2));
+
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`, payload,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
       );
+      console.log("Cliente creado:", response.data);
       showToast('Cliente guardado exitosamente', 'success');
       setClientes(prev => [response.data, ...prev]);
       setNuevoCliente(nuevoClienteInicial);
@@ -225,6 +246,7 @@ export default function ClientesPage() {
     setNuevoCliente(nuevoClienteInicial);
     setErrors({});
     setLengthErrors({});
+    setSucursalSeleccionada(0);
     setIsNuevoOpen(false);
   };
 
@@ -269,8 +291,9 @@ export default function ClientesPage() {
     const estadoStr = c.estado ? 'Activo' : 'Inactivo';
     const matchStatus = filterStatus === 'Todos' || estadoStr === filterStatus;
     const matchTipo = filterTipo === 'Todos' || c.tipoDocumento.tipoDocumentoNombre === filterTipo;
-    return matchSearch && matchStatus && matchTipo;
-  }), [clientes, search, filterStatus, filterTipo]);
+    const matchSucursal = !filtroSucursal || c.sucursalID === filtroSucursal;
+    return matchSearch && matchStatus && matchTipo && matchSucursal;
+  }), [clientes, search, filterStatus, filterTipo, filtroSucursal]);
 
   const activeFilters = (filterStatus !== 'Todos' ? 1 : 0) + (filterTipo !== 'Todos' ? 1 : 0);
 
@@ -329,24 +352,50 @@ export default function ClientesPage() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* Filtro Estado */}
-          <div className="relative">
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
-              className={cn(
-                "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
-                filterStatus !== 'Todos'
-                  ? 'bg-blue-50 border-blue-300 text-blue-700'
-                  : 'bg-white border-gray-200 text-gray-600'
-              )}
-            >
-              <option value="Todos">Estado: Todos</option>
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+          {/* Filtro sucursal */}
+          {isSuperAdmin && (
+            <div className="relative">
+              <select
+                value={filtroSucursal}
+                 onChange={(e) => setFiltroSucursal(Number(e.target.value))}
+                className={cn(
+                  "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                  filtroSucursal
+                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    : "bg-white border-gray-200 text-gray-600"
+                )}
+              >
+                <option value="">Sucursal: Todas</option>
+                {sucursales.map((s) => (
+                  <option key={s.sucursalId} value={s.sucursalId}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          )} 
+
+          {/* Filtro Estado 
+            <div className="relative">
+              <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
+                className={cn(
+                  "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                  filterStatus !== 'Todos'
+                    ? 'bg-blue-50 border-blue-300 text-blue-700'
+                    : 'bg-white border-gray-200 text-gray-600'
+                )}
+              >
+                <option value="Todos">Estado: Todos</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div> 
+          */}
+
           {/* Filtro Tipo Doc */}
           <div className="relative">
             <select
@@ -369,7 +418,7 @@ export default function ClientesPage() {
           {/* Limpiar filtros */}
           {activeFilters > 0 && (
             <button
-              onClick={() => { setFilterStatus('Todos'); setFilterTipo('Todos'); }}
+              onClick={() => { setFilterStatus('Todos'); setFilterTipo('Todos'); setFiltroSucursal(0); }}
               className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors"
             >
               <X size={12} /> Limpiar ({activeFilters})
@@ -401,6 +450,7 @@ export default function ClientesPage() {
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Razón Social / Nombre</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nombre Comercial</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dirección</th>
+                {isSuperAdmin && (<th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sucursal</th>)}
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Correo</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Teléfono</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha Creación</th>
@@ -437,6 +487,11 @@ export default function ClientesPage() {
                   <td className="px-6 py-4 text-sm text-gray-600" title={formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}>
                     {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
                   </td>
+                  {isSuperAdmin && (
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {sucursales.find(s => s.sucursalId === client.sucursalID)?.nombre ?? "-"}
+                    </td>
+                  )}
                   <td className="px-6 py-4 text-sm text-gray-600">{client.correo ?? '-'}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{client.telefono ?? '-'}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{formatFecha(client.fechaCreacion)}</td>
@@ -489,6 +544,11 @@ export default function ClientesPage() {
         setLengthErrors={setLengthErrors}
         handleNuevoSubmit={handleNuevoSubmit}
         handleCancelarNuevo={handleCancelarNuevo}
+        isSuperAdmin={isSuperAdmin}
+        sucursales={sucursales}
+        sucursalSeleccionada={sucursalSeleccionada}
+        setSucursalSeleccionada={setSucursalSeleccionada}
+        errorSucursal={!!errors.sucursalId}
       />
     </div>
   );

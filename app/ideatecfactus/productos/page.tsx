@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Search, Upload, Plus, Edit2, Trash2, ChevronDown } from "lucide-react";
+import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench } from "lucide-react";
 import axios from "axios";
 
 import { Button } from "@/app/components/ui/Button";
@@ -23,14 +23,14 @@ import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursal
 export default function ProductosPage() {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
+  const isSuperAdmin = user?.rol === "superadmin";
 
   //Productos de la sucursal actual
-  const { productosSucursal, loadingSucursal, setProductosSucursal } = useProductosSucursal();
+  const { productosSucursal, loadingSucursal, setProductosSucursal } = useProductosSucursal(null, !isSuperAdmin);// solo fetcha si no es superAdmin
 
   //Todos los productos de la emoresa o todas las sucursales 
-  const { productosEmpresa, loadingEmpresa, setProductosEmpresa } = useProductosEmpresaLista();
+  const { productosEmpresa, loadingEmpresa, setProductosEmpresa } = useProductosEmpresaLista(isSuperAdmin); // solo fetcha si es superAdmin
 
-  const isSuperAdmin = user?.rol === "admin";
   const productos = isSuperAdmin ? productosEmpresa : productosSucursal;
   const loadingProductos = isSuperAdmin ? loadingEmpresa : loadingSucursal;
   const setProductos = isSuperAdmin ? setProductosEmpresa : setProductosSucursal;
@@ -199,7 +199,7 @@ export default function ProductosPage() {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-xl transition-all whitespace-nowrap",
                 filtrosAvanzadosActivos
-                  ? "bg-violet-50 border-violet-300 text-violet-700"
+                  ? "bg-green-50 border-green-300 text-green-700"
                   : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
               )}
             >
@@ -209,7 +209,7 @@ export default function ProductosPage() {
               </svg>
               Filtros avanzados
               {filtrosAvanzadosActivos && (
-                <span className="bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                <span className="bg-green-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                   {[filtroStock, ...filtroAfectacion, ...filtroTipoProducto].filter(Boolean).length}
                 </span>
               )}
@@ -245,7 +245,7 @@ export default function ProductosPage() {
                 type="checkbox"
                 checked={filtroStock}
                 onChange={(e) => setFiltroStock(e.target.checked)}
-                className="w-3.5 h-3.5 accent-violet-600"
+                className="w-3.5 h-3.5 accent-green-600"
               />
               <span className="text-xs font-medium text-gray-600 flex items-center gap-1 whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
@@ -293,9 +293,9 @@ export default function ProductosPage() {
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">Tipo</span>
               <div className="flex gap-1">
                 {[
-                  { value: "BIEN",     label: "📦 Bien" },
-                  { value: "SERVICIO", label: "⚙️ Servicio" },
-                ].map(({ value, label }) => {
+                  { value: "BIEN",     label: "Bien",     icon: <Package size={12} /> },
+                  { value: "SERVICIO", label: "Servicio", icon: <Wrench size={12} /> },
+                ].map(({ value, label, icon }) => {
                   const active = filtroTipoProducto.includes(value);
                   return (
                     <button
@@ -307,13 +307,13 @@ export default function ProductosPage() {
                         )
                       }
                       className={cn(
-                        "px-2.5 py-1 text-xs font-semibold border rounded-lg transition-all whitespace-nowrap",
+                        "flex items-center gap-1 px-2.5 py-1 text-xs font-semibold border rounded-lg transition-all whitespace-nowrap",
                         active
-                          ? "bg-violet-50 border-violet-300 text-violet-700"
+                          ? "bg-green-50 border-green-300 text-green-700"
                           : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
                       )}
                     >
-                      {label}
+                      {icon} {label}
                     </button>
                   );
                 })}
@@ -336,7 +336,7 @@ export default function ProductosPage() {
                     className={cn(
                       "appearance-none pl-3 pr-8 py-1 text-xs font-medium border rounded-lg outline-none cursor-pointer transition-all",
                       filtroSucursal
-                        ? "bg-blue-50 border-blue-300 text-blue-700"
+                        ? "bg-blue-50 border-blue-300 text-green-700"
                         : "bg-white border-gray-200 text-gray-500"
                     )}
                   >

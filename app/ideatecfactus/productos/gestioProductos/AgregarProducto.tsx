@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
@@ -12,6 +12,7 @@ import { generarCodigoProducto } from "./generarCodigoProducto";
 import { useProductosEmpresaLista } from "./useProductosEmpresaLista";
 import { useSucursalRuc } from "../../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { useProductosBaseDisponiblesLista } from "./useProductosBaseDisponiblesLista";
+import { useSearchProductosBaseDisponiblesLista } from "./useSearchProductosBaseDisponiblesLista";
 
 interface Props {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export default function AgregarProducto({
 }: Props) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
-  const isSuperAdmin = user?.rol === "admin";
+  const isSuperAdmin = user?.rol === "superadmin";
 
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
   const [productoExistente, setProductoExistente] = React.useState<ProductoBase | null>(null);
@@ -53,37 +54,50 @@ export default function AgregarProducto({
 
   //seleccionar sucursal para agregar si es superadmin
   const { sucursales } = useSucursalRuc(isSuperAdmin);
-
   const [sucursalSeleccionada, setSucursalSeleccionada] = React.useState<number>(0);
   const sucursalIdEfectivo = isSuperAdmin
     ? sucursalSeleccionada
     : parseInt(user?.sucursalID ?? "0");
 
   //Producto base sin estock ni precio de una empresa que no estan sucursal actual
-  const { productosBase } = useProductosBaseDisponiblesLista(sucursalIdEfectivo);
+  const [palabraBusqueda, setPalabraBusqueda] = useState("");
+  const { productosBase, loadingBase } = useSearchProductosBaseDisponiblesLista(
+    sucursalIdEfectivo,
+    palabraBusqueda
+  );
+
+  //const { productosBase } = useProductosBaseDisponiblesLista(sucursalIdEfectivo); sin usar la palbra 
 
   // ─── NUEVO: estado de errores ─────────────────────────────
   const [errors, setErrors] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
-    const sid = sucursalIdEfectivo;
     if (isOpen) {
-      setForm({ ...emptyForm, sucursalId: sid });
+      setForm({ ...emptyForm, sucursalId: sucursalIdEfectivo });
       setErrors({});
     } else {
-      setForm({ ...emptyForm, sucursalId: sid });
+      setForm({ ...emptyForm, sucursalId: 0 });
       setProductoExistente(null);
       setSugerencias([]);
       setShowSugerencias(false);
       setErrors({});
+      setSucursalSeleccionada(0); 
     }
-  }, [isOpen, sucursalSeleccionada]);
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (palabraBusqueda.trim().length > 0) {
+      setSugerencias(productosBase);
+      setShowSugerencias(productosBase.length > 0);
+    }
+  }, [productosBase]);
 
   const { productosEmpresa } = useProductosEmpresaLista()
 
   // REEMPLAZA ESTA FUNCIÓN COMPLETA:
   const handleNomProductoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    setPalabraBusqueda(value);
 
     // 👇 genera código automático usando el componente
     const codigoAuto = value.trim().length > 0
@@ -100,12 +114,6 @@ export default function AgregarProducto({
       setShowSugerencias(false);
       return;
     }
-
-    const matches = productosBase.filter((p) =>
-      p.nomProducto.toLowerCase().includes(value.toLowerCase())
-    );
-    setSugerencias(matches);
-    setShowSugerencias(matches.length > 0);
   };
 
   const handleSeleccionarSugerencia = (prod: ProductoBase) => {

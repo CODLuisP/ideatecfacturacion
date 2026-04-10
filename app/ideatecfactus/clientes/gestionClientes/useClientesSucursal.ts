@@ -1,21 +1,24 @@
-// useClientesRuc.ts
+// useClientesSucursal.ts
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 import { Cliente } from './Cliente';
 
-export function useClientesRuc(enabled: boolean = true) {
+export function useClientesSucursal(sucursalId?: number, enabled: boolean = true) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loadingClientes, setLoadingClientes] = useState(false)
 
+  const idToUse = sucursalId ?? parseInt(user?.sucursalID ?? "0");
+
   const fetchClientes = async () => {
+    if (!idToUse) return;
     setLoadingClientes(true)
     try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/ruc/${user?.ruc}`,
+      const res = await axios.get<Cliente[]>(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/sucursal/${idToUse}`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
@@ -31,7 +34,7 @@ export function useClientesRuc(enabled: boolean = true) {
 
   useEffect(() => {
     if (accessToken && enabled) fetchClientes()
-  }, [accessToken, enabled])
+  }, [accessToken, idToUse, enabled])
 
   return { clientes, loadingClientes, setClientes, fetchClientes }
 }

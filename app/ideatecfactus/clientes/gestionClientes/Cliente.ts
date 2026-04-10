@@ -15,6 +15,7 @@ export interface TipoDocumento {
 
 export interface Cliente {
   clienteId: number
+  sucursalID: number
   razonSocialNombre: string
   numeroDocumento: string
   nombreComercial: string | null

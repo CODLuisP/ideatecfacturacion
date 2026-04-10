@@ -5,6 +5,7 @@ import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { useToast } from "@/app/components/ui/Toast";
+import { Sucursal } from "../../operaciones/boleta/gestionBoletas/Boleta";
 
 interface AgregarClienteProps {
   isOpen: boolean;
@@ -17,6 +18,11 @@ interface AgregarClienteProps {
   handleNuevoSubmit: (e: React.FormEvent) => void;
   handleCancelarNuevo: () => void;
   isSubmitting: boolean;
+  isSuperAdmin: boolean;
+  sucursales: Sucursal[];
+  sucursalSeleccionada: number;
+  setSucursalSeleccionada: React.Dispatch<React.SetStateAction<number>>;
+  errorSucursal: boolean;
 }
 
 export const AgregarCliente: React.FC<AgregarClienteProps> = ({
@@ -30,6 +36,11 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
   handleNuevoSubmit,
   handleCancelarNuevo,
   isSubmitting,
+  isSuperAdmin,
+  sucursales,
+  sucursalSeleccionada,
+  setSucursalSeleccionada,
+  errorSucursal,
   }) => {
 
   const { showToast } = useToast();
@@ -114,6 +125,35 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
     title="Registrar Nuevo Cliente"
   >
     <form className="space-y-4" onSubmit={handleNuevoSubmit}>
+
+      {isSuperAdmin && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+            Sucursal <span className="text-rose-500">*</span>
+          </label>
+          <select
+            value={sucursalSeleccionada}
+            onChange={(e) => {
+          setSucursalSeleccionada(Number(e.target.value));
+            if (errors.sucursalId) setErrors((prev) => ({ ...prev, sucursalId: false }));
+          }}
+            className={`w-full px-4 py-2 bg-gray-50 border rounded-xl outline-none focus:border-brand-blue ${
+              errorSucursal ? "border-rose-400" : "border-gray-200"
+            }`}
+          >
+            <option value={0}>Seleccione una sucursal</option>
+            {sucursales.map((s) => (
+              <option key={s.sucursalId} value={s.sucursalId}>
+                {s.nombre}
+              </option>
+            ))}
+          </select>
+          {errorSucursal && (
+            <p className="text-xs text-rose-500 font-medium">Debe seleccionar una sucursal</p>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-gray-500 uppercase">
@@ -182,6 +222,7 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
           </div>
         </div>
       </div>
+
       <InputBase
         label={
           nuevoCliente.tipoDocumentoId === "06"
