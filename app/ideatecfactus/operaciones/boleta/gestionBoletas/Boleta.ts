@@ -136,10 +136,14 @@ export interface Sucursal {
   correlativoFactura: number
   serieBoleta: string
   correlativoBoleta: number
-  serieNotaCredito: string
-  correlativoNotaCredito: number
-  serieNotaDebito: string
-  correlativoNotaDebito: number
+  serieNotaCreditoFactura: string
+  correlativoNotaCreditoFactura: number
+  serieNotaCreditoBoleta: string
+  correlativoNotaCreditoBoleta: number
+  serieNotaDebitoFactura: string
+  correlativoNotaDebitoFactura: number
+  serieNotaDebitoBoleta: string
+  correlativoNotaDebitoBoleta: number
   serieGuiaRemision: string
   correlativoGuiaRemision: number
   serieGuiaTransportista: string
