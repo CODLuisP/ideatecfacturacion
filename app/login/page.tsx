@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 
 import IncaPattern from "../components/IncaPattern";
-import { useAuth } from "@/context/AuthContext";
 
 // ─── Enums & Interfaces ────────────────────────────────────────────────────────
 
@@ -75,7 +74,7 @@ const Modal: React.FC<{
         onClick={onClose}
       />
       {/* Panel */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors z-10"
@@ -295,13 +294,13 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
   return (
     <div className="overflow-hidden rounded-2xl">
       {/* Header */}
-      <div className="bg-linear-to-br from-blue-900 to-blue-800 p-6 text-white">
+     <div className="bg-blue-900 p-6 text-white">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
             <PlayCircle size={22} />
           </div>
           <div>
-            <h3 className="text-base font-bold">Demo de IDEATEC</h3>
+            <h3 className="text-base font-bold">Demo de FACTUNET</h3>
             <p className="text-blue-200 text-xs">
               Sin compromiso, 100% gratuito
             </p>
@@ -317,18 +316,18 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
         {/* Acceso rápido con cuenta demo */}
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <p className="text-xs font-bold text-amber-800 mb-1 uppercase tracking-wide">
-            ⚡ Acceso Inmediato
+            Acceso Inmediato
           </p>
           <p className="text-sm text-amber-700 mb-3">
             Prueba la plataforma ahora mismo con nuestra cuenta de demostración.
           </p>
           <div className="flex gap-2 text-xs text-amber-800 bg-amber-100 rounded-lg p-2.5 font-mono mb-3">
             <span>
-              Usuario: <strong>demo</strong>
+              Usuario:<strong>demo</strong>
             </span>
-            <span>·</span>
+            <span>-</span>
             <span>
-              Contraseña: <strong>demo123</strong>
+              Contraseña:<strong>demo123</strong>
             </span>
           </div>
           <button
@@ -399,6 +398,9 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
           </button>
         </form>
       </div>
+
+
+      
     </div>
   );
 };
@@ -491,7 +493,7 @@ const SupportModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       <div className="mt-5 bg-slate-50 rounded-xl p-4">
         <p className="text-xs font-bold text-slate-700 mb-1">
-          📚 Base de Conocimiento
+          Base de Conocimiento
         </p>
         <p className="text-xs text-slate-500 mb-3">
           Encuentra respuestas rápidas en nuestra documentación.
@@ -652,6 +654,27 @@ const LoginPage: React.FC = () => {
   const [apiError, setApiError] = useState<string>("");
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
+  // Cargar credenciales guardadas al montar el componente
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("rememberedCredentials");
+      if (saved) {
+        const { identifier, password } = JSON.parse(saved) as {
+          identifier: string;
+          password: string;
+        };
+        setFormData((prev) => ({
+          ...prev,
+          identifier: identifier ?? "",
+          password: password ?? "",
+          rememberMe: true,
+        }));
+      }
+    } catch {
+      // Si hay algún error leyendo localStorage, ignorar silenciosamente
+    }
+  }, []);
+
   const validate = (name: string, value: string) => {
     let error = "";
     if (name === "identifier" && !value)
@@ -702,12 +725,19 @@ const LoginPage: React.FC = () => {
         return;
       }
       if (result?.ok) {
-        setStatus(LoginStatus.SUCCESS);
-        setTimeout(() => {
-          router.push("/ideatecfactus/dashboard");
-        }, 1000);
-      }
-      if (result?.ok) {
+        // Guardar o borrar credenciales según la opción de "Recordarme"
+        if (formData.rememberMe) {
+          localStorage.setItem(
+            "rememberedCredentials",
+            JSON.stringify({
+              identifier: formData.identifier,
+              password: formData.password,
+            })
+          );
+        } else {
+          localStorage.removeItem("rememberedCredentials");
+        }
+
         setStatus(LoginStatus.SUCCESS);
         setTimeout(() => {
           window.location.href = "/ideatecfactus/dashboard";
@@ -769,13 +799,14 @@ const LoginPage: React.FC = () => {
           <div className="w-full max-w-md mx-auto space-y-8 relative z-10">
             {/* Logo */}
             <div className="flex items-center gap-2 mb-8">
-              <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white shadow-lg">
-                <Building2 size={24} />
+              <div>
+                <img src="/logopng.png" alt="" className="w-22 h-22"/>
               </div>
-              <h1 className="text-2xl font-extrabold text-blue-900 tracking-tight">
-                IDEA<span className="text-red-600">TEC</span>
+              <h1 className="text-2xl font-extrabold text-blue-900 tracking-[0.02em] ">
+                FACTU<span className="text-red-600">NET</span>
               </h1>
             </div>
+
 
             {/* Main Content */}
             <div>
@@ -885,13 +916,13 @@ const LoginPage: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <label className="flex items-center group cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="rememberMe"
-                      className="w-5 h-5 text-blue-900 border-slate-300 rounded focus:ring-blue-500"
-                      checked={formData.rememberMe}
-                      onChange={handleChange}
-                    />
+              <input
+  type="checkbox"
+  name="rememberMe"
+  className="w-5 h-5 rounded focus:ring-blue-900 accent-blue-900"
+  checked={formData.rememberMe}
+  onChange={handleChange}
+/>
                     <span className="ml-2.5 text-sm font-medium text-slate-600">
                       Recordarme
                     </span>
@@ -978,10 +1009,10 @@ const LoginPage: React.FC = () => {
                 La Facturación
                 <span className="text-red-500 italic">
                   {" "}
-                  más inteligente
+                  más confiable
                 </span>{" "}
                 <br />
-                del Perú.
+                 del Perú.
               </h3>
               <p className="text-blue-200 text-[14px] mt-4 leading-relaxed max-w-lg">
                 Optimiza la gestión tributaria de tu empresa con cumplimiento
@@ -1000,7 +1031,7 @@ const LoginPage: React.FC = () => {
                 {
                   icon: <ShieldCheck size={20} />,
                   color: "bg-green-500/20 text-green-400",
-                  title: "Seguridad Bancaria",
+                  title: "Seguridad",
                   desc: "Tus datos empresariales protegidos con los estándares más altos de encriptación.",
                 },
                 {
@@ -1052,7 +1083,7 @@ const LoginPage: React.FC = () => {
               </div>
               <p className="text-blue-200 text-xs lg:text-sm">
                 <span className="text-white font-bold">Más de 5,000</span>{" "}
-                empresas peruanas <br /> ya confían en IDEATEC.
+                empresas peruanas <br /> ya confían en FACTUNET.
               </p>
             </div>
           </div>

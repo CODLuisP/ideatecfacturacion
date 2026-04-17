@@ -376,6 +376,7 @@ export default function SunatPage() {
             ruc={user?.ruc ?? ''}
             initialData={companyData}
             loadingInitial={loadingCompany}
+            logoBase64={user?.logoBase64 ?? null}
           />
         </div>
 

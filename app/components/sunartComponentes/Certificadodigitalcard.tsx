@@ -23,6 +23,7 @@ interface CertificadoDigitalCardProps {
   ruc: string;
   initialData?: CompanyData | null;
   loadingInitial?: boolean;
+  logoBase64?: string | null; 
 }
 
 // ─── Parse cert expiry from PEM base64 ───────────────────────────────────────
@@ -179,6 +180,7 @@ export function CertificadoDigitalCard({
   ruc,
   initialData,
   loadingInitial,
+  logoBase64, 
 }: CertificadoDigitalCardProps) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
@@ -323,7 +325,7 @@ export function CertificadoDigitalCard({
       setStep("saving");
       await axios.put(
         `http://localhost:5004/api/companies/${ruc}`,
-        { certificadoPem: pem, certificadoPassword: certPasswordInput },
+        { certificadoPem: pem, certificadoPassword: certPasswordInput, logoBase64: logoBase64 ?? null,  },
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
