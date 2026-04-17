@@ -96,7 +96,7 @@ function StatStrip({
 function SeriesBadge({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase">
+      <span className="text-[9px] font-semibold  text-gray-400 uppercase">
         {label}
       </span>
       <span
@@ -176,13 +176,13 @@ function SucursalCard({
 
         {/* Dirección */}
         <p className="flex items-start gap-1.5 text-xs text-gray-400 mb-4">
-          <MapPin className="w-3 h-3 mt-0.5 shrink-0 text-gray-300" />
+          <MapPin className="w-3 h-3 mt-0.5 shrink-0 text-gray-800" />
           {s.direccion || "Sin dirección registrada"}
         </p>
 
         {/* Series */}
         <div className="border-t border-gray-100 pt-3 mb-4">
-          <p className="text-[9px] font-semibold tracking-widest text-gray-400 uppercase mb-2.5">
+          <p className="text-[10px] font-semibold  text-gray-600 uppercase mb-2.5">
             Series de comprobantes
           </p>
           <div className="grid grid-cols-5 gap-2">
@@ -210,7 +210,7 @@ function SucursalCard({
             {canManage && (
               <button
                 onClick={onSeries}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100 hover:bg-violet-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-100 hover:bg-green-100 transition-colors"
               >
                 <FileText className="w-3 h-3" />
                 Series

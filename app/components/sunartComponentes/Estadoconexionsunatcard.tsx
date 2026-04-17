@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Zap, WifiOff, AlertTriangle, CheckCircle2, FileJson, AlertCircle, RefreshCw } from "lucide-react";
 import { Card } from "@/app/components/ui/Card";
 import { cn } from "@/app/utils/cn";
+import { ApisSunat } from "@/app/utils/ApisSunat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ConnectionStatus {
@@ -155,7 +156,7 @@ export function EstadoConexionSunatCard({
 
     const start = Date.now();
     try {
-      const res = await fetch("/api/auth/sunat", {
+      const res = await fetch(ApisSunat.checkConnection, {
         method: "GET",
         signal: AbortSignal.timeout(8000),
       });

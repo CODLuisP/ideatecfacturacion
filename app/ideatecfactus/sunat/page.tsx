@@ -13,6 +13,7 @@ import { cn } from '@/app/utils/cn';
 import { CertificadoDigitalCard } from '@/app/components/sunartComponentes/Certificadodigitalcard';
 import { useAuth } from '@/context/AuthContext';
 import { EstadoConexionSunatCard } from '@/app/components/sunartComponentes/Estadoconexionsunatcard';
+import { ApisSunat } from '@/app/utils/ApisSunat';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Config {
@@ -288,7 +289,7 @@ export default function SunatPage() {
     const fetchCompany = async () => {
       setLoadingCompany(true);
       try {
-        const res = await axios.get(`http://localhost:5004/api/companies/${user.ruc}`, {
+        const res = await axios.get(ApisSunat.getCompany(user.ruc), {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         const data = res.data;
@@ -346,7 +347,7 @@ export default function SunatPage() {
             logoBase64:   user?.logoBase64   ?? null,
           };
 
-      await axios.put(`http://localhost:5004/api/companies/${user!.ruc}`, body, {
+      await axios.put(ApisSunat.updateCompany(user!.ruc), body, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setEnvironment(config.environment);
