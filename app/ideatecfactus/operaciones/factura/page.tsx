@@ -2477,6 +2477,20 @@ export default function FacturaPage() {
                         </div>
                       ))}
                     </div>
+                    {/* Monto base informativo debajo de cuotas */}
+                    <div className="flex justify-end text-xs pt-2 gap-2 border-t border-gray-100">
+                      <span className="text-gray-400">
+                        {aplicarDetraccion ? 'Monto base crédito después de detracción: ' : 'Monto base crédito: '}
+                      </span>
+                      <span className="font-semibold text-brand-blue">
+                        {simbolo} {Math.max(
+                          0,
+                          totales.total
+                          - (aplicarDetraccion ? detraccion.montoDetraccion : 0)
+                          - (factura.tipoPago === 'CreditoInicial' ? totalPagado : 0)
+                        ).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 )}
 

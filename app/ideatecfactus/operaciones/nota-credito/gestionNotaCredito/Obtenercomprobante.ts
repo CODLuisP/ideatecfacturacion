@@ -1,5 +1,7 @@
-export interface FacturaCliente {
-  clienteId: number | null
+// ── Interfaces para la respuesta de GET /api/Comprobantes/{ruc}/{serie}/{correlativo} ──
+
+export interface ComprobanteCliente {
+  clienteId: number
   tipoDocumento: string
   numeroDocumento: string
   razonSocial: string
@@ -10,7 +12,7 @@ export interface FacturaCliente {
   distrito: string
 }
 
-export interface FacturaCompany {
+export interface ComprobanteCompany {
   empresaId: number
   numeroDocumento: string
   razonSocial: string
@@ -23,10 +25,12 @@ export interface FacturaCompany {
   distrito: string
 }
 
-export interface FacturaDetalle {
+export interface ComprobanteDetalle {
+  detalleId: number
+  comprobanteId: number
   item: number
-  productoId: number | null
-  codigo: string | null
+  productoId: number
+  codigo: string
   descripcion: string
   cantidad: number
   unidadMedida: string
@@ -45,32 +49,33 @@ export interface FacturaDetalle {
   factorIcbper: number
 }
 
-export interface FacturaPago {
+export interface ComprobantePago {
+  comprobanteId: number
   medioPago: string
   monto: number
   fechaPago: string
-  numeroOperacion: string
-  entidadFinanciera: string
+  numeroOperacion: string | null
+  entidadFinanciera: string | null
   observaciones: string
 }
 
-export interface FacturaCuota {
+export interface ComprobanteCuota {
+  comprobanteId: number
   numeroCuota: string
   monto: number
   fechaVencimiento: string
+  montoPagado: number | null
+  fechaPago: string | null
+  estado: string | null
 }
 
-export interface FacturaLegend {
+export interface ComprobanteLegend {
   code: string
   value: string
 }
 
-export interface FacturaGuia {
-  guiaNumeroCompleto: string
-  guiaTipoDoc: string
-}
-
-export interface FacturaDetraccion {
+export interface ComprobanteDetraccion {
+  comprobanteID: number
   codigoBienDetraccion: string
   codigoMedioPago: string
   cuentaBancoDetraccion: string
@@ -79,20 +84,21 @@ export interface FacturaDetraccion {
   observacion: string
 }
 
-export interface Factura {
+export interface ComprobanteObtenido {
   ublVersion: string
   tipoOperacion: string
-  tipoComprobante: string
+  tipoComprobante: string       // "01" = Factura, "03" = Boleta
   serie: string
   correlativo: string
+  numeroCompleto: string
+  tipoCambio: number
   fechaEmision: string
   horaEmision: string
   fechaVencimiento: string
   tipoMoneda: string
-  tipoCambio?: number
   tipoPago: string
-  cliente: FacturaCliente
-  company: FacturaCompany
+  cliente: ComprobanteCliente
+  company: ComprobanteCompany
   codigoTipoDescGlobal: string
   descuentoGlobal: number
   totalOperacionesGravadas: number
@@ -109,35 +115,19 @@ export interface Factura {
   subTotal: number
   importeTotal: number
   montoCredito: number
-  details: FacturaDetalle[]
-  pagos: FacturaPago[]
-  cuotas: FacturaCuota[]
-  legends: FacturaLegend[]
-  guias: FacturaGuia[]
-  detracciones: FacturaDetraccion[]
-}
-
-export interface Sucursal {
-  sucursalId: number
-  empresaRuc: string
-  codEstablecimiento: string
-  nombre: string
-  direccion: string
-  serieFactura: string
-  correlativoFactura: number
-  serieBoleta: string
-  correlativoBoleta: number
-  serieNotaCreditoFactura: string
-  correlativoNotaCreditoFactura: number
-  serieNotaCreditoBoleta: string
-  correlativoNotaCreditoBoleta: number
-  serieNotaDebitoFactura: string
-  correlativoNotaDebitoFactura: number
-  serieNotaDebitoBoleta: string
-  correlativoNotaDebitoBoleta: number
-  serieGuiaRemision: string
-  correlativoGuiaRemision: number
-  serieGuiaTransportista: string
-  correlativoGuiaTransportista: number
-  estado: boolean
+  details: ComprobanteDetalle[]
+  pagos: ComprobantePago[]
+  cuotas: ComprobanteCuota[]
+  legends: ComprobanteLegend[]
+  guias: any[]
+  detracciones: ComprobanteDetraccion[]
+  estadoSunat: string
+  codigoHashCPE: string | null
+  codigoRespuestaSunat: string
+  mensajeRespuestaSunat: string
+  fechaEnvioSunat: string
+  usuarioCreacion: string | null
+  fechaCreacion: string
+  usuarioModificacion: string | null
+  fechaModificacion: string
 }
