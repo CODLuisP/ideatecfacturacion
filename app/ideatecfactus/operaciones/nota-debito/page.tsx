@@ -52,12 +52,15 @@ interface DetalleEditable {
 const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): DetalleEditable => {
   const es10 = d.tipAfeIgv === 10;
   const pct = d.porcentajeIgv || 18;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  
   const mtoValorUnitario = es10
     ? parseFloat((montoConIgv / (1 + pct / 100)).toFixed(6))
     : montoConIgv;
-  const mtoBaseIgv = parseFloat((mtoValorUnitario * d.cantidad).toFixed(2));
-  const igv = es10 ? parseFloat(((mtoBaseIgv * pct) / 100).toFixed(2)) : 0;
-  const totalVentaItem = parseFloat((mtoBaseIgv + igv).toFixed(2));
+  const mtoBaseIgv = round2(mtoValorUnitario * d.cantidad);
+  const igv = es10 ? round2(montoConIgv * d.cantidad - mtoBaseIgv) : 0;
+  const totalVentaItem = round2(montoConIgv * d.cantidad);
+
   return {
     ...d,
     _montoConIgv: montoConIgv,
@@ -65,7 +68,7 @@ const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): De
     mtoBaseIgv,
     igv,
     mtoValorVenta: mtoBaseIgv,
-    mtoPrecioUnitario: parseFloat((mtoValorUnitario * (1 + pct / 100)).toFixed(2)),
+    mtoPrecioUnitario: round2(mtoValorUnitario * (1 + pct / 100)),
     totalVentaItem,
   };
 };
@@ -208,13 +211,24 @@ export default function NotaDebitoPage() {
       _precioVentaOriginal: d.precioVenta,
     }));
     setDetallesOriginales(originales);
-    if (codMotivo) setDetalles(construirDetallesPorMotivo(codMotivo, originales, incluyePenalidad));
+    if (codMotivo) {
+      if (codMotivo === "01" && comprobante?.tipoPago === "Contado") {
+        setDetalles(originales.map((d) => ({ ...d })));
+      } else {
+        setDetalles(construirDetallesPorMotivo(codMotivo, originales, incluyePenalidad));
+        }
+      }
   }, [comprobante]);
 
   useEffect(() => {
     if (!codMotivo || !detallesOriginales.length) return;
+    // Motivo 01 con contado: no generar ítems
+    if (codMotivo === "01" && comprobante?.tipoPago === "Contado") {
+      setDetalles(detallesOriginales.map((d) => ({ ...d })));
+      return;
+    }
     setDetalles(construirDetallesPorMotivo(codMotivo, detallesOriginales, incluyePenalidad));
-  }, [codMotivo]);
+  }, [codMotivo, comprobante]);
 
   // ── Toggle penalidad (motivo 03) ─────────────────────────────
   useEffect(() => {
@@ -368,6 +382,10 @@ export default function NotaDebitoPage() {
         numDoc: comprobante.cliente.numeroDocumento,
         rznSocial: comprobante.cliente.razonSocial,
         address: clienteDireccion,
+        clienteCorreo: correoCliente || undefined,
+        enviadoPorCorreo: enviarCorreo,
+        clienteWhatsApp: telefonoCliente || undefined,
+        enviadoPorWhatsApp: enviarWhatsapp,
       },
       formaPago: { moneda: comprobante.tipoMoneda, tipo: comprobante.tipoPago === "Credito" ? "Credito" : "Contado" },
       mtoOperGravadas: totales.mtoOperGravadas,
@@ -388,6 +406,7 @@ export default function NotaDebitoPage() {
         totalVentaItem: d.totalVentaItem, icbper: d.icbper, factorIcbper: d.factorIcbper,
       })),
       legends: [{ code: "1000", value: numeroALetras(totales.mtoImpVenta, moneda) }],
+      usuarioCreacion: Number(user?.id ?? 0),
     };
   };
 
@@ -834,7 +853,8 @@ export default function NotaDebitoPage() {
                               <td className="px-2 py-1.5">
                                 <input type="text" value={d.descripcion}
                                   onChange={(e) => actualizarDescripcion(i, e.target.value)}
-                                  className="w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
+                                  disabled={codMotivo === "01" && comprobante?.tipoPago === "Contado"}
+                                  className="w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed" />
                               </td>
 
                               {/* U.M. */}
@@ -862,7 +882,8 @@ export default function NotaDebitoPage() {
                                 <div className="space-y-0.5">
                                   <input type="number" min={0} step="0.01" value={d._montoConIgv ?? 0}
                                     onChange={(e) => actualizarMontoConIgv(i, Number(e.target.value))}
-                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono" />
+                                    disabled={codMotivo === "01" && comprobante?.tipoPago === "Contado"}
+                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono disabled:opacity-50 disabled:cursor-not-allowed" />
                                   {/* Precio venta original — solo motivo 02 */}
                                   {codMotivo === "02" && d._precioVentaOriginal !== undefined && (
                                     <p className="text-[9px] text-right text-gray-400">
@@ -1025,16 +1046,16 @@ export default function NotaDebitoPage() {
                 )}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-sky-700 bg-white hover:bg-sky-500 hover:text-white active:scale-95 border border-sky-300 hover:border-sky-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
                   <button type="button"
-                    onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `notadebito-${serieND}-${correlativoDisplay}.pdf`; a.click(); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-500 hover:text-white active:scale-95 border border-emerald-300 hover:border-emerald-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `${empresa?.numeroDocumento}-08-${serieND}-${correlativoDisplay}.pdf`; a.click(); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
                   <button type="button" onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-violet-700 bg-white hover:bg-violet-500 hover:text-white active:scale-95 border border-violet-300 hover:border-violet-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
                     <Printer className="w-3.5 h-3.5" /> Imprimir
                   </button>
                 </div>

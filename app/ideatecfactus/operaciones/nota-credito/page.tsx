@@ -34,7 +34,7 @@ const MOTIVOS_NC = [
   { code: "10", label: "Otros conceptos" },
 ];
 
-const MOTIVOS_DEVOLUCION_STOCK = ["01", "06", "07"];
+const MOTIVOS_DEVOLUCION_STOCK = ["01", "02", "06", "07"];
 
 // ── Interface local para detalles editables ──────────────────
 interface DetalleEditable {
@@ -86,12 +86,15 @@ const mapearDetalle = (d: ComprobanteObtenido["details"][0]): DetalleEditable =>
 const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): DetalleEditable => {
   const es10 = d.tipAfeIgv === 10;
   const pct = d.porcentajeIgv || 18;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
   const mtoValorUnitario = es10
     ? parseFloat((montoConIgv / (1 + pct / 100)).toFixed(6))
     : montoConIgv;
-  const mtoBaseIgv = parseFloat((mtoValorUnitario * d.cantidad).toFixed(2));
-  const igv = es10 ? parseFloat(((mtoBaseIgv * pct) / 100).toFixed(2)) : 0;
-  const totalVentaItem = parseFloat((mtoBaseIgv + igv).toFixed(2));
+  const mtoBaseIgv = round2(mtoValorUnitario * d.cantidad);
+  const igv = es10 ? round2(montoConIgv * d.cantidad - mtoBaseIgv) : 0;
+  const totalVentaItem = round2(montoConIgv * d.cantidad);
+
   return {
     ...d,
     _montoConIgv: montoConIgv,
@@ -99,7 +102,7 @@ const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): De
     mtoBaseIgv,
     igv,
     mtoValorVenta: mtoBaseIgv,
-    mtoPrecioUnitario: parseFloat((mtoValorUnitario * (1 + pct / 100)).toFixed(2)),
+    mtoPrecioUnitario: round2(mtoValorUnitario * (1 + pct / 100)),
     totalVentaItem,
   };
 };
@@ -385,6 +388,10 @@ export default function NotaCreditoPage() {
         numDoc: comprobante.cliente.numeroDocumento,
         rznSocial: comprobante.cliente.razonSocial,
         address: clienteDireccion,
+        clienteCorreo: correoCliente || undefined,
+        enviadoPorCorreo: enviarCorreo,
+        clienteWhatsApp: telefonoCliente || undefined,
+        enviadoPorWhatsApp: enviarWhatsapp,
       },
       formaPago: { moneda: comprobante.tipoMoneda, tipo: comprobante.tipoPago === "Credito" ? "Credito" : "Contado" },
       mtoOperGravadas: totales.mtoOperGravadas,
@@ -405,6 +412,7 @@ export default function NotaCreditoPage() {
         totalVentaItem: d.totalVentaItem, icbper: d.icbper, factorIcbper: d.factorIcbper,
       })),
       legends: [{ code: "1000", value: numeroALetras(totales.mtoImpVenta, moneda) }],
+      usuarioCreacion: Number(user?.id ?? 0),
     };
   };
 
@@ -1160,16 +1168,16 @@ const actualizarStockDevolucion = async () => {
                 )}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-sky-700 bg-white hover:bg-sky-500 hover:text-white active:scale-95 border border-sky-300 hover:border-sky-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
                   <button type="button"
-                    onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `notacredito-${serieNC}-${correlativoDisplay}.pdf`; a.click(); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-500 hover:text-white active:scale-95 border border-emerald-300 hover:border-emerald-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `${empresa?.numeroDocumento}-07-${serieNC}-${correlativoDisplay}.pdf`; a.click(); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
                   <button type="button" onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-violet-700 bg-white hover:bg-violet-500 hover:text-white active:scale-95 border border-violet-300 hover:border-violet-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
                     <Printer className="w-3.5 h-3.5" /> Imprimir
                   </button>
                 </div>
