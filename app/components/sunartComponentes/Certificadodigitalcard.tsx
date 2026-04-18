@@ -11,6 +11,7 @@ import { Modal }    from "@/app/components/ui/Modal";
 import { cn }       from "@/app/utils/cn";
 import { useToast } from "@/app/components/ui/Toast";
 import { useAuth }  from "@/context/AuthContext";
+import { ApisSunat } from "@/app/utils/ApisSunat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CompanyData {
@@ -23,6 +24,7 @@ interface CertificadoDigitalCardProps {
   ruc: string;
   initialData?: CompanyData | null;
   loadingInitial?: boolean;
+  logoBase64?: string | null; 
 }
 
 // ─── Parse cert expiry from PEM base64 ───────────────────────────────────────
@@ -179,6 +181,7 @@ export function CertificadoDigitalCard({
   ruc,
   initialData,
   loadingInitial,
+  logoBase64, 
 }: CertificadoDigitalCardProps) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
@@ -218,7 +221,7 @@ export function CertificadoDigitalCard({
     const fetchCompany = async () => {
       setLoadingCompany(true);
       try {
-        const res = await axios.get(`http://localhost:5004/api/companies/${ruc}`, {
+        const res = await axios.get(ApisSunat.getCompany(ruc), {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         setCompany(res.data);
@@ -283,7 +286,7 @@ export function CertificadoDigitalCard({
     const formData = new FormData();
     formData.append("file", file);
     const res = await axios.post<{ base64: string }>(
-      "http://localhost:5004/api/companies/file/base64",
+      ApisSunat.uploadCertificateBase64,
       formData,
       { headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${accessToken}` } },
     );
@@ -293,7 +296,7 @@ export function CertificadoDigitalCard({
   // ── Paso 2: base64 + contraseña → PEM ───────────────────────────────────
   const convertToPem = async (certBase64: string, password: string): Promise<string> => {
     const res = await axios.post<{ pem: string; cer: string }>(
-      "http://localhost:5004/api/companies/certificate",
+      ApisSunat.convertCertificate,
       { cert: certBase64, certPass: password },
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
@@ -322,8 +325,8 @@ export function CertificadoDigitalCard({
 
       setStep("saving");
       await axios.put(
-        `http://localhost:5004/api/companies/${ruc}`,
-        { certificadoPem: pem, certificadoPassword: certPasswordInput },
+        ApisSunat.updateCompany(ruc),
+        { certificadoPem: pem, certificadoPassword: certPasswordInput, logoBase64: logoBase64 ?? null,  },
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
