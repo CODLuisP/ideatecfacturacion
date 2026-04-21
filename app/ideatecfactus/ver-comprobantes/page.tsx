@@ -213,11 +213,11 @@ export default function VerComprobantesPage() {
     };
 
     const generarNotaCredito = (c: ComprobanteListado) => {
-        router.push(`/ideatecfactus/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}`)
+        router.push(`/ideatecfactus/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`)
     }
 
     const generarNotaDebito = (c: ComprobanteListado) => {
-        router.push(`/ideatecfactus/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}`)
+        router.push(`/ideatecfactus/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`)
     }
 
     // ── Anular (vacío por ahora) ──

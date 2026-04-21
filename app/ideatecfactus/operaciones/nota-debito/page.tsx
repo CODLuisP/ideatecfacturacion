@@ -16,9 +16,9 @@ import { useEmpresaEmisor } from "../boleta/gestionBoletas/useEmpresaEmisor";
 import { Sucursal } from "../boleta/gestionBoletas/Boleta";
 import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { numeroALetras } from "@/app/components/ui/numeroALetras";
-import { ComprobanteObtenido } from "../nota-credito/gestionNotaCredito/Obtenercomprobante";
 import { NotaCredito } from "../nota-credito/gestionNotaCredito/NotacreditoDebito";
 import { useComprobanteRucSerieCorrelativo } from "../nota-credito/gestionNotaCredito/Usecomprobanterucseriecorrelativo";
+import { useSearchParams } from 'next/navigation'
 
 // ── Catálogo de motivos SUNAT Nota Débito ────────────────────
 const MOTIVOS_ND = [
@@ -139,6 +139,7 @@ const construirDetallesPorMotivo = (
 };
 
 export default function NotaDebitoPage() {
+  const searchParams = useSearchParams()
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -176,6 +177,7 @@ export default function NotaDebitoPage() {
   const [telefonoCliente, setTelefonoCliente] = useState("");
   const [enviarCorreo, setEnviarCorreo] = useState(false);
   const [enviarWhatsapp, setEnviarWhatsapp] = useState(false);
+  const [vieneDesdeLista, setVieneDesdeLista] = useState(!!(searchParams.get('serie') && searchParams.get('correlativo') && searchParams.get('ruc')))
 
   // ── Effects ──────────────────────────────────────────────────
   useEffect(() => {
@@ -240,6 +242,66 @@ export default function NotaDebitoPage() {
     }
   }, [incluyePenalidad]);
 
+    // ── Series disponibles ───────────────────────────────────────
+  const seriesDisponibles = useMemo((): { serie: string; nombre: string }[] => {
+    if (!sucursal) return [];
+    const nombre = sucursal.nombre ?? sucursal.codEstablecimiento;
+    return [
+      ...(sucursal.serieFactura ? [{ serie: sucursal.serieFactura, nombre }] : []),
+      ...(sucursal.serieBoleta ? [{ serie: sucursal.serieBoleta, nombre }] : []),
+    ];
+  }, [sucursal]);
+
+  useEffect(() => {
+    const serie = searchParams.get('serie')
+    const correlativo = searchParams.get('correlativo')
+    const ruc = searchParams.get('ruc')
+    const establecimiento = searchParams.get('establecimiento')
+
+    if (!serie || !correlativo || !ruc) return
+
+    if (isSuperAdmin) {
+        if (!loadingSucursales && sucursales.length > 0 && establecimiento) {
+            const sucursalEncontrada = sucursales.find(
+                (s: Sucursal) => s.codEstablecimiento === establecimiento && s.empresaRuc === ruc
+            )
+            if (sucursalEncontrada) {
+                setSucursal(sucursalEncontrada)
+                setSerieInput(serie)
+                setCorrelativoInput(correlativo)
+            } else {
+                showToast('No se encontró la sucursal correspondiente', 'error')
+            }
+        }
+        return
+    }
+
+    if (!sucursal || loadingSucursal) return
+
+    const serieValida = seriesDisponibles.some(s => s.serie === serie)
+    if (!serieValida) {
+        showToast(`La serie ${serie} no corresponde a tu sucursal`, 'error')
+        return
+    }
+
+    setSerieInput(serie)
+    setCorrelativoInput(correlativo)
+    buscarComprobante(serie, correlativo)
+
+  }, [sucursal, loadingSucursal, sucursales, loadingSucursales, seriesDisponibles])
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    if (!sucursal) return
+
+    const serie = searchParams.get('serie')
+    const correlativo = searchParams.get('correlativo')
+    if (!serie || !correlativo) return
+
+    if (serieInput === serie && correlativoInput === correlativo) {
+        buscarComprobante(serie, correlativo)
+    }
+  }, [sucursal])
+
   // ── Serie / correlativo ND dinámico ──────────────────────────
   const afectaFactura = serieInput.toUpperCase().startsWith("F");
   const serieND = afectaFactura
@@ -282,16 +344,6 @@ export default function NotaDebitoPage() {
 
   const eliminarDetalle = (i: number) => setDetalles((prev) => prev.filter((_, idx) => idx !== i));
   const agregarDetalle = () => setDetalles((prev) => [...prev, itemVacio("", detallesOriginales[0]?.porcentajeIgv ?? 18)]);
-
-  // ── Series disponibles ───────────────────────────────────────
-  const seriesDisponibles = useMemo((): { serie: string; nombre: string }[] => {
-    if (!sucursal) return [];
-    const nombre = sucursal.nombre ?? sucursal.codEstablecimiento;
-    return [
-      ...(sucursal.serieFactura ? [{ serie: sucursal.serieFactura, nombre }] : []),
-      ...(sucursal.serieBoleta ? [{ serie: sucursal.serieBoleta, nombre }] : []),
-    ];
-  }, [sucursal]);
 
   // ── Validación mora ──────────────────────────────────────────
   const validarMora = (): boolean => {
@@ -562,7 +614,7 @@ export default function NotaDebitoPage() {
                     <label className="text-xs font-bold text-gray-500 uppercase">Sucursal</label>
                     <select
                       value={sucursal?.sucursalId ?? ""}
-                      disabled={loadingSucursales}
+                      disabled={loadingSucursales || vieneDesdeLista}
                       onChange={async (e) => {
                         if (!e.target.value) { setSucursal(null); setCorrelativoNDFactura(null); setCorrelativoNDBoleta(null); setSerieInput(""); return; }
                         const sel = sucursales.find((s: Sucursal) => s.sucursalId === Number(e.target.value));
@@ -616,7 +668,7 @@ export default function NotaDebitoPage() {
                     <select
                       value={serieInput}
                       onChange={(e) => { setSerieInput(e.target.value); if (comprobante) limpiarBuscador(); }}
-                      disabled={isSuperAdmin && sinSucursal}
+                      disabled={isSuperAdmin && sinSucursal || vieneDesdeLista}
                       className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50"
                     >
                       <option value="">Seleccionar serie</option>
@@ -632,12 +684,17 @@ export default function NotaDebitoPage() {
                       <input
                         type="text" value={correlativoInput}
                         onChange={(e) => setCorrelativoInput(e.target.value.replace(/\D/g, ""))}
-                        placeholder="127" maxLength={10}
+                        placeholder="127" maxLength={10} disabled={vieneDesdeLista}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarComprobante(serieInput, correlativoInput); } }}
                         className="w-full py-2.5 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono"
                       />
                       {(correlativoInput || comprobante) && (
-                        <button type="button" onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); }} title="Limpiar"
+                        <button type="button" 
+                          onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); 
+                            if (vieneDesdeLista) {
+                                router.replace('/ideatecfactus/operaciones/nota-debito')
+                                setVieneDesdeLista(false)
+                            } }} title="Limpiar"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -651,7 +708,7 @@ export default function NotaDebitoPage() {
                       disabled={loadingComprobante || !serieInput || !correlativoInput}>
                       {loadingComprobante ? (
                         <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Buscando...
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{vieneDesdeLista ? 'Cargando comprobante...' : 'Buscando...'}
                         </span>
                       ) : <span className="flex items-center gap-2"><Search className="w-4 h-4" /> Buscar</span>}
                     </Button>
