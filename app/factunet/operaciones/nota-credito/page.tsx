@@ -803,7 +803,7 @@ const actualizarStockDevolucion = async () => {
                       {(correlativoInput || comprobante) && (
                         <button type="button" 
                           onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); if (vieneDesdeLista) {
-                            router.replace('/ideatecfactus/operaciones/nota-credito')} setVieneDesdeLista(false)
+                            router.replace('/factunet/operaciones/nota-debito')} setVieneDesdeLista(false)
                           }} 
                           title="Limpiar búsqueda"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
