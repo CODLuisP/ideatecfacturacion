@@ -1,36 +1,36 @@
 import { useState, useCallback } from "react"
-import { Comprobante } from "./Comprobante"
+import { ComprobanteListado } from "../Comprobante"
 import { useAuth } from '@/context/AuthContext'
 
-interface UseComprobantesEmpresaUsuarioParams {
-  rucEmpresa: string
-  usuarioId: number
+interface UseComprobantesClienteSucursalListadoParams {
+  sucursalId: number
+  clienteNumDoc: string
   fechaDesde?: string | null
   fechaHasta?: string | null
 }
 
-interface UseComprobantesEmpresaUsuarioReturn {
-  comprobantes: Comprobante[]
+interface UseComprobantesClienteSucursalListadoReturn {
+  comprobantes: ComprobanteListado[]
   loading: boolean
   error: string | null
-  fetchComprobantes: (params: UseComprobantesEmpresaUsuarioParams) => Promise<void>
+  fetchComprobantes: (params: UseComprobantesClienteSucursalListadoParams) => Promise<void>
   reset: () => void
 }
 
-export const useComprobantesEmpresaUsuario = (): UseComprobantesEmpresaUsuarioReturn => {
+export const useComprobantesClienteSucursalListado = (): UseComprobantesClienteSucursalListadoReturn => {
   const { accessToken } = useAuth()
-  const [comprobantes, setComprobantes] = useState<Comprobante[]>([])
+  const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchComprobantes = useCallback(async ({
-    rucEmpresa, usuarioId, fechaDesde, fechaHasta,
-  }: UseComprobantesEmpresaUsuarioParams) => {
+    sucursalId, clienteNumDoc, fechaDesde, fechaHasta,
+  }: UseComprobantesClienteSucursalListadoParams) => {
     setLoading(true)
     setError(null)
     try {
       const url = new URL(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/empresa/${rucEmpresa}/usuario/${usuarioId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/listado/sucursal/${sucursalId}/cliente/${clienteNumDoc}`
       )
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
@@ -39,7 +39,7 @@ export const useComprobantesEmpresaUsuario = (): UseComprobantesEmpresaUsuarioRe
         headers: { Authorization: `Bearer ${accessToken}` }
       })
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
-      const data: Comprobante[] = await response.json()
+      const data: ComprobanteListado[] = await response.json()
       setComprobantes(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al obtener comprobantes")

@@ -140,11 +140,76 @@ export interface Comprobante {
   codigoHashCPE: string | null
   codigoRespuestaSunat: string
   mensajeRespuestaSunat: string
-  pdfGenerado: boolean | null
+  pdfGenerado: string | null
   enviadoEnResumen: boolean | null
   fechaEnvioSunat: string
   usuarioCreacion: number | null
   fechaCreacion: string
   usuarioModificacion: number | null
   fechaModificacion: string
+  comprobanteAfectadoId: number | null
+  observaciones: string | null
+}
+
+// Interface para listado rápido (sin detalles)
+export interface ComprobanteListado {
+  comprobanteId: number
+  ublVersion: string
+  tipoOperacion: string
+  tipoComprobante: string
+  serie: string
+  correlativo: string
+  numeroCompleto: string
+  tipoCambio: number
+  fechaEmision: string
+  horaEmision: string
+  fechaVencimiento: string
+  tipoMoneda: string
+  tipoPago: string
+  cliente: ComprobanteClienteDetalle
+  company: ComprobanteCompanyDetalle
+  codigoTipoDescGlobal: string
+  descuentoGlobal: number
+  totalOperacionesGravadas: number
+  totalOperacionesExoneradas: number
+  totalOperacionesInafectas: number
+  totalOperacionesGratuitas: number
+  totalIgvGratuitas: number
+  totalIGV: number
+  totalImpuestos: number
+  totalDescuentos: number
+  totalOtrosCargos: number
+  totalIcbper: number
+  valorVenta: number
+  subTotal: number
+  importeTotal: number
+  montoCredito: number
+  comprobanteAfectadoId: number | null
+  tipDocAfectado: string | null
+  numDocAfectado: string | null
+  tipoNotaCreditoDebito: string | null
+  motivoNota: string | null
+  observaciones: string | null
+  estadoSunat: string
+  codigoHashCPE: string | null
+  codigoRespuestaSunat: string
+  mensajeRespuestaSunat: string
+  pdfGenerado: string | null
+  enviadoEnResumen: boolean | null
+  fechaEnvioSunat: string
+  usuarioCreacion: number | null
+  fechaCreacion: string
+  usuarioModificacion: number | null
+  fechaModificacion: string
+}
+
+// Interface para detalles por id
+export interface ComprobanteDetalles {
+  comprobanteId: number
+  details: ComprobanteDetalleItem[]
+  pagos: ComprobantePagoItem[]
+  cuotas: ComprobanteCuotaItem[]
+  legends: ComprobanteLeyenda[]
+  guias: ComprobanteGuia[]
+  detracciones: ComprobanteDetraccionItem[]
 }

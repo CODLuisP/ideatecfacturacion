@@ -19,6 +19,7 @@ import { numeroALetras } from "@/app/components/ui/numeroALetras";
 import { ComprobanteObtenido } from "./gestionNotaCredito/Obtenercomprobante";
 import { NotaCredito } from "./gestionNotaCredito/NotacreditoDebito";
 import { useComprobanteRucSerieCorrelativo } from "./gestionNotaCredito/Usecomprobanterucseriecorrelativo";
+import { useSearchParams } from 'next/navigation'
 
 // ── Catálogo de motivos SUNAT ────────────────────────────────
 const MOTIVOS_NC = [

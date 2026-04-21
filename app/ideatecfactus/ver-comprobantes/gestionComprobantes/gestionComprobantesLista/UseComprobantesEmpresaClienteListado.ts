@@ -1,34 +1,37 @@
 import { useState, useCallback } from "react"
-import { Comprobante } from "./Comprobante"
 import { useAuth } from '@/context/AuthContext'
+import { ComprobanteListado } from "../Comprobante"
 
-interface UseComprobantesEmpresaParams {
-  ruc: string
+interface UseComprobantesEmpresaClienteListadoParams {
+  rucEmpresa: string
+  clienteNumDoc: string
   fechaDesde?: string | null
   fechaHasta?: string | null
 }
 
-interface UseComprobantesEmpresaReturn {
-  comprobantes: Comprobante[]
+interface UseComprobantesEmpresaClienteListadoReturn {
+  comprobantes: ComprobanteListado[]
   loading: boolean
   error: string | null
-  fetchComprobantes: (params: UseComprobantesEmpresaParams) => Promise<void>
+  fetchComprobantes: (params: UseComprobantesEmpresaClienteListadoParams) => Promise<void>
   reset: () => void
 }
 
-export const useComprobantesEmpresa = (): UseComprobantesEmpresaReturn => {
+export const useComprobantesEmpresaClienteListado = (): UseComprobantesEmpresaClienteListadoReturn => {
   const { accessToken } = useAuth()
-  const [comprobantes, setComprobantes] = useState<Comprobante[]>([])
+  const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchComprobantes = useCallback(async ({
-    ruc, fechaDesde, fechaHasta,
-  }: UseComprobantesEmpresaParams) => {
+    rucEmpresa, clienteNumDoc, fechaDesde, fechaHasta,
+  }: UseComprobantesEmpresaClienteListadoParams) => {
     setLoading(true)
     setError(null)
     try {
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/ruc/${ruc}`)
+      const url = new URL(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/listado/empresa/${rucEmpresa}/cliente/${clienteNumDoc}`
+      )
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
 
@@ -36,7 +39,7 @@ export const useComprobantesEmpresa = (): UseComprobantesEmpresaReturn => {
         headers: { Authorization: `Bearer ${accessToken}` }
       })
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
-      const data: Comprobante[] = await response.json()
+      const data: ComprobanteListado[] = await response.json()
       setComprobantes(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al obtener comprobantes")

@@ -1,36 +1,37 @@
 import { useState, useCallback } from "react"
-import { Comprobante } from "./Comprobante"
+import { Comprobante } from "../Comprobante"
 import { useAuth } from '@/context/AuthContext'
 
-interface UseComprobantesSucursalParams {
-  sucursalId: number
+interface UseComprobantesEmpresaClienteParams {
+  rucEmpresa: string
+  clienteNumDoc: string
   fechaDesde?: string | null
   fechaHasta?: string | null
 }
 
-interface UseComprobantesSucursalReturn {
+interface UseComprobantesEmpresaClienteReturn {
   comprobantes: Comprobante[]
   loading: boolean
   error: string | null
-  fetchComprobantes: (params: UseComprobantesSucursalParams) => Promise<void>
+  fetchComprobantes: (params: UseComprobantesEmpresaClienteParams) => Promise<void>
   reset: () => void
 }
 
-export const useComprobantesSucursal = (): UseComprobantesSucursalReturn => {
+export const useComprobantesEmpresaCliente = (): UseComprobantesEmpresaClienteReturn => {
   const { accessToken } = useAuth()
   const [comprobantes, setComprobantes] = useState<Comprobante[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchComprobantes = useCallback(async ({
-    sucursalId,
-    fechaDesde,
-    fechaHasta,
-  }: UseComprobantesSucursalParams) => {
+    rucEmpresa, clienteNumDoc, fechaDesde, fechaHasta,
+  }: UseComprobantesEmpresaClienteParams) => {
     setLoading(true)
     setError(null)
     try {
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/sucursal/${sucursalId}`)
+      const url = new URL(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/empresa/${rucEmpresa}/cliente/${clienteNumDoc}`
+      )
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
 
