@@ -1,5 +1,5 @@
 "use client";
-import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
@@ -62,6 +62,9 @@ export default function EmisionRapidaPage() {
   const { accessToken, user } = useAuth();
   const isSuperAdmin = user?.rol === 'superadmin';
   const { empresa } = useEmpresaEmisor();
+
+  //estado para envio por resumen
+  const [enviarEnResumen, setEnviarEnResumen] = useState(false);
   
   //sucursales tanto para admin y superadmin
   const { sucursal, loadingSucursal } = useSucursal();
@@ -69,6 +72,9 @@ export default function EmisionRapidaPage() {
 
   // ── Tipo comprobante ───────────────────────────────────────
   const [tipo, setTipo] = useState<TipoComprobante>('boleta');
+
+  //guardar url del PDF
+  const [pdfUrlEmitido, setPdfUrlEmitido] = useState<string | null>(null);
 
   //emitir nueva factura 
   const [emitido, setEmitido] = useState(false);
@@ -513,6 +519,11 @@ export default function EmisionRapidaPage() {
       const clienteFinal = {
         ...clienteSeleccionado,
         tipoDocumento: tipo === 'factura' && clienteSeleccionado?.tipoDocumento === '06' ? '6' : clienteSeleccionado?.tipoDocumento,
+        ubigeo: clienteSeleccionado?.ubigeo || null,
+        direccionLineal: clienteSeleccionado?.direccionLineal || null,
+        departamento: clienteSeleccionado?.departamento || null,
+        provincia: clienteSeleccionado?.provincia || null,
+        distrito: clienteSeleccionado?.distrito || null,
       };
       const details = items.map((item, idx) => {
         const calc = calcItem(item);
@@ -543,8 +554,13 @@ export default function EmisionRapidaPage() {
         fechaEmision: ahora, horaEmision: ahora, fechaVencimiento: hoy,
         tipoPago: 'Contado',
         serie, correlativo: String(correlativoActual ?? 1).padStart(8, '0'),
-        company: { ...empresa, establecimientoAnexo: sucursalActual?.codEstablecimiento ?? empresa?.establecimientoAnexo ?? '0000'},
-        cliente: clienteFinal,
+        company: { ...empresa, establecimientoAnexo: sucursalActual?.codEstablecimiento ?? empresa?.establecimientoAnexo ?? '0000' },
+        cliente: { ...clienteFinal,
+          correo: correoCliente || null,
+          enviadoPorCorreo: enviarCorreo,
+          whatsApp: telefonoCliente || null,
+          enviadoPorWhatsApp: enviarWhatsapp,
+        },
         details,
         pagos: [{ medioPago, monto: totales.importeTotal, fechaPago: ahora, numeroOperacion: '', entidadFinanciera: '', observaciones: '' }],
         cuotas: [], guias: [],
@@ -560,30 +576,57 @@ export default function EmisionRapidaPage() {
         valorVenta: totales.valorVenta,
         montoCredito: 0,
         descuentoGlobal: 0, codigoTipoDescGlobal: '03',
+        usuarioCreacion: user?.id ?? 0,
+        enviadoEnResumen: tipo === 'factura' ? null : enviarEnResumen,
         legends: [{ code: '1000', value: numeroALetras(totales.importeTotal, moneda) }],
       };
       console.log('comprobante:', payload);
-      
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, payload, { headers: { Authorization: `Bearer ${accessToken}` } });
+
+      // ── 1. Generar XML ──────────────────────────────────────
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
+        payload,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const comprobanteId = res.data.comprobanteId;
-      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
 
-      if (resSunat.data.exitoso) {
-        showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
-        setComprobanteIdEmitido(comprobanteId);
-        if (enviarCorreo && correoCliente || enviarWhatsapp && telefonoCliente) {
-        try {
-          const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
-          const serieNum = `${serie}-${corrNum}`;
-          const esBoleta = tipo === 'boleta';
+      // ── 2. Enviar a SUNAT o guardar en resumen ──────────────
+      if (!enviarEnResumen) {
+        const resSunat = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+          null,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (resSunat.data.exitoso) {
+          showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
+        } else {
+          showToast('Comprobante generado pero rechazado por SUNAT', 'error');
+        }
+      } else {
+        showToast('Comprobante guardado como pendiente', 'success');
+      }
 
-          // ── PDF una sola vez ──
-          const resPdf = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
-          const pdfBlob = await resPdf.blob();
+      // ── 3. Setear id y PDF (siempre, independiente del modo) ─
+      setComprobanteIdEmitido(comprobanteId);
+
+      // ── 4. PDF + correo + whatsapp (siempre si hay contacto) ─
+      const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
+      const serieNum = `${serie}-${corrNum}`;
+      const esBoleta = tipo === 'boleta';
+
+      try {
+        const resPdf = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
+        const pdfBlob = await resPdf.blob();
+
+        // ← Para el botón Abrir
+        setPdfUrlEmitido(URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' })));
+
+        // ← Solo si hay contacto marcado
+        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
           const pdfFile = new File(
             [pdfBlob],
             `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
@@ -599,15 +642,21 @@ export default function EmisionRapidaPage() {
               formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
               formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
               formData.append('tipo', esBoleta ? '3' : '1');
+              formData.append('comprobanteJson', JSON.stringify({  // ← agregar
+                serieNumero: serieNum,
+                estadoSunat: 'ACEPTADO',
+                items: items.filter(i => !i._esIcbper).map(i => ({
+                  descripcion: i.descripcion ?? '',
+                  cantidad: i.cantidad ?? 1,
+                  precioUnitario: i.precioVentaConIGV ?? 0,
+                })),
+                igv: totales.igv,
+                total: totales.importeTotal,
+              }));
               formData.append('adjunto', pdfFile);
-
               const resCorreo = await fetch(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-                {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${accessToken}` },
-                  body: formData,
-                }
+                { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
               );
               if (!resCorreo.ok) throw new Error('Error al enviar el correo');
               showToast('Comprobante enviado por correo', 'success');
@@ -619,32 +668,19 @@ export default function EmisionRapidaPage() {
             try {
               const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
               const whatsappBase = 'https://do.velsat.pe:8443/whatsapp';
-
               const uploadForm = new FormData();
               uploadForm.append('file', pdfFile);
               const resUpload = await fetch(`${whatsappBase}/api/upload`, {
-                method: 'POST',
-                headers: { 'x-api-key': whatsappApiKey },
-                body: uploadForm,
+                method: 'POST', headers: { 'x-api-key': whatsappApiKey }, body: uploadForm,
               });
               if (!resUpload.ok) throw new Error('No se pudo subir el PDF');
-              const uploadData = await resUpload.json();
-              const fileUrl = uploadData.datos.url;
-
-              const numeroFormateado = telefonoCliente.startsWith('51')
-                ? telefonoCliente
-                : `51${telefonoCliente}`;
-
+              const fileUrl = (await resUpload.json()).datos.url;
+              const numeroFormateado = telefonoCliente.startsWith('51') ? telefonoCliente : `51${telefonoCliente}`;
               const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-api-key': whatsappApiKey,
-                },
+                headers: { 'Content-Type': 'application/json', 'x-api-key': whatsappApiKey },
                 body: JSON.stringify({
-                  phone: numeroFormateado,
-                  type: 'documento',
-                  file_url: fileUrl,
+                  phone: numeroFormateado, type: 'documento', file_url: fileUrl,
                   filename: `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
                   mime_type: 'application/pdf',
                   text: `Estimado(a) ${clienteSeleccionado?.razonSocial ?? ''}, adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica ${serieNum}.`,
@@ -654,20 +690,23 @@ export default function EmisionRapidaPage() {
               showToast('Documento enviado por WhatsApp', 'success');
             } catch { showToast('Error al enviar por WhatsApp', 'error'); }
           }
+        }
+      } catch { showToast('Error al obtener el PDF', 'error'); }
 
-        } catch { showToast('Error al procesar envíos', 'error'); }
-      }
-      } else {
-        showToast('Comprobante generado pero rechazado por SUNAT', 'error');
-      }
-
-      // Stock
+      // ── 5. Stock ────────────────────────────────────────────
       const itemsStock = items.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === 'BIEN');
       if (itemsStock.length > 0) {
-        try { await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`, itemsStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad })), { headers: { Authorization: `Bearer ${accessToken}` } }); await fetchProductosSucursal(); } catch {}
+        try {
+          await axios.put(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+            itemsStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad })),
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          await fetchProductosSucursal();
+        } catch {}
       }
 
-      // Correlativo nuevo
+      // ── 6. Correlativo nuevo ────────────────────────────────
       const sucursalId = isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID;
       const resSucursal = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
@@ -675,10 +714,9 @@ export default function EmisionRapidaPage() {
       );
       setCorrelativoActual(tipo === 'boleta' ? resSucursal.data.correlativoBoleta : resSucursal.data.correlativoFactura);
 
-      // Auto-guardar cliente si vino de API o fue ingresado manualmente
+      // ── 7. Auto-guardar cliente nuevo ───────────────────────
       const esClienteNuevo = clienteSeleccionado?.clienteId === null && clienteSeleccionado?.razonSocial;
       const tieneContacto = (correoCliente && enviarCorreo) || (telefonoCliente && enviarWhatsapp);
-
       if (esClienteNuevo && tieneContacto) {
         try {
           await axios.post(
@@ -691,22 +729,20 @@ export default function EmisionRapidaPage() {
               telefono: telefonoCliente || '',
               correo: correoCliente || '',
               tipoDocumentoId: clienteSeleccionado.tipoDocumento,
-              direccion: clienteSeleccionado.tipoDocumento === '01' 
-              ? {} 
-              : {
-                  ubigeo: clienteSeleccionado.ubigeo ?? '',
-                  direccionLineal: clienteSeleccionado.direccionLineal ?? '',
-                  departamento: clienteSeleccionado.departamento ?? '',
-                  provincia: clienteSeleccionado.provincia ?? '',
-                  distrito: clienteSeleccionado.distrito ?? '',
-                  tipoDireccion: 'PRINCIPAL',
-                }
+              direccion: clienteSeleccionado.tipoDocumento === '01'
+                ? {}
+                : {
+                    ubigeo: clienteSeleccionado.ubigeo ?? '',
+                    direccionLineal: clienteSeleccionado.direccionLineal ?? '',
+                    departamento: clienteSeleccionado.departamento ?? '',
+                    provincia: clienteSeleccionado.provincia ?? '',
+                    distrito: clienteSeleccionado.distrito ?? '',
+                    tipoDireccion: 'PRINCIPAL',
+                  }
             },
             { headers: { Authorization: `Bearer ${accessToken}` } }
           );
-        } catch { 
-          // silencioso, no interrumpir el flujo
-        }
+        } catch {}
       }
 
       setEmitido(true);
@@ -748,6 +784,9 @@ export default function EmisionRapidaPage() {
       setSucursalActual(null);
       setCorrelativoActual(null);
     }
+
+    //Envio por resumen
+    setEnviarEnResumen(false);
   };
 
   const descargarPdf = async () => {
@@ -786,6 +825,9 @@ export default function EmisionRapidaPage() {
       };
     } catch { showToast('Error al imprimir el PDF', 'error'); }
   };
+
+  //activar boton emitir
+  const puedeEmitir = !emitiendo && !sinSucursal && (!!clienteSeleccionado || clienteVarios) && items.filter(i => !i._esIcbper).length > 0;
 
   // ─── Render ────────────────────────────────────────────────
   return (
@@ -1317,8 +1359,11 @@ export default function EmisionRapidaPage() {
             {/* Botón emitir */}
             <button type="button"
               onClick={emitido ? () => { resetForm(); } : emitirComprobante}
-              disabled={emitiendo || sinSucursal}
-              className="w-full py-2.5 bg-brand-blue hover:bg-blue-700 disabled:opacity-60 text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100 hover:shadow-blue-200">
+              disabled={!puedeEmitir && !emitido}
+              className={`w-full py-2.5 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
+                ${!puedeEmitir && !emitido
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-blue-700 hover:shadow-blue-200 cursor-pointer'}`}>
               {emitiendo ? (
                 <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Emitiendo...</>
               ) : emitido ? (
@@ -1328,19 +1373,34 @@ export default function EmisionRapidaPage() {
               )}
             </button>
 
+            {tipo === 'boleta' && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={enviarEnResumen}
+                  onChange={e => setEnviarEnResumen(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-brand-blue" />
+                <span className="text-xs text-gray-500">Enviar mendiante resumen (Guardar doc. en BD)</span>
+              </label>
+            )}
+
             {errorEmision && (
               <p className="text-[10px] text-red-500 text-center leading-relaxed">{errorEmision}</p>
             )}
 
             {comprobanteIdEmitido && (
               <div className="relative flex items-center gap-2 p-3 bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl shadow-sm">
+                <button type="button"
+                  onClick={() => window.open(pdfUrlEmitido!, '_blank')}
+                  disabled={!pdfUrlEmitido}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200 disabled:opacity-50">
+                  <ExternalLink className="w-3.5 h-3.5" /> Abrir
+                </button>
                 <button type="button" onClick={descargarPdf}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-500 hover:text-white active:scale-95 border border-emerald-300 hover:border-emerald-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-emerald-200">
-                  <Download className="w-4 h-4" /> Descargar PDF
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-black bg-emerald-400 hover:bg-emerald-300 active:scale-95 border border-emerald-300 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                  <Download className="w-3.5 h-3.5" /> Descargar
                 </button>
                 <button type="button" onClick={imprimirPdf}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-sky-700 bg-white hover:bg-sky-500 hover:text-white active:scale-95 border border-sky-300 hover:border-sky-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-sky-200">
-                  <Printer className="w-4 h-4" /> Imprimir
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-black bg-amber-400 hover:bg-amber-300 active:scale-95 border border-amber-300 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                  <Printer className="w-3.5 h-3.5" /> Imprimir
                 </button>
                 <button type="button" onClick={() => setComprobanteIdEmitido(null)}
                   className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-white hover:bg-red-500 hover:text-white text-gray-400 active:scale-95 border border-gray-200 hover:border-red-500 rounded-full transition-all duration-200 shadow-sm">

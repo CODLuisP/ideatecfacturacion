@@ -13,7 +13,7 @@ export interface NotaCreditoCompany {
   codEstablecimiento: string
   razonSocial: string
   nombreComercial: string
-  address: NotaCreditoAddress
+  address: NotaCreditoAddress | null
 }
 
 export interface NotaCreditoClient {
@@ -21,6 +21,10 @@ export interface NotaCreditoClient {
   numDoc: string
   rznSocial: string
   address: NotaCreditoAddress | null
+  clienteCorreo?: string | null
+  enviadoPorCorreo?: boolean
+  clienteWhatsApp?: string| null
+  enviadoPorWhatsApp?: boolean
 }
 
 export interface NotaCreditoDetalle {
@@ -74,6 +78,7 @@ export interface NotaCredito {
   valorVenta: number
   subTotal: number
   mtoImpVenta: number
+  usuarioCreacion?: number;
   details: NotaCreditoDetalle[]
   legends: NotaCreditoLegend[]
 }

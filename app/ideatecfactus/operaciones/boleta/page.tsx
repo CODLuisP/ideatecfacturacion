@@ -71,6 +71,9 @@ export default function BoletaPage() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
 
+  //enviar mediante resumen
+  const [enviarEnResumen, setEnviarEnResumen] = useState(false)
+
   // ── isSuperAdmin ─────────────────────────────────────────────
   const isSuperAdmin = user?.rol === "superadmin";
 
@@ -1230,220 +1233,125 @@ export default function BoletaPage() {
         boleta.company?.establecimientoAnexo ??
         "0000",
     },
+    enviadoEnResumen: enviarEnResumen,
+    cliente: {
+      ...boleta.cliente,
+      ubigeo: boleta.cliente?.ubigeo || null,
+      direccionLineal: boleta.cliente?.direccionLineal || null,
+      departamento: boleta.cliente?.departamento || null,
+      provincia: boleta.cliente?.provincia || null,
+      distrito: boleta.cliente?.distrito || null,
+      correo: correoCliente || null,
+      enviadoPorCorreo: enviarCorreo,
+      whatsApp: telefonoCliente || null,
+      enviadoPorWhatsApp: enviarWhatsapp,
+    },
+    usuarioCreacion: user?.id ?? 0,
   });
 
   // ── Emitir ───────────────────────────────────────────────────
   const emitirComprobante = async () => {
-    if (!detalles.length) {
-      showToast("Debe agregar al menos un ítem", "error");
-      return;
-    }
-    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) {
-      showToast("Debe seleccionar o ingresar un cliente", "error");
-      return;
-    }
-    const itemSinDesc = detalles.findIndex(
-      (d) => !d.descripcion || d.descripcion.trim() === "",
-    );
-    if (itemSinDesc !== -1) {
-      showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error");
-      return;
-    }
-    if (enviarCorreo && !correoCliente.trim()) {
-      showToast("Ingrese el correo del cliente para enviar", "error");
-      return;
-    }
-    if (enviarWhatsapp && !telefonoCliente.trim()) {
-      showToast("Ingrese el teléfono para enviar por WhatsApp", "error");
-      return;
-    }
+    if (!detalles.length) { showToast("Debe agregar al menos un ítem", "error"); return; }
+    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) { showToast("Debe seleccionar o ingresar un cliente", "error"); return; }
+    const itemSinDesc = detalles.findIndex(d => !d.descripcion || d.descripcion.trim() === "");
+    if (itemSinDesc !== -1) { showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error"); return; }
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return; }
+    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return; }
 
     setEmitiendo(true);
     setErrorEmision(null);
     try {
       const boletaFinal = prepararBoleta();
-      const resBoleta = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
-        boletaFinal,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
+      const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } });
       const comprobanteId = resBoleta.data.comprobanteId;
-      const resSunat = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
-        null,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
 
-      if (resSunat.data.exitoso) {
-        showToast(
-          resSunat.data.mensaje ?? "Boleta emitida correctamente.",
-          "success",
-        );
-        setComprobanteIdEmitido(comprobanteId);
-        await cargarPdf(comprobanteId, tamanoPdf);
-
-        // ── Correo y WhatsApp ──
-        if (
-          (enviarCorreo && correoCliente) ||
-          (enviarWhatsapp && telefonoCliente)
-        ) {
-          try {
-            const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
-            const serieNum = `${boleta.serie}-${corrNum}`;
-
-            const resPdf = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-              { headers: { Authorization: `Bearer ${accessToken}` } },
-            );
-            if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
-            const pdfBlob = await resPdf.blob();
-            const pdfFile = new File(
-              [pdfBlob],
-              `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`,
-              { type: "application/pdf" },
-            );
-
-            if (enviarCorreo && correoCliente) {
-              try {
-                const formData = new FormData();
-                formData.append("toEmail", correoCliente);
-                formData.append(
-                  "toName",
-                  boleta.cliente?.razonSocial ?? "Cliente",
-                );
-                formData.append("subject", `Boleta Electrónica ${serieNum}`);
-                formData.append(
-                  "body",
-                  "Se emitió la boleta electrónica por los productos/servicios indicados.",
-                );
-                formData.append("tipo", "3");
-                formData.append(
-                  "comprobanteJson",
-                  JSON.stringify({
-                    serieNumero: serieNum,
-                    estadoSunat: "ACEPTADO",
-                    items: detalles.map((d) => ({
-                      descripcion: d.descripcion ?? "",
-                      cantidad: d.cantidad ?? 1,
-                      precioUnitario: d.precioUnitario ?? 0,
-                    })),
-                    igv: totales.igv,
-                    total: totales.importeTotal,
-                  }),
-                );
-                formData.append("adjunto", pdfFile);
-
-                const resCorreo = await fetch(
-                  `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-                  {
-                    method: "POST",
-                    headers: { Authorization: `Bearer ${accessToken}` },
-                    body: formData,
-                  },
-                );
-                if (!resCorreo.ok) {
-                  const err = await resCorreo.text();
-                  console.error("Error email:", err);
-                  throw new Error("Error correo");
-                }
-                showToast("Boleta enviada por correo", "success");
-              } catch {
-                showToast("Error al enviar por correo", "error");
-              }
-            }
-
-            if (enviarWhatsapp && telefonoCliente) {
-              try {
-                const whatsappApiKey =
-                  process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-                const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
-                const uploadForm = new FormData();
-                uploadForm.append("file", pdfFile);
-                const resUpload = await fetch(`${whatsappBase}/api/upload`, {
-                  method: "POST",
-                  headers: { "x-api-key": whatsappApiKey },
-                  body: uploadForm,
-                });
-                if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
-                const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51")
-                  ? telefonoCliente
-                  : `51${telefonoCliente}`;
-                const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "x-api-key": whatsappApiKey,
-                  },
-                  body: JSON.stringify({
-                    phone: numeroFormateado,
-                    type: "documento",
-                    file_url: fileUrl,
-                    filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`,
-                    mime_type: "application/pdf",
-                    text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.`,
-                  }),
-                });
-                if (!resWsp.ok) throw new Error("Error WhatsApp");
-                showToast("Boleta enviada por WhatsApp", "success");
-              } catch {
-                showToast("Error al enviar por WhatsApp", "error");
-              }
-            }
-          } catch {
-            showToast("Error al procesar envíos", "error");
-          }
+      // ── Enviar a SUNAT o guardar en resumen ──
+      if (!enviarEnResumen) {
+        const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (resSunat.data.exitoso) {
+          showToast(resSunat.data.mensaje ?? "Boleta emitida correctamente.", "success");
+        } else {
+          showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, "error");
         }
-
-        setEmitido(true);
       } else {
-        showToast(
-          `Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`,
-          "error",
-        );
-        setEmitido(true);
+        showToast("Boleta guardada como pendiente en resumen", "success");
       }
 
-      // Stock
-      const itemsParaStock = detalles.filter(
-        (d) =>
-          d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN",
-      );
+      setComprobanteIdEmitido(comprobanteId);
+      await cargarPdf(comprobanteId, tamanoPdf);
+
+      // ── Correo y WhatsApp ──
+      if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+        try {
+          const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
+          const serieNum = `${boleta.serie}-${corrNum}`;
+          const resPdf = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+          const pdfBlob = await resPdf.blob();
+          const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
+
+          if (enviarCorreo && correoCliente) {
+            try {
+              const formData = new FormData();
+              formData.append("toEmail", correoCliente);
+              formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
+              formData.append("subject", `Boleta Electrónica ${serieNum}`);
+              formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
+              formData.append("tipo", "3");
+              formData.append("comprobanteJson", JSON.stringify({
+                serieNumero: serieNum, estadoSunat: "ACEPTADO",
+                items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
+                igv: totales.igv, total: totales.importeTotal,
+              }));
+              formData.append("adjunto", pdfFile);
+              const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
+              if (!resCorreo.ok) throw new Error("Error correo");
+              showToast("Boleta enviada por correo", "success");
+            } catch { showToast("Error al enviar por correo", "error"); }
+          }
+
+          if (enviarWhatsapp && telefonoCliente) {
+            try {
+              const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+              const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+              const uploadForm = new FormData();
+              uploadForm.append("file", pdfFile);
+              const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
+              if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
+              const fileUrl = (await resUpload.json()).datos.url;
+              const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+              const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+                body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
+              });
+              if (!resWsp.ok) throw new Error("Error WhatsApp");
+              showToast("Boleta enviada por WhatsApp", "success");
+            } catch { showToast("Error al enviar por WhatsApp", "error"); }
+          }
+        } catch { showToast("Error al procesar envíos", "error"); }
+      }
+
+      setEmitido(true);
+
+      // ── Stock ──
+      const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
       if (itemsParaStock.length > 0) {
         try {
-          await axios.put(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-            itemsParaStock.map((d) => ({
-              sucursalProductoId: d._sucursalProductoId,
-              cantidad: d.cantidad ?? 1,
-            })),
-            { headers: { Authorization: `Bearer ${accessToken}` } },
-          );
+          await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`, itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })), { headers: { Authorization: `Bearer ${accessToken}` } });
           await fetchProductosSucursal();
-        } catch {
-          console.error("Error al actualizar stock");
-        }
+        } catch { console.error("Error al actualizar stock"); }
       }
 
-      // Actualizar correlativo
+      // ── Correlativo ──
       const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
+      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
       setCorrelativoActual(resSucursal.data.correlativoBoleta);
-      setBoleta((prev) => ({
-        ...prev,
-        serie: resSucursal.data.serieBoleta,
-        correlativo: String(resSucursal.data.correlativoBoleta).padStart(
-          8,
-          "0",
-        ),
-      }));
+      setBoleta(prev => ({ ...prev, serie: resSucursal.data.serieBoleta, correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0") }));
+
     } catch (err: any) {
       const data = err?.response?.data;
-      const mensaje =
-        data?.mensaje ?? data?.message ?? "Error al emitir el comprobante";
+      const mensaje = data?.mensaje ?? data?.message ?? "Error al emitir el comprobante";
       const detalle = data?.detalle;
       setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
       showToast("Error al emitir comprobante.", "error");
@@ -1454,58 +1362,64 @@ export default function BoletaPage() {
 
   // ── Nueva boleta ─────────────────────────────────────────────
   const nuevaBoleta = () => {
+    // Estado emisión
     setEmitido(false);
+    setEnviarEnResumen(false);
     setPdfUrl(null);
     setComprobanteIdEmitido(null);
     setErrorEmision(null);
+
+    // Ítems
     setDetalles([]);
     setBusquedaProducto([]);
     setShowDropdownProducto([]);
     inputRefs.current = [];
-    setPagos([
-      {
-        medioPago: "Efectivo",
-        monto: "",
-        numeroOperacion: "",
-        entidadFinanciera: "",
-        observaciones: "",
-      },
-    ]);
-    setPagosEditados([false]);
-    setBusqueda("");
+    setPorConsumo(false);
+
+    // Cliente
+    setBusqueda('');
     setClienteVarios(false);
-    setDescuentoGlobal(0);
-    setCodigoTipoDescGlobal("02");
+
+    // Contacto
+    setCorreoCliente('');
+    setTelefonoCliente('');
+    setEnviarCorreo(false);
+    setEnviarWhatsapp(false);
+
+    // Pagos y cuotas
+    setPagos([{ medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }]);
+    setPagosEditados([false]);
     setNumeroCuotas(1);
     setCuotas([]);
+
+    // Descuentos y guías
+    setDescuentoGlobal(0);
+    setCodigoTipoDescGlobal('02');
     setGuias([]);
-    setFechaEmisionEditada(false);
+
+    // Bolsa ICBPER
     setCantidadBolsa(0);
     setShowBolsa(false);
     setAplicarIcbper(false);
-    setTamañoBolsa("mediana");
-    setCorreoCliente("");
-    setTelefonoCliente("");
-    setEnviarCorreo(false);
-    setEnviarWhatsapp(false);
-    setPorConsumo(false);
-    setBoleta((prev) => ({
-      ublVersion: "2.1",
-      tipoOperacion: "0101",
-      tipoComprobante: "03",
-      tipoMoneda: "PEN",
+    setTamañoBolsa('mediana');
+
+    // Fecha emisión
+    setFechaEmisionEditada(false);
+
+    // Boleta base
+    setBoleta(prev => ({
+      ublVersion: '2.1', tipoOperacion: '0101', tipoComprobante: '03',
+      tipoMoneda: 'PEN', tipoPago: 'Contado',
       fechaEmision: formatoFechaActual().fechaHora,
       horaEmision: formatoFechaActual().fechaHora,
       fechaVencimiento: formatoFechaActual().fecha,
-      tipoPago: "Contado",
       serie: prev.serie,
-      correlativo: String(correlativoActual ?? "1").padStart(8, "0"),
+      correlativo: String(correlativoActual ?? '1').padStart(8, '0'),
       company: prev.company,
     }));
-    if (isSuperAdmin) {
-      setSucursal(null);
-      setCorrelativoActual(null);
-    }
+
+    // Superadmin
+    if (isSuperAdmin) { setSucursal(null); setCorrelativoActual(null); }
   };
 
   const montoRestante = (index: number) => {
@@ -1522,6 +1436,7 @@ export default function BoletaPage() {
     correlativoActual ?? sucursal?.correlativoBoleta ?? "",
   ).padStart(8, "0");
 
+  const puedeEmitir = !emitiendo && !sinSucursal && !!boleta.cliente?.razonSocial && detalles.filter(d => !d._esIcbper).length > 0;
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-2 animate-in fade-in duration-500">
@@ -1553,93 +1468,36 @@ export default function BoletaPage() {
             <form className="space-y-6">
               {/* ── Serie y correlativo ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isSuperAdmin ? (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Sucursal
-                      </label>
-                      <select
-                        value={sucursal?.sucursalId ?? ""}
-                        disabled={loadingSucursales}
-                        onChange={async (e) => {
-                          if (!e.target.value) {
-                            setSucursal(null);
-                            setCorrelativoActual(null);
-                            setDetalles([]);
-                            setBusquedaProducto([]);
-                            setShowDropdownProducto([]);
-                            setCantidadBolsa(0);
-                            return;
-                          }
-                          const sel = sucursales.find(
-                            (s: Sucursal) =>
-                              s.sucursalId === Number(e.target.value),
-                          );
-                          if (!sel) return;
-                          setSucursal(sel);
-                          setDetalles([]);
-                          setBusquedaProducto([]);
-                          setShowDropdownProducto([]);
-                          setCantidadBolsa(0);
-                          const res = await axios.get(
-                            `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
-                            {
-                              headers: {
-                                Authorization: `Bearer ${accessToken}`,
-                              },
-                            },
-                          );
-                          setCorrelativoActual(res.data.correlativoBoleta);
-                          setBoleta((prev) => ({
-                            ...prev,
-                            serie: sel.serieBoleta,
-                            correlativo: String(
-                              res.data.correlativoBoleta,
-                            ).padStart(8, "0"),
-                          }));
-                        }}
-                        className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                      >
-                        <option value="">Seleccionar sucursal</option>
-                        {sucursales.map((s: Sucursal) => (
-                          <option key={s.sucursalId} value={s.sucursalId}>
-                            {s.serieBoleta} — {s.nombre ?? s.codEstablecimiento}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Serie y Correlativo
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={
-                          !sucursal
-                            ? "Selecciona una sucursal"
-                            : `${serieDisplay}-${correlativoDisplay}`
-                        }
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm"
-                      />
-                    </div>
-                  </>
-                ) : (
+                {isSuperAdmin ? (<>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Serie y Correlativo
-                    </label>
-                    <input
-                      type="text"
-                      disabled
-                      value={
-                        loadingSucursal
-                          ? "Cargando..."
-                          : `${serieDisplay}-${correlativoDisplay}`
-                      }
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm"
-                    />
+                    <label className="text-xs font-bold text-gray-500 uppercase">Sucursal</label>
+                    <select value={sucursal?.sucursalId ?? ""} disabled={loadingSucursales}
+                      onChange={async e => {
+                        if (!e.target.value) { setSucursal(null); setCorrelativoActual(null); setDetalles([]); setBusquedaProducto([]); setShowDropdownProducto([]); setCantidadBolsa(0); return; }
+                        const sel = sucursales.find((s: Sucursal) => s.sucursalId === Number(e.target.value));
+                        if (!sel) return;
+                        setSucursal(sel); setDetalles([]); setBusquedaProducto([]); setShowDropdownProducto([]); setCantidadBolsa(0);
+                        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+                        setCorrelativoActual(res.data.correlativoBoleta);
+                        setBoleta(prev => ({ ...prev, serie: sel.serieBoleta, correlativo: String(res.data.correlativoBoleta).padStart(8, "0") }));
+                      }}
+                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
+                      <option value="">Seleccionar sucursal</option>
+                      {sucursales.map((s: Sucursal) => (
+                        <option key={s.sucursalId} value={s.sucursalId}>{s.serieBoleta} — {s.nombre ?? s.codEstablecimiento}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo</label>
+                    <input type="text" disabled value={!sucursal ? "Selecciona una sucursal" : `${serieDisplay}-${correlativoDisplay}`}
+                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
+                  </div>
+                </>) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo</label>
+                    <input type="text" disabled value={loadingSucursal ? "Cargando..." : `${serieDisplay}-${correlativoDisplay}`}
+                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
                   </div>
                 )}
               </div>
@@ -1669,171 +1527,76 @@ export default function BoletaPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Tipo y Nº Documento
-                    </label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Tipo y Nº Documento</label>
                     <div className="flex gap-2">
-                      <select
-                        value={tipoDoc}
-                        onChange={(e) => {
-                          setTipoDoc(e.target.value);
-                          setBusqueda("");
-                          setShowDropdown(false);
-                          setBoleta((prev) => ({
-                            ...prev,
-                            cliente: undefined,
-                          }));
-                        }}
-                        disabled={clienteVarios}
-                        className="w-1/3 py-2.5 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm disabled:opacity-50"
-                      >
+                      <select value={tipoDoc} disabled={clienteVarios}
+                        onChange={e => { setTipoDoc(e.target.value); setBusqueda(""); setShowDropdown(false); setBoleta(prev => ({ ...prev, cliente: undefined })); }}
+                        className="w-1/3 py-2.5 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm disabled:opacity-50">
                         <option value="01">DNI</option>
                         <option value="06">RUC</option>
                         <option value="04">CE</option>
                       </select>
                       <div className="relative w-2/3">
-                        <input
-                          type="text"
-                          value={clienteVarios ? "00000000" : busqueda}
-                          disabled={clienteVarios}
-                          onChange={(e) => {
-                            setBusqueda(e.target.value);
-                            setShowDropdown(true);
-                            if (
-                              e.target.value.length < busqueda.length ||
-                              e.target.value === ""
-                            ) {
-                              setBoleta((prev) => ({
-                                ...prev,
-                                cliente: undefined,
-                              }));
-                              setCorreoCliente("");
-                              setTelefonoCliente("");
+                        <input type="text" value={clienteVarios ? "00000000" : busqueda} disabled={clienteVarios}
+                          onChange={e => {
+                            setBusqueda(e.target.value); setShowDropdown(true);
+                            if (e.target.value.length < busqueda.length || e.target.value === "") {
+                              setBoleta(prev => ({ ...prev, cliente: undefined }));
+                              setCorreoCliente(""); setTelefonoCliente("");
                             }
                           }}
                           onFocus={() => setShowDropdown(true)}
-                          onBlur={() =>
-                            setTimeout(() => setShowDropdown(false), 150)
-                          }
-                          maxLength={
-                            tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : 12
-                          }
+                          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                          maxLength={tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : 12}
                           placeholder="Buscar por nº doc o nombre..."
-                          className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm disabled:opacity-50"
-                        />
-                        {loadingCliente && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+                          className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm disabled:opacity-50" />
+                        {loadingCliente && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
+                        {showDropdown && clientesFiltrados.length > 0 && !clienteVarios && (
+                          <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                            {loadingClientes ? <p className="text-xs text-gray-400 px-4 py-3">Cargando...</p> : (
+                              clientesFiltrados.map(c => (
+                                <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
+                                  className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+                                  <span className="text-sm text-gray-800">{c.numeroDocumento} - {c.razonSocialNombre}</span>
+                                </button>
+                              ))
+                            )}
+                          </div>
                         )}
-                        {showDropdown &&
-                          clientesFiltrados.length > 0 &&
-                          !clienteVarios && (
-                            <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                              {loadingClientes ? (
-                                <p className="text-xs text-gray-400 px-4 py-3">
-                                  Cargando...
-                                </p>
-                              ) : (
-                                clientesFiltrados.map((c) => (
-                                  <button
-                                    key={c.clienteId}
-                                    type="button"
-                                    onMouseDown={() => seleccionarDeLista(c)}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                                  >
-                                    <span className="text-sm text-gray-800">
-                                      {c.numeroDocumento} -{" "}
-                                      {c.razonSocialNombre}
-                                    </span>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        disabled
-                        value={
-                          clienteVarios
-                            ? "Clientes Varios"
-                            : (boleta.cliente?.razonSocial ?? "")
-                        }
+                      <input type="text" disabled value={clienteVarios ? "Clientes Varios" : (boleta.cliente?.razonSocial ?? "")}
                         placeholder="Nombre o razón social"
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
-                      />
-                      {!clienteVarios &&
-                        boleta.cliente?.clienteId === null &&
-                        boleta.cliente?.razonSocial && (
-                          <button
-                            type="button"
-                            onClick={() => setShowModalCliente(true)}
-                            className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
-                            title="Guardar cliente"
-                          >
-                            +
-                          </button>
-                        )}
+                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
+                      {!clienteVarios && boleta.cliente?.clienteId === null && boleta.cliente?.razonSocial && (
+                        <button type="button" onClick={() => setShowModalCliente(true)}
+                          className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                          title="Guardar cliente">+</button>
+                      )}
                     </div>
-                    {errorCliente && (
-                      <p className="text-xs text-red-500">{errorCliente}</p>
-                    )}
+                    {errorCliente && <p className="text-xs text-red-500">{errorCliente}</p>}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Contacto
-                    </label>
-                    <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
-                    >
-                      <input
-                        type="email"
-                        value={correoCliente}
-                        onChange={(e) => {
-                          setCorreoCliente(e.target.value);
-                          if (!e.target.value) setEnviarCorreo(false);
-                        }}
+                    <label className="text-xs font-bold text-gray-500 uppercase">Contacto</label>
+                    <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                      <input type="email" value={correoCliente} placeholder="Correo del cliente"
                         disabled={!boleta.cliente?.razonSocial || clienteVarios}
-                        placeholder="Correo del cliente"
-                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
-                      />
+                        onChange={e => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
+                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
                       <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={enviarCorreo}
-                          onChange={(e) => setEnviarCorreo(e.target.checked)}
-                          disabled={!correoCliente}
-                          className="w-3.5 h-3.5 accent-brand-blue"
-                        />
+                        <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={e => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
                         <span className="text-xs text-gray-500">Enviar</span>
                       </label>
                     </div>
-                    <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
-                    >
-                      <input
-                        type="tel"
-                        value={telefonoCliente}
-                        onChange={(e) => {
-                          const s = e.target.value.replace(/\D/g, "");
-                          setTelefonoCliente(s);
-                          if (!s) setEnviarWhatsapp(false);
-                        }}
+                    <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                      <input type="tel" value={telefonoCliente} placeholder="Teléfono / WhatsApp" maxLength={9}
                         disabled={!boleta.cliente?.razonSocial || clienteVarios}
-                        maxLength={9}
-                        placeholder="Teléfono / WhatsApp"
-                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
-                      />
+                        onChange={e => { const s = e.target.value.replace(/\D/g, ""); setTelefonoCliente(s); if (!s) setEnviarWhatsapp(false); }}
+                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
                       <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={enviarWhatsapp}
-                          onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                          disabled={!telefonoCliente}
-                          className="w-3.5 h-3.5 accent-brand-blue"
-                        />
+                        <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente} onChange={e => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
                         <span className="text-xs text-gray-500">Enviar</span>
                       </label>
                     </div>
@@ -1841,13 +1604,8 @@ export default function BoletaPage() {
 
                   {boleta.cliente?.razonSocial && !clienteVarios && (
                     <div className="md:col-span-2">
-                      <input
-                        type="text"
-                        disabled
-                        value={boleta.cliente?.direccionLineal ?? ""}
-                        placeholder="Dirección del cliente"
-                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500"
-                      />
+                      <input type="text" disabled value={boleta.cliente?.direccionLineal ?? ""} placeholder="Dirección del cliente"
+                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500" />
                     </div>
                   )}
                 </div>
@@ -1907,81 +1665,36 @@ export default function BoletaPage() {
               {/* ── Moneda y Tipo Pago ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
-                    Moneda
-                  </label>
-                  <select
-                    value={boleta.tipoMoneda ?? "PEN"}
-                    onChange={(e) => {
-                      const nueva = e.target.value,
-                        anterior = boleta.tipoMoneda ?? "PEN";
-                      setBoleta((prev) => ({ ...prev, tipoMoneda: nueva }));
+                  <label className="text-xs font-bold text-gray-500 uppercase">Moneda</label>
+                  <select value={boleta.tipoMoneda ?? "PEN"}
+                    onChange={e => {
+                      const nueva = e.target.value, anterior = boleta.tipoMoneda ?? "PEN";
+                      setBoleta(prev => ({ ...prev, tipoMoneda: nueva }));
                       if (detalles.length > 0) {
-                        setDetalles((prev) =>
-                          prev.map((d) => {
-                            const pb = d._precioBase ?? 0;
-                            const npb =
-                              nueva === "USD" && anterior === "PEN"
-                                ? parseFloat((pb / tipoCambio).toFixed(6))
-                                : nueva === "PEN" && anterior === "USD"
-                                  ? parseFloat((pb * tipoCambio).toFixed(6))
-                                  : pb;
-                            const ta = d.tipoAfectacionIGV ?? "10",
-                              pct = d.porcentajeIGV ?? 18;
-                            const npv =
-                              ta === "10"
-                                ? parseFloat((npb * (1 + pct / 100)).toFixed(2))
-                                : npb;
-                            return {
-                              ...d,
-                              _precioBase: npb,
-                              _precioVentaConIGV: npv,
-                              ...calcularDetalle(
-                                npb,
-                                npv,
-                                d.cantidad ?? 1,
-                                pct,
-                                ta,
-                                d.codigoTipoDescuento ?? "01",
-                                d.descuentoUnitario ?? 0,
-                              ),
-                            };
-                          }),
-                        );
+                        setDetalles(prev => prev.map(d => {
+                          const pb = d._precioBase ?? 0;
+                          const npb = nueva === "USD" && anterior === "PEN" ? parseFloat((pb / tipoCambio).toFixed(6))
+                            : nueva === "PEN" && anterior === "USD" ? parseFloat((pb * tipoCambio).toFixed(6)) : pb;
+                          const ta = d.tipoAfectacionIGV ?? "10", pct = d.porcentajeIGV ?? 18;
+                          const npv = ta === "10" ? parseFloat((npb * (1 + pct / 100)).toFixed(2)) : npb;
+                          return { ...d, _precioBase: npb, _precioVentaConIGV: npv, ...calcularDetalle(npb, npv, d.cantidad ?? 1, pct, ta, d.codigoTipoDescuento ?? "01", d.descuentoUnitario ?? 0) };
+                        }));
                       }
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                  >
+                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
                     <option value="PEN">PEN - Soles</option>
-                    <option value="USD">
-                      USD - Dólares ({tipoCambio.toFixed(2)})
-                    </option>
+                    <option value="USD">USD - Dólares ({tipoCambio.toFixed(2)})</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
-                    Tipo de Pago
-                  </label>
-                  <select
-                    value={boleta.tipoPago ?? "Contado"}
-                    onChange={(e) => {
-                      setBoleta((prev) => ({
-                        ...prev,
-                        tipoPago: e.target.value,
-                      }));
-                      setPagos([
-                        {
-                          medioPago: "Efectivo",
-                          monto: "",
-                          numeroOperacion: "",
-                          entidadFinanciera: "",
-                          observaciones: "",
-                        },
-                      ]);
+                  <label className="text-xs font-bold text-gray-500 uppercase">Tipo de Pago</label>
+                  <select value={boleta.tipoPago ?? "Contado"}
+                    onChange={e => {
+                      setBoleta(prev => ({ ...prev, tipoPago: e.target.value }));
+                      setPagos([{ medioPago: "Efectivo", monto: "", numeroOperacion: "", entidadFinanciera: "", observaciones: "" }]);
                       setPagosEditados([false]);
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                  >
+                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
                     <option value="Contado">Contado</option>
                     <option value="Credito">Crédito</option>
                     <option value="CreditoInicial">Crédito con Inicial</option>
@@ -1990,161 +1703,62 @@ export default function BoletaPage() {
               </div>
 
               {/* ── Pagos ── */}
-              {(boleta.tipoPago === "Contado" ||
-                boleta.tipoPago === "CreditoInicial") && (
+              {(boleta.tipoPago === "Contado" || boleta.tipoPago === "CreditoInicial") && (
                 <div className="border border-gray-100 rounded-xl p-4 space-y-4 bg-gray-50/50">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-gray-500 uppercase">
-                      {boleta.tipoPago === "CreditoInicial"
-                        ? "Pago Inicial"
-                        : "Datos de Pago"}
+                      {boleta.tipoPago === "CreditoInicial" ? "Pago Inicial" : "Datos de Pago"}
                     </label>
                     {mediosUsados.length < todosMedios.length && (
-                      <button
-                        type="button"
-                        onClick={agregarPago}
-                        className="text-xs text-brand-blue hover:underline flex items-center gap-1"
-                      >
+                      <button type="button" onClick={agregarPago} className="text-xs text-brand-blue hover:underline flex items-center gap-1">
                         <Plus className="w-3 h-3" /> Agregar medio de pago
                       </button>
                     )}
                   </div>
                   <div className="space-y-3">
                     {pagos.map((pago, i) => (
-                      <div
-                        key={i}
-                        className="space-y-3 pb-3 border-b border-gray-100 last:border-0"
-                      >
+                      <div key={i} className="space-y-3 pb-3 border-b border-gray-100 last:border-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div className="space-y-1.5">
-                            <label className="text-xs text-gray-500">
-                              Medio de Pago
-                            </label>
-                            <select
-                              value={pago.medioPago}
-                              onChange={(e) =>
-                                actualizarPago(i, "medioPago", e.target.value)
-                              }
-                              className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                            >
-                              {todosMedios.map((m) => (
-                                <option
-                                  key={m}
-                                  value={m}
-                                  disabled={
-                                    mediosUsados.includes(m) &&
-                                    pago.medioPago !== m
-                                  }
-                                >
-                                  {m}
-                                </option>
+                            <label className="text-xs text-gray-500">Medio de Pago</label>
+                            <select value={pago.medioPago} onChange={e => actualizarPago(i, "medioPago", e.target.value)}
+                              className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
+                              {todosMedios.map(m => (
+                                <option key={m} value={m} disabled={mediosUsados.includes(m) && pago.medioPago !== m}>{m}</option>
                               ))}
                             </select>
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-xs text-gray-500">
-                              Monto
-                            </label>
+                            <label className="text-xs text-gray-500">Monto</label>
                             <div className="flex gap-2">
-                              <input
-                                type="number"
-                                value={pago.monto}
-                                onChange={(e) => {
-                                  actualizarPago(i, "monto", e.target.value);
-                                  setPagosEditados((prev) => {
-                                    const n = [...prev];
-                                    n[i] = e.target.value !== "";
-                                    return n;
-                                  });
-                                }}
-                                onBlur={(e) => {
-                                  if (
-                                    !e.target.value ||
-                                    e.target.value === "0"
-                                  ) {
-                                    setPagosEditados((prev) => {
-                                      const n = [...prev];
-                                      n[i] = false;
-                                      return n;
-                                    });
-                                    actualizarPago(i, "monto", "");
-                                  }
-                                }}
-                                disabled={
-                                  pago.medioPago === "Efectivo" &&
-                                  pagos.length === 1
-                                }
-                                placeholder={montoRestante(i)}
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                              />
+                              <input type="number" value={pago.monto} placeholder={montoRestante(i)}
+                                disabled={pago.medioPago === "Efectivo" && pagos.length === 1}
+                                onChange={e => { actualizarPago(i, "monto", e.target.value); setPagosEditados(prev => { const n = [...prev]; n[i] = e.target.value !== ""; return n; }); }}
+                                onBlur={e => { if (!e.target.value || e.target.value === "0") { setPagosEditados(prev => { const n = [...prev]; n[i] = false; return n; }); actualizarPago(i, "monto", ""); } }}
+                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
                               {pagos.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => eliminarPago(i)}
-                                  className="text-red-400 hover:text-red-600 px-2"
-                                >
+                                <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-2">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
                             </div>
                           </div>
-                          {pago.medioPago !== "Efectivo" && (
-                            <>
-                              <div className="space-y-1.5">
-                                <label className="text-xs text-gray-500">
-                                  Nº Operación
-                                </label>
-                                <input
-                                  type="text"
-                                  value={pago.numeroOperacion}
-                                  onChange={(e) =>
-                                    actualizarPago(
-                                      i,
-                                      "numeroOperacion",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="Número de operación"
-                                  className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs text-gray-500">
-                                  Entidad Financiera
-                                </label>
-                                <input
-                                  type="text"
-                                  value={pago.entidadFinanciera}
-                                  onChange={(e) =>
-                                    actualizarPago(
-                                      i,
-                                      "entidadFinanciera",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="Banco / entidad"
-                                  className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                                />
-                              </div>
-                            </>
-                          )}
+                          {pago.medioPago !== "Efectivo" && (<>
+                            <div className="space-y-1.5">
+                              <label className="text-xs text-gray-500">Nº Operación</label>
+                              <input type="text" value={pago.numeroOperacion} onChange={e => actualizarPago(i, "numeroOperacion", e.target.value)} placeholder="Número de operación"
+                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-xs text-gray-500">Entidad Financiera</label>
+                              <input type="text" value={pago.entidadFinanciera} onChange={e => actualizarPago(i, "entidadFinanciera", e.target.value)} placeholder="Banco / entidad"
+                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
+                            </div>
+                          </>)}
                           <div className="space-y-1.5 md:col-span-2">
-                            <label className="text-xs text-gray-500">
-                              Observaciones
-                            </label>
-                            <input
-                              type="text"
-                              value={pago.observaciones}
-                              onChange={(e) =>
-                                actualizarPago(
-                                  i,
-                                  "observaciones",
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Observaciones (opcional)"
-                              className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                            />
+                            <label className="text-xs text-gray-500">Observaciones</label>
+                            <input type="text" value={pago.observaciones} onChange={e => actualizarPago(i, "observaciones", e.target.value)} placeholder="Observaciones (opcional)"
+                              className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
                           </div>
                         </div>
                       </div>
@@ -2152,100 +1766,46 @@ export default function BoletaPage() {
                   </div>
                   {boleta.tipoPago === "CreditoInicial" && (
                     <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
-                      <p className="text-gray-500">
-                        Total pagado:{" "}
-                        <span className="font-semibold text-gray-800">
-                          {simbolo} {totalPagado.toFixed(2)}
-                        </span>
-                      </p>
-                      <p className="text-gray-500">
-                        Monto a crédito:{" "}
-                        <span className="font-semibold text-brand-blue">
-                          {simbolo}{" "}
-                          {Math.max(0, totales.total - totalPagado).toFixed(2)}
-                        </span>
-                      </p>
+                      <p className="text-gray-500">Total pagado: <span className="font-semibold text-gray-800">{simbolo} {totalPagado.toFixed(2)}</span></p>
+                      <p className="text-gray-500">Monto a crédito: <span className="font-semibold text-brand-blue">{simbolo} {Math.max(0, totales.total - totalPagado).toFixed(2)}</span></p>
                     </div>
                   )}
                 </div>
               )}
 
               {/* ── Cuotas ── */}
-              {(boleta.tipoPago === "Credito" ||
-                boleta.tipoPago === "CreditoInicial") && (
+              {(boleta.tipoPago === "Credito" || boleta.tipoPago === "CreditoInicial") && (
                 <div className="border border-gray-100 rounded-xl p-4 space-y-4 bg-gray-50/50">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Cuotas de Pago
-                    </label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Cuotas de Pago</label>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">Nº cuotas:</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={24}
-                        value={numeroCuotas}
-                        onChange={(e) =>
-                          setNumeroCuotas(Number(e.target.value))
-                        }
-                        className="w-16 py-1.5 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue text-center"
-                      />
+                      <input type="number" min={1} max={24} value={numeroCuotas} onChange={e => setNumeroCuotas(Number(e.target.value))}
+                        className="w-16 py-1.5 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue text-center" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     {cuotas.map((cuota, i) => (
                       <div key={i} className="grid grid-cols-3 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">
-                            Cuota
-                          </label>
-                          <input
-                            type="text"
-                            disabled
-                            value={cuota.numeroCuota}
-                            className="w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500 font-mono"
-                          />
+                          <label className="text-[10px] text-gray-400">Cuota</label>
+                          <input type="text" disabled value={cuota.numeroCuota}
+                            className="w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500 font-mono" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">
-                            Monto
-                          </label>
-                          <input
-                            type="number"
-                            value={cuota.monto}
-                            onChange={(e) => {
-                              const n = [...cuotas];
-                              n[i].monto = e.target.value;
-                              setCuotas(n);
-                            }}
-                            placeholder="0.00"
-                            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue"
-                          />
+                          <label className="text-[10px] text-gray-400">Monto</label>
+                          <input type="number" value={cuota.monto} placeholder="0.00"
+                            onChange={e => { const n = [...cuotas]; n[i].monto = e.target.value; setCuotas(n); }}
+                            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">
-                            Fecha Vencimiento
-                          </label>
-                          <DatePickerLimitado
-                            modo="cuota"
-                            fechaMinima={
-                              i > 0 ? cuotas[i - 1].fechaVencimiento : undefined
-                            }
+                          <label className="text-[10px] text-gray-400">Fecha Vencimiento</label>
+                          <DatePickerLimitado modo="cuota" fechaMinima={i > 0 ? cuotas[i - 1].fechaVencimiento : undefined}
                             value={cuota.fechaVencimiento}
-                            onChange={(e) => {
-                              const fs = calcularFechasCuotas(
-                                e,
-                                cuotas.length - i,
-                              );
-                              setCuotas((prev) =>
-                                prev.map((c, idx) =>
-                                  idx < i
-                                    ? c
-                                    : { ...c, fechaVencimiento: fs[idx - i] },
-                                ),
-                              );
-                            }}
-                          />
+                            onChange={e => {
+                              const fs = calcularFechasCuotas(e, cuotas.length - i);
+                              setCuotas(prev => prev.map((c, idx) => idx < i ? c : { ...c, fechaVencimiento: fs[idx - i] }));
+                            }} />
                         </div>
                       </div>
                     ))}
@@ -2255,85 +1815,41 @@ export default function BoletaPage() {
 
               {/* ── Guías de Remisión ── */}
               <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowGuias(!showGuias)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <span className="text-xs font-bold text-gray-500 uppercase">
-                    Guías de Remisión (opcional)
-                  </span>
-                  {showGuias ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  )}
+                <button type="button" onClick={() => setShowGuias(!showGuias)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Guías de Remisión (opcional)</span>
+                  {showGuias ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                 </button>
                 {showGuias && (
                   <div className="p-4 space-y-3">
                     {guias.map((g, i) => (
                       <div key={i} className="grid grid-cols-3 gap-3 items-end">
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">
-                            Tipo Doc
-                          </label>
-                          <select
-                            value={g.tipoDoc}
-                            onChange={(e) =>
-                              actualizarGuia(i, "tipoDoc", e.target.value)
-                            }
-                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                          >
+                          <label className="text-[10px] text-gray-400">Tipo Doc</label>
+                          <select value={g.tipoDoc} onChange={e => actualizarGuia(i, "tipoDoc", e.target.value)}
+                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
                             <option value="09">Guía Remisión Remitente</option>
-                            <option value="31">
-                              Guía Remisión Transportista
-                            </option>
+                            <option value="31">Guía Remisión Transportista</option>
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">
-                            Serie
-                          </label>
-                          <input
-                            type="text"
-                            value={g.serie}
-                            onChange={(e) =>
-                              actualizarGuia(i, "serie", e.target.value)
-                            }
-                            placeholder="T001"
-                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                          />
+                          <label className="text-[10px] text-gray-400">Serie</label>
+                          <input type="text" value={g.serie} onChange={e => actualizarGuia(i, "serie", e.target.value)} placeholder="T001"
+                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">
-                            Número
-                          </label>
+                          <label className="text-[10px] text-gray-400">Número</label>
                           <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={g.numero}
-                              onChange={(e) =>
-                                actualizarGuia(i, "numero", e.target.value)
-                              }
-                              placeholder="00000001"
-                              className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => eliminarGuia(i)}
-                              className="text-red-400 hover:text-red-600"
-                            >
+                            <input type="text" value={g.numero} onChange={e => actualizarGuia(i, "numero", e.target.value)} placeholder="00000001"
+                              className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
+                            <button type="button" onClick={() => eliminarGuia(i)} className="text-red-400 hover:text-red-600">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={agregarGuia}
-                      className="text-xs text-brand-blue hover:underline flex items-center gap-1 pt-1"
-                    >
+                    <button type="button" onClick={agregarGuia} className="text-xs text-brand-blue hover:underline flex items-center gap-1 pt-1">
                       <Plus className="w-3 h-3" /> Agregar guía
                     </button>
                   </div>
@@ -2347,34 +1863,15 @@ export default function BoletaPage() {
                     <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                       <ClipboardList className="w-4 h-4 text-brand-blue" />
                     </div>
-                    <label className="text-sm font-bold text-gray-800">
-                      Ítems / Productos
-                    </label>
+                    <label className="text-sm font-bold text-gray-800">Ítems / Productos</label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label
-                      className={`flex items-center gap-1.5 select-none ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={porConsumo}
-                        onChange={(e) => {
-                          if (sinSucursal) return;
-                          setPorConsumo(e.target.checked);
-                        }}
-                        disabled={sinSucursal}
-                        className="w-3.5 h-3.5 accent-brand-blue"
-                      />
+                    <label className={`flex items-center gap-1.5 select-none ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
+                      <input type="checkbox" checked={porConsumo} onChange={e => { if (sinSucursal) return; setPorConsumo(e.target.checked); }} disabled={sinSucursal} className="w-3.5 h-3.5 accent-brand-blue" />
                       <span className="text-xs text-gray-500">Por Consumo</span>
                     </label>
                     {!porConsumo && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="h-8 text-xs text-brand-blue"
-                        disabled={sinSucursal}
-                        onClick={agregarFila}
-                      >
+                      <Button type="button" variant="ghost" className="h-8 text-xs text-brand-blue" disabled={sinSucursal} onClick={agregarFila}>
                         <Plus className="w-3 h-3 mr-1" /> Agregar ítem
                       </Button>
                     )}
@@ -2382,400 +1879,170 @@ export default function BoletaPage() {
                 </div>
 
                 <div className="border border-gray-100 rounded-xl overflow-x-auto">
-                  <table
-                    className="w-full text-xs"
-                    style={{ minWidth: "860px" }}
-                  >
+                  <table className="w-full text-xs" style={{ minWidth: "860px" }}>
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-2 py-2 text-left text-gray-500 w-6">
-                          #
-                        </th>
-                        <th
-                          className="px-2 py-2 text-left text-gray-500"
-                          style={{ minWidth: "180px" }}
-                        >
-                          Producto
-                        </th>
-                        <th className="px-2 py-2 text-left text-gray-500 w-14">
-                          Cód.
-                        </th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">
-                          U.M.
-                        </th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">
-                          Cant.
-                        </th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-20">
-                          Afect. IGV
-                        </th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-22">
-                          P.Venta c/IGV
-                        </th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">
-                          %IGV
-                        </th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">
-                          T.Desc
-                        </th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">
-                          Desc.Unit
-                        </th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">
-                          P.Final
-                        </th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">
-                          Total
-                        </th>
+                        <th className="px-2 py-2 text-left text-gray-500 w-6">#</th>
+                        <th className="px-2 py-2 text-left text-gray-500" style={{ minWidth: "180px" }}>Producto</th>
+                        <th className="px-2 py-2 text-left text-gray-500 w-14">Cód.</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">U.M.</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">Cant.</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-20">Afect. IGV</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-22">P.Venta c/IGV</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">%IGV</th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">T.Desc</th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">Desc.Unit</th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">P.Final</th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">Total</th>
                         <th className="px-2 py-2 w-6"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {detalles.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={13}
-                            className="px-4 py-8 text-center text-xs text-gray-400"
-                          >
-                            Sin ítems. Haz clic en "Agregar ítem" para comenzar.
-                          </td>
-                        </tr>
+                        <tr><td colSpan={13} className="px-4 py-8 text-center text-xs text-gray-400">Sin ítems. Haz clic en "Agregar ítem" para comenzar.</td></tr>
                       ) : (
                         detalles.map((d, i) => {
                           const esPorConsumo = d._id === "por-consumo";
                           return (
                             <tr key={i} className="hover:bg-gray-50/50">
-                              <td className="px-2 py-1.5 text-gray-400">
-                                {i + 1}
-                              </td>
-                              <td
-                                className="px-2 py-1.5"
-                                style={{
-                                  overflow: "visible",
-                                  position: "relative",
-                                  minWidth: "180px",
-                                }}
-                              >
-                                <input
-                                  ref={(el) => {
-                                    inputRefs.current[i] = el;
-                                  }}
-                                  type="text"
-                                  value={busquedaProducto[i] ?? ""}
+                              <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
+
+                              {/* Producto */}
+                              <td className="px-2 py-1.5" style={{ overflow: "visible", position: "relative", minWidth: "180px" }}>
+                                <input ref={el => { inputRefs.current[i] = el; }} type="text" value={busquedaProducto[i] ?? ""}
                                   disabled={!!d._esIcbper || esPorConsumo}
-                                  onChange={(e) => {
-                                    const nb = [...busquedaProducto];
-                                    nb[i] = e.target.value;
-                                    setBusquedaProducto(nb);
-                                    const nd = [...showDropdownProducto];
-                                    nd[i] = true;
-                                    setShowDropdownProducto(nd);
-                                    if (!d.productoId) {
-                                      const n = [...detalles];
-                                      n[i] = {
-                                        ...n[i],
-                                        descripcion: e.target.value,
-                                      };
-                                      setDetalles(n);
-                                    }
+                                  onChange={e => {
+                                    const nb = [...busquedaProducto]; nb[i] = e.target.value; setBusquedaProducto(nb);
+                                    const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd);
+                                    if (!d.productoId) { const n = [...detalles]; n[i] = { ...n[i], descripcion: e.target.value }; setDetalles(n); }
                                   }}
-                                  onFocus={() => {
-                                    const nd = [...showDropdownProducto];
-                                    nd[i] = true;
-                                    setShowDropdownProducto(nd);
-                                  }}
+                                  onFocus={() => { const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd); }}
                                   onBlur={() => {
-                                    setTimeout(() => {
-                                      const nd = [...showDropdownProducto];
-                                      nd[i] = false;
-                                      setShowDropdownProducto(nd);
-                                    }, 150);
+                                    setTimeout(() => { const nd = [...showDropdownProducto]; nd[i] = false; setShowDropdownProducto(nd); }, 150);
                                     const txt = busquedaProducto[i] ?? "";
-                                    if (txt && !detalles[i]?.productoId) {
-                                      const n = [...detalles];
-                                      n[i] = {
-                                        ...n[i],
-                                        descripcion: txt,
-                                        productoId: null,
-                                        codigo: null,
-                                      };
-                                      setDetalles(n);
-                                    }
+                                    if (txt && !detalles[i]?.productoId) { const n = [...detalles]; n[i] = { ...n[i], descripcion: txt, productoId: null, codigo: null }; setDetalles(n); }
                                   }}
                                   placeholder="Buscar o agregar producto..."
                                   className="w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
-                                {showDropdownProducto[i] &&
-                                  !d._esIcbper &&
-                                  !esPorConsumo &&
-                                  (() => {
-                                    const rect =
-                                      inputRefs.current[
-                                        i
-                                      ]?.getBoundingClientRect();
-                                    const filtrados = productosSucursal.filter(
-                                      (p: ProductoSucursal) =>
-                                        !(busquedaProducto[i] ?? "")
-                                          ? true
-                                          : p.nomProducto
-                                              .toLowerCase()
-                                              .includes(
-                                                (
-                                                  busquedaProducto[i] ?? ""
-                                                ).toLowerCase(),
-                                              ) ||
-                                            p.codigo.includes(
-                                              busquedaProducto[i] ?? "",
-                                            ),
-                                    );
-                                    if (!filtrados.length) return null;
-                                    return (
-                                      <div
-                                        style={{
-                                          position: "fixed",
-                                          zIndex: 9999,
-                                          top:
-                                            (rect?.bottom ?? 0) +
-                                            window.scrollY +
-                                            4,
-                                          left: rect?.left ?? 0,
-                                          width: "280px",
-                                        }}
-                                        className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto"
-                                      >
-                                        {filtrados.map(
-                                          (p: ProductoSucursal) => (
-                                            <button
-                                              key={p.productoId}
-                                              type="button"
-                                              disabled={
-                                                p.tipoProducto === "BIEN" &&
-                                                p.sucursalProducto.stock === 0
-                                              }
-                                              onMouseDown={() => {
-                                                if (
-                                                  p.tipoProducto === "BIEN" &&
-                                                  p.sucursalProducto.stock === 0
-                                                )
-                                                  return;
-                                                seleccionarProducto(p, i);
-                                              }}
-                                              className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0 ? "opacity-50 cursor-not-allowed bg-gray-50" : "hover:bg-gray-50"}`}
-                                            >
-                                              <p className="text-xs font-medium text-gray-800">
-                                                {p.nomProducto}
-                                              </p>
-                                              <p className="text-[10px] text-gray-400">
-                                                {p.codigo} · S/{" "}
-                                                {p.sucursalProducto.precioUnitario.toFixed(
-                                                  2,
-                                                )}
-                                                {p.tipoProducto === "BIEN" && (
-                                                  <span
-                                                    className={
-                                                      p.sucursalProducto
-                                                        .stock === 0
-                                                        ? " text-red-400"
-                                                        : " text-green-600"
-                                                    }
-                                                  >
-                                                    {p.sucursalProducto
-                                                      .stock === 0
-                                                      ? " · Sin stock"
-                                                      : ` · Stock: ${p.sucursalProducto.stock}`}
-                                                  </span>
-                                                )}
-                                              </p>
-                                            </button>
-                                          ),
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
+                                {showDropdownProducto[i] && !d._esIcbper && !esPorConsumo && (() => {
+                                  const rect = inputRefs.current[i]?.getBoundingClientRect();
+                                  const filtrados = productosSucursal.filter((p: ProductoSucursal) =>
+                                    !(busquedaProducto[i] ?? "") ? true :
+                                      p.nomProducto.toLowerCase().includes((busquedaProducto[i] ?? "").toLowerCase()) ||
+                                      p.codigo.includes(busquedaProducto[i] ?? "")
+                                  );
+                                  if (!filtrados.length) return null;
+                                  return (
+                                    <div style={{ position: "fixed", zIndex: 9999, top: (rect?.bottom ?? 0) + window.scrollY + 4, left: rect?.left ?? 0, width: "280px" }}
+                                      className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                                      {filtrados.map((p: ProductoSucursal) => (
+                                        <button key={p.productoId} type="button"
+                                          disabled={p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0}
+                                          onMouseDown={() => { if (p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0) return; seleccionarProducto(p, i); }}
+                                          className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0 ? "opacity-50 cursor-not-allowed bg-gray-50" : "hover:bg-gray-50"}`}>
+                                          <p className="text-xs font-medium text-gray-800">{p.nomProducto}</p>
+                                          <p className="text-[10px] text-gray-400">
+                                            {p.codigo} · S/ {p.sucursalProducto.precioUnitario.toFixed(2)}
+                                            {p.tipoProducto === "BIEN" && (
+                                              <span className={p.sucursalProducto.stock === 0 ? " text-red-400" : " text-green-600"}>
+                                                {p.sucursalProducto.stock === 0 ? " · Sin stock" : ` · Stock: ${p.sucursalProducto.stock}`}
+                                              </span>
+                                            )}
+                                          </p>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </td>
-                              <td className="px-2 py-1.5 text-gray-500 font-mono text-[10px]">
-                                {d.codigo || "-"}
-                              </td>
+
+                              <td className="px-2 py-1.5 text-gray-500 font-mono text-[10px]">{d.codigo || "-"}</td>
+
+                              {/* U.M. */}
                               <td className="px-2 py-1.5">
                                 {!d.productoId && !esPorConsumo ? (
-                                  <select
-                                    value={d.unidadMedida ?? "NIU"}
-                                    onChange={(e) => {
-                                      const n = [...detalles];
-                                      n[i] = {
-                                        ...n[i],
-                                        unidadMedida: e.target.value,
-                                      };
-                                      setDetalles(n);
-                                    }}
-                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                                  >
+                                  <select value={d.unidadMedida ?? "NIU"} onChange={e => { const n = [...detalles]; n[i] = { ...n[i], unidadMedida: e.target.value }; setDetalles(n); }}
+                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
                                     <option value="NIU">NIU</option>
                                     <option value="KGM">KGM</option>
                                     <option value="LTR">LTR</option>
                                     <option value="ZZ">ZZ</option>
                                   </select>
                                 ) : (
-                                  <span className="text-xs text-gray-500">
-                                    {d.unidadMedida || "NIU"}
-                                  </span>
+                                  <span className="text-xs text-gray-500">{d.unidadMedida || "NIU"}</span>
                                 )}
                               </td>
+
+                              {/* Cantidad */}
                               <td className="px-2 py-1.5">
                                 {d._esIcbper || esPorConsumo ? (
-                                  <span className="text-xs text-gray-500 text-center block">
-                                    {d.cantidad}
-                                  </span>
+                                  <span className="text-xs text-gray-500 text-center block">{d.cantidad}</span>
                                 ) : (
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          actualizarCantidad(
-                                            i,
-                                            Math.max(1, (d.cantidad ?? 1) - 1),
-                                          )
-                                        }
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors"
-                                      >
-                                        −
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        value={d.cantidad ?? 1}
-                                        onChange={(e) =>
-                                          actualizarCantidad(
-                                            i,
-                                            Number(e.target.value),
-                                          )
-                                        }
-                                        className="w-10 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          actualizarCantidad(
-                                            i,
-                                            (d.cantidad ?? 1) + 1,
-                                          )
-                                        }
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors"
-                                      >
-                                        +
-                                      </button>
+                                      <button type="button" onClick={() => actualizarCantidad(i, Math.max(1, (d.cantidad ?? 1) - 1))} className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors">−</button>
+                                      <input type="number" min={1} value={d.cantidad ?? 1} onChange={e => actualizarCantidad(i, Number(e.target.value))} className="w-10 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
+                                      <button type="button" onClick={() => actualizarCantidad(i, (d.cantidad ?? 1) + 1)} className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors">+</button>
                                     </div>
-                                    {d._tipoProducto === "BIEN" &&
-                                      d._stockDisponible != null && (
-                                        <p
-                                          className={`text-[9px] text-center ${d._stockDisponible === 0 ? "text-red-500" : (d.cantidad ?? 1) > d._stockDisponible ? "text-red-400" : "text-gray-400"}`}
-                                        >
-                                          Stock: {d._stockDisponible}
-                                        </p>
-                                      )}
+                                    {d._tipoProducto === "BIEN" && d._stockDisponible != null && (
+                                      <p className={`text-[9px] text-center ${d._stockDisponible === 0 ? "text-red-500" : (d.cantidad ?? 1) > d._stockDisponible ? "text-red-400" : "text-gray-400"}`}>
+                                        Stock: {d._stockDisponible}
+                                      </p>
+                                    )}
                                   </div>
                                 )}
                               </td>
+
+                              {/* Afect. IGV */}
                               <td className="px-2 py-1.5">
-                                <select
-                                  value={d.tipoAfectacionIGV ?? "10"}
-                                  disabled={!!d._esIcbper || esPorConsumo}
-                                  onChange={(e) =>
-                                    actualizarTipoAfectacion(i, e.target.value)
-                                  }
-                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                                >
+                                <select value={d.tipoAfectacionIGV ?? "10"} disabled={!!d._esIcbper || esPorConsumo} onChange={e => actualizarTipoAfectacion(i, e.target.value)}
+                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
                                   <option value="10">10 - Gravado</option>
                                   <option value="20">20 - Exonerado</option>
                                   <option value="30">30 - Inafecto</option>
                                 </select>
                               </td>
+
+                              {/* P.Venta c/IGV */}
                               <td className="px-2 py-1.5">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={
-                                    d._precioVentaConIGV ?? d.precioVenta ?? 0
-                                  }
-                                  onChange={(e) =>
-                                    actualizarPrecioVenta(
-                                      i,
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  disabled={!!d._esIcbper}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
-                                />
+                                <input type="number" min={0} step="0.01" value={d._precioVentaConIGV ?? d.precioVenta ?? 0}
+                                  onChange={e => actualizarPrecioVenta(i, Number(e.target.value))} disabled={!!d._esIcbper}
+                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`} />
                               </td>
+
+                              {/* %IGV */}
                               <td className="px-2 py-1.5">
                                 {d.tipoAfectacionIGV === "10" ? (
-                                  <select
-                                    value={d.porcentajeIGV ?? IGV_DEFAULT}
-                                    disabled={!!d._esIcbper}
-                                    onChange={(e) =>
-                                      actualizarPorcentajeIGV(
-                                        i,
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
-                                  >
+                                  <select value={d.porcentajeIGV ?? IGV_DEFAULT} disabled={!!d._esIcbper} onChange={e => actualizarPorcentajeIGV(i, Number(e.target.value))}
+                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
                                     <option value={18}>18%</option>
                                     <option value={10.5}>10.5%</option>
                                   </select>
                                 ) : (
-                                  <span className="block text-center text-gray-400 text-xs">
-                                    N/A
-                                  </span>
+                                  <span className="block text-center text-gray-400 text-xs">N/A</span>
                                 )}
                               </td>
+
+                              {/* T.Desc */}
                               <td className="px-2 py-1.5">
-                                <select
-                                  value={d.codigoTipoDescuento ?? "01"}
-                                  onChange={(e) =>
-                                    actualizarCodigoDescuento(i, e.target.value)
-                                  }
-                                  disabled={!!d._esIcbper || esPorConsumo}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
-                                >
-                                  <option value="01">
-                                    01 - No afecta base
-                                  </option>
+                                <select value={d.codigoTipoDescuento ?? "01"} onChange={e => actualizarCodigoDescuento(i, e.target.value)} disabled={!!d._esIcbper || esPorConsumo}
+                                  className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}>
+                                  <option value="01">01 - No afecta base</option>
                                   <option value="00">00 - Afecta base</option>
                                 </select>
                               </td>
+
+                              {/* Desc.Unit */}
                               <td className="px-2 py-1.5">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={d.descuentoUnitario ?? 0}
-                                  onChange={(e) =>
-                                    actualizarDescuento(
-                                      i,
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  disabled={!!d._esIcbper || esPorConsumo}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
-                                />
+                                <input type="number" min={0} step="0.01" value={d.descuentoUnitario ?? 0} onChange={e => actualizarDescuento(i, Number(e.target.value))} disabled={!!d._esIcbper || esPorConsumo}
+                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`} />
                               </td>
-                              <td className="px-2 py-1.5 text-right font-mono text-gray-700 text-xs">
-                                {(d.precioVenta ?? 0).toFixed(2)}
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 text-xs">
-                                {(d.totalVentaItem ?? 0).toFixed(2)}
-                              </td>
+
+                              <td className="px-2 py-1.5 text-right font-mono text-gray-700 text-xs">{(d.precioVenta ?? 0).toFixed(2)}</td>
+                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 text-xs">{(d.totalVentaItem ?? 0).toFixed(2)}</td>
                               <td className="px-2 py-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => eliminarFila(i)}
-                                  className="text-red-400 hover:text-red-600"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <button type="button" onClick={() => eliminarFila(i)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                               </td>
                             </tr>
                           );
@@ -2986,30 +2253,16 @@ export default function BoletaPage() {
                   />
                 )}
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-sky-700 bg-white hover:bg-sky-500 hover:text-white active:scale-95 border border-sky-300 hover:border-sky-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm"
-                  >
+                  <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const a = document.createElement("a");
-                      a.href = pdfUrl;
-                      a.download = `boleta-${boleta.serie}-${boleta.correlativo}.pdf`;
-                      a.click();
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-500 hover:text-white active:scale-95 border border-emerald-300 hover:border-emerald-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm"
-                  >
+                  <button type="button" onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `boleta-${boleta.serie}-${boleta.correlativo}.pdf`; a.click(); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
-                  <button
-                    type="button"
-                    onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-violet-700 bg-white hover:bg-violet-500 hover:text-white active:scale-95 border border-violet-300 hover:border-violet-500 py-2.5 rounded-lg transition-all duration-200 shadow-sm"
-                  >
+                  <button type="button" onClick={imprimirPdf}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
                     <Printer className="w-3.5 h-3.5" /> Imprimir
                   </button>
                 </div>
@@ -3031,23 +2284,23 @@ export default function BoletaPage() {
             )}
 
             <div className="mt-6 space-y-3">
-              <Button
-                className="w-full py-3 text-base"
-                type="button"
+              <Button className="w-full py-3 text-base" type="button"
                 onClick={emitido ? nuevaBoleta : emitirComprobante}
-                disabled={emitiendo || (!emitido && sinSucursal)}
-              >
+                disabled={!puedeEmitir && !emitido}>
                 {emitiendo ? (
                   <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Emitiendo...
                   </span>
-                ) : emitido ? (
-                  "Nueva Boleta"
-                ) : (
-                  "Emitir Boleta"
-                )}
+                ) : emitido ? 'Nueva Boleta' : 'Emitir Boleta'}
               </Button>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={enviarEnResumen}
+                  onChange={e => setEnviarEnResumen(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-brand-blue" />
+                <span className="text-xs text-gray-500">Enviar mendiante resumen (Guardar doc. en BD)</span>
+              </label>
+
               {sinSucursal && (
                 <p className="text-xs text-amber-600 text-center">
                   Selecciona una sucursal para emitir
@@ -3058,9 +2311,6 @@ export default function BoletaPage() {
                   {errorEmision}
                 </p>
               )}
-              <Button variant="outline" className="w-full" type="button">
-                Guardar como Borrador
-              </Button>
             </div>
           </Card>
 
