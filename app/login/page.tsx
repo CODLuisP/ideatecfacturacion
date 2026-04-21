@@ -737,7 +737,7 @@ const LoginPage: React.FC = () => {
 
         setStatus(LoginStatus.SUCCESS);
         setTimeout(() => {
-          window.location.href = "/ideatecfactus/dashboard";
+          window.location.href = "/factunet/dashboard";
         }, 800);
       }
     } catch (error) {
@@ -801,7 +801,7 @@ const LoginPage: React.FC = () => {
                 <img
                   src="/logofnsb.png"
                   alt=""
-                  className="w-20 h-20 object-contain rounded-lg bg-[#00296b]"
+                  className="w-30 h-30 object-contain rounded-lg bg-[#00296b]"
                 />
 
                 {/* Textos a la derecha, uno debajo del otro */}
@@ -967,7 +967,7 @@ const LoginPage: React.FC = () => {
 
               <div className="mt-10 pt-2 border-t border-slate-100 text-center">
                 <p className="text-sm text-slate-600">
-                  ¿Necesitas una demostración? {/* ✅ Abre modal de demo */}
+                  ¿Necesitas una demostración? 
                   <button
                     type="button"
                     onClick={() => setActiveModal("demo")}

@@ -25,19 +25,19 @@ export function Sidebar() {
       </div>
       
       <nav className="flex-1 p-4 space-y-2">
-        <Link href="/ideatecfactus" className="block px-4 py-2 hover:bg-gray-800 rounded">
+        <Link href="/factunet" className="block px-4 py-2 hover:bg-gray-800 rounded">
           Dashboard
         </Link>
         <div className="pt-4 pb-2 px-4 text-xs uppercase text-gray-500 font-semibold">
           Módulos
         </div>
-        <Link href="/ideatecfactus/facturacion" className="block px-4 py-2 hover:bg-gray-800 rounded">
+        <Link href="/factunet/facturacion" className="block px-4 py-2 hover:bg-gray-800 rounded">
           Facturación
         </Link>
-        <Link href="/ideatecfactus/inventario" className="block px-4 py-2 hover:bg-gray-800 rounded">
+        <Link href="/factunet/inventario" className="block px-4 py-2 hover:bg-gray-800 rounded">
           Inventario
         </Link>
-        <Link href="/ideatecfactus/clientes" className="block px-4 py-2 hover:bg-gray-800 rounded">
+        <Link href="/factunet/clientes" className="block px-4 py-2 hover:bg-gray-800 rounded">
           Clientes
         </Link>
       </nav>

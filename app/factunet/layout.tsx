@@ -22,8 +22,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const activeView = (pathname.split('/').pop() as View) || 'dashboard';
 
   React.useEffect(() => {
-    if (pathname === '/ideatecfactus' || pathname === '/ideatecfactus/') {
-      router.push('/ideatecfactus/dashboard');
+    if (pathname === '/factunet' || pathname === '/factunet/') {
+      router.push('/factunet/dashboard');
     }
   }, [pathname]);
 
@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar
           isOpen={isSidebarOpen}
           activeView={activeView}
-          onViewChange={(view) => router.push(`/ideatecfactus/${view}`)}
+          onViewChange={(view) => router.push(`/factunet/${view}`)}
           menuItems={menuItems}
         />
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
@@ -75,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {activeView === 'dashboard' && (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleExport}><Download className="w-4 h-4" /> Exportar Reporte</Button>
-                    <Button onClick={() => router.push('/ideatecfactus/operaciones')}><Plus className="w-4 h-4" /> Nuevo Comprobante</Button>
+                    <Button onClick={() => router.push('/factunet/operaciones')}><Plus className="w-4 h-4" /> Nuevo Comprobante</Button>
                   </div>
                 )}
               </div>
