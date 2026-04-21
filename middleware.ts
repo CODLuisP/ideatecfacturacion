@@ -9,7 +9,7 @@ export default withAuth(
     // Redirigir usuarios autenticados fuera del login
     if (token && (pathname === "/login" || pathname === "/")) {
       return NextResponse.redirect(
-        new URL("/ideatecfactus/dashboard", req.url),
+        new URL("/factunet/dashboard", req.url),
       );
     }
 
@@ -25,7 +25,7 @@ export default withAuth(
           return true;
         }
 
-        if (pathname.startsWith("/ideatecfactus")) {
+        if (pathname.startsWith("/factunet")) {
           return !!token;
         }
         return true;
@@ -39,7 +39,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/ideatecfactus/:path*", // ✅ Cubre /ideatecfactus/dashboard y cualquier subruta
+    "/factunet/:path*", // ✅ Cubre /factunet/dashboard y cualquier subruta
     '/docs/:path*',
     "/login",
     "/",

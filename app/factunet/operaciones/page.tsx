@@ -3,11 +3,11 @@ import { useRouter } from 'next/navigation';
 import { FileText, AlertCircle, Plus, Truck, Receipt, ReceiptText } from 'lucide-react';
 
 const documentTypes = [
-  { title: 'Factura Electrónica', desc: 'Para empresas y negocios con RUC (con derecho a crédito fiscal).', icon: ReceiptText,    href: '/ideatecfactus/operaciones/factura'},
-  { title: 'Boleta de Venta',     desc: 'Para personas naturales y consumidores finales sin RUC.',          icon: FileText,    href: '/ideatecfactus/operaciones/boleta'       },
-  { title: 'Nota de Crédito',     desc: 'Para anular o modificar comprobantes emitidos previamente.',       icon: AlertCircle, href: '/ideatecfactus/operaciones/nota-credito' },
-  { title: 'Nota de Débito',      desc: 'Para aumentar el valor de un comprobante emitido previamente.',    icon: Plus,        href: '/ideatecfactus/operaciones/nota-debito'  },
-  { title: 'Guía de Remisión',    desc: 'Para sustentar el traslado de bienes a nivel nacional.',           icon: Truck,       href: '/ideatecfactus/operaciones/guia-remision'},
+  { title: 'Factura Electrónica', desc: 'Para empresas y negocios con RUC (con derecho a crédito fiscal).', icon: ReceiptText,    href: '/factunet/operaciones/factura'},
+  { title: 'Boleta de Venta',     desc: 'Para personas naturales y consumidores finales sin RUC.',          icon: FileText,    href: '/factunet/operaciones/boleta'       },
+  { title: 'Nota de Crédito',     desc: 'Para anular o modificar comprobantes emitidos previamente.',       icon: AlertCircle, href: '/factunet/operaciones/nota-credito' },
+  { title: 'Nota de Débito',      desc: 'Para aumentar el valor de un comprobante emitido previamente.',    icon: Plus,        href: '/factunet/operaciones/nota-debito'  },
+  { title: 'Guía de Remisión',    desc: 'Para sustentar el traslado de bienes a nivel nacional.',           icon: Truck,       href: '/factunet/operaciones/guia-remision'},
 ];
 
 export default function EmisionPage() {

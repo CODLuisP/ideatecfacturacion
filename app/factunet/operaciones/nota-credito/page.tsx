@@ -647,7 +647,7 @@ const actualizarStockDevolucion = async () => {
 
           {/* Header */}
           <div className="flex items-center gap-4 mb-2">
-            <Button variant="ghost" onClick={() => router.push("/ideatecfactus/operaciones")} className="h-10 w-10 p-0 rounded-full">
+            <Button variant="ghost" onClick={() => router.push("/factunet/operaciones")} className="h-10 w-10 p-0 rounded-full">
               <ChevronLeft className="w-6 h-6" />
             </Button>
             <div>

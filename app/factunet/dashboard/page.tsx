@@ -324,7 +324,7 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               className="text-brand-blue"
-              onClick={() => router.push('/ideatecfactus/ver-comprobantes')}
+              onClick={() => router.push('/factunet/ver-comprobantes')}
             >
               Ver todos <ChevronRight className="w-4 h-4" />
             </Button>

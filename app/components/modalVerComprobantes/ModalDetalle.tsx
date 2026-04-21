@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { RefreshCw, FileText, X, CheckCircle2, Eye, Download, ChevronDown, Building2, Calendar, Hash, AlertCircle } from 'lucide-react';
 import { cn } from '@/app/utils/cn';
-import { Comprobante } from '@/app/ideatecfactus/ver-comprobantes/gestionComprobantes/Comprobante';
-import { padCorrelativo, COLORS, TIPO_PAGO_MAP, tipoLabel, formatFecha, TIPO_GUIA_MAP, limpiarMensajeSunat, PDF_SIZES } from '@/app/ideatecfactus/ver-comprobantes/gestionComprobantes/helpers';
+import { Comprobante } from '@/app/factunet/ver-comprobantes/gestionComprobantes/Comprobante';
+import { padCorrelativo, COLORS, TIPO_PAGO_MAP, tipoLabel, formatFecha, TIPO_GUIA_MAP, limpiarMensajeSunat, PDF_SIZES } from '@/app/factunet/ver-comprobantes/gestionComprobantes/helpers';
 
 // ─── DataCard ─────────────────────────────────────────────────────────────────
 const DataCard = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
