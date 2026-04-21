@@ -294,7 +294,7 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
   return (
     <div className="overflow-hidden rounded-2xl">
       {/* Header */}
-     <div className="bg-blue-900 p-6 text-white">
+      <div className="bg-blue-900 p-6 text-white">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
             <PlayCircle size={22} />
@@ -398,9 +398,6 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
           </button>
         </form>
       </div>
-
-
-      
     </div>
   );
 };
@@ -732,7 +729,7 @@ const LoginPage: React.FC = () => {
             JSON.stringify({
               identifier: formData.identifier,
               password: formData.password,
-            })
+            }),
           );
         } else {
           localStorage.removeItem("rememberedCredentials");
@@ -797,16 +794,27 @@ const LoginPage: React.FC = () => {
           <IncaPattern />
 
           <div className="w-full max-w-md mx-auto space-y-8 relative z-10">
-            {/* Logo */}
-            <div className="flex items-center gap-2 mb-8">
-              <div>
-                <img src="/logopng.png" alt="" className="w-22 h-22"/>
-              </div>
-              <h1 className="text-2xl font-extrabold text-blue-900 tracking-[0.02em] ">
-                FACTU<span className="text-red-600">NET</span>
-              </h1>
-            </div>
+            <div className="w-full max-w-md mx-auto space-y-8 relative z-10">
+              {/* Logo */}
+              <div className="flex items-center gap-3 mb-8">
+                {/* Imagen a la izquierda */}
+                <img
+                  src="/logofnsb.png"
+                  alt=""
+                  className="w-20 h-20 object-contain rounded-lg bg-[#00296b]"
+                />
 
+                {/* Textos a la derecha, uno debajo del otro */}
+                <div className="flex flex-col">
+                  <h1 className="text-2xl font-extrabold text-[#00296b] tracking-[0.02em] leading-tight">
+                    FACTU<span className="text-[#a80a0a]">NET</span>
+                  </h1>
+                  <p className="text-sm text-[#6c757d] font-medium tracking-wide">
+                    Facturación electrónica
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Main Content */}
             <div>
@@ -916,13 +924,13 @@ const LoginPage: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <label className="flex items-center group cursor-pointer">
-              <input
-  type="checkbox"
-  name="rememberMe"
-  className="w-5 h-5 rounded focus:ring-blue-900 accent-blue-900"
-  checked={formData.rememberMe}
-  onChange={handleChange}
-/>
+                    <input
+                      type="checkbox"
+                      name="rememberMe"
+                      className="w-5 h-5 rounded focus:ring-blue-900 accent-blue-900"
+                      checked={formData.rememberMe}
+                      onChange={handleChange}
+                    />
                     <span className="ml-2.5 text-sm font-medium text-slate-600">
                       Recordarme
                     </span>
@@ -1007,12 +1015,9 @@ const LoginPage: React.FC = () => {
             <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <h3 className="text-3xl lg:text-4xl xl:text-4xl font-brand font-extrabold text-white leading-tight">
                 La Facturación
-                <span className="text-red-500 italic">
-                  {" "}
-                  más confiable
-                </span>{" "}
+                <span className="text-red-500 italic"> más confiable</span>{" "}
                 <br />
-                 del Perú.
+                del Perú.
               </h3>
               <p className="text-blue-200 text-[14px] mt-4 leading-relaxed max-w-lg">
                 Optimiza la gestión tributaria de tu empresa con cumplimiento
