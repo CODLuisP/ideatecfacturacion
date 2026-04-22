@@ -254,7 +254,7 @@ export const Topbar = ({
                 </p>
               </div>
               <div
-                className={`w-9 h-9 rounded-xl overflow-hidden border transition-colors shrink-0 ${
+                className={`w-9 h-9 rounded-lg overflow-hidden border transition-colors shrink-0 ${
                   isBeta
                     ? "border-amber-300 group-hover:border-amber-400"
                     : "border-gray-200 group-hover:border-gray-300"
