@@ -35,7 +35,7 @@ import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type TipoGuia = "remitente" | "transportista";
-type ModalidadTraslado = "01" | "02"; // 01 = público, 02 = privado
+type ModalidadTraslado = "01" | "02";
 
 interface SucursalData {
   serieGuiaRemision: string;
@@ -60,8 +60,8 @@ interface Cliente {
   numeroDocumento: string;
   tipoDocumento: { tipoDocumentoId: string; tipoDocumentoNombre: string };
   direccion: DireccionCliente[];
-  telefono?: string; // ← agrega
-  correo?: string; // ← agrega
+  telefono?: string;
+  correo?: string;
 }
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const MOTIVOS_TRASLADO = [
@@ -181,7 +181,6 @@ export default function GuiaRemisionPage() {
     null,
   );
 
-  const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [envioExitoso, setEnvioExitoso] = useState(false);
   const [enviarWhatsapp, setEnviarWhatsapp] = useState(false);
@@ -848,6 +847,13 @@ export default function GuiaRemisionPage() {
           descripcion: b.descripcion,
           codigo: b.codigo || "",
         })),
+        clienteCorreo:
+          enviarCorreo && correoEnvio.trim() ? correoEnvio.trim() : null,
+        enviadoPorCorreo: enviarCorreo,
+        clienteWhatsapp:
+          enviarWhatsapp && telefonoEnvio.trim() ? telefonoEnvio.trim() : null,
+        enviadoPorWhatsapp: enviarWhatsapp,
+        usuarioCreacion: user?.id ?? 0,
       };
 
       // ── POST /api/guias — crear en DB ──────────────────────────────────
@@ -1700,7 +1706,7 @@ export default function GuiaRemisionPage() {
               {/* Contacto para envío */}
               {destinatarioSeleccionado && (
                 <div className="space-y-3">
-                  <label className={labelClass}>Enviar comprobante a</label>
+                  <label className={labelClass}>Enviar guía a</label>
 
                   {/* WhatsApp */}
                   <div className="flex items-center gap-3">
