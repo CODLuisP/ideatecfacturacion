@@ -3,8 +3,7 @@ import { useRouter } from 'next/navigation';
 import { FileText, AlertCircle, Plus, Truck, Receipt, ReceiptText } from 'lucide-react';
 
 const documentTypes = [
-  { title: 'Factura Electrónica', desc: 'Para empresas y negocios con RUC (con derecho a crédito fiscal).', icon: ReceiptText,    href: '/factunet/operaciones/factura'},
-  { title: 'Boleta de Venta',     desc: 'Para personas naturales y consumidores finales sin RUC.',          icon: FileText,    href: '/factunet/operaciones/boleta'       },
+  { title: 'Boleta y Factura Electrónica', desc: 'Para personas naturales y empresas (con o sin RUC).', icon: ReceiptText,    href: '/factunet/operaciones/boleta-facturaelectronica'},
   { title: 'Nota de Crédito',     desc: 'Para anular o modificar comprobantes emitidos previamente.',       icon: AlertCircle, href: '/factunet/operaciones/nota-credito' },
   { title: 'Nota de Débito',      desc: 'Para aumentar el valor de un comprobante emitido previamente.',    icon: Plus,        href: '/factunet/operaciones/nota-debito'  },
   { title: 'Guía de Remisión',    desc: 'Para sustentar el traslado de bienes a nivel nacional.',           icon: Truck,       href: '/factunet/operaciones/guia-remision'},
