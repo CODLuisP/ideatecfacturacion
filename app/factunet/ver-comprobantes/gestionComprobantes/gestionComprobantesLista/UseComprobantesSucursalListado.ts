@@ -33,6 +33,7 @@ export const useComprobantesSucursalListado = (): UseComprobantesSucursalListado
       const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/listado/sucursal/${sucursalId}`)
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
+      url.searchParams.append("limit", "100") 
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` }
