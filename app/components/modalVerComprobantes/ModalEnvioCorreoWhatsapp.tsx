@@ -5,6 +5,7 @@ import { cn } from '@/app/utils/cn';
 import { ComprobanteListado, ComprobanteDetalleItem } from '@/app/factunet/ver-comprobantes/gestionComprobantes/Comprobante';
 import { padCorrelativo, tipoLabel, formatFechaHora, COLORS } from '@/app/factunet/ver-comprobantes/gestionComprobantes/helpers';
 import { useActualizarCorreoWhatsapp } from '@/app/factunet/ver-comprobantes/gestionComprobantes/UseActualizarCorreoWhatsapp';
+import { useToast } from '../ui/Toast';
 
 export interface ModalEnvioCorreoWhatsappProps {
     comprobante: ComprobanteListado;
@@ -17,6 +18,7 @@ export interface ModalEnvioCorreoWhatsappProps {
 
 export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, onClose, onEnviado }: ModalEnvioCorreoWhatsappProps) => {
     const { actualizar } = useActualizarCorreoWhatsapp()
+    const { showToast } = useToast()
     const esEmail = tipo === 'email';
     const [detalles, setDetalles] = useState<ComprobanteDetalleItem[]>([]);
     const yaEnviado = esEmail ? comprobante.cliente.enviadoPorCorreo : comprobante.cliente.enviadoPorWhatsApp;
@@ -99,6 +101,7 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                 if (!resWsp.ok) throw new Error('Error al enviar por WhatsApp');
             }
             setExito(true);
+            showToast(esEmail ? 'Correo enviado correctamente' : 'WhatsApp enviado correctamente', 'success')
             // Actualizar correo/whatsapp con los valores ingresados
             if (esEmail) {
                 await actualizar({
@@ -119,7 +122,9 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
             }
             onEnviado(tipo, destino);
             setTimeout(() => { setExito(false); onClose(); }, 1500);
-        } catch { } finally { setEnviando(false); }
+        } catch { 
+            showToast(esEmail ? 'Error al enviar por correo' : 'Error al enviar por WhatsApp', 'error')
+        } finally { setEnviando(false); }
     };
 
     return (
@@ -135,7 +140,10 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                             <p className="text-xs text-gray-500">{tipoLabel(comprobante.tipoComprobante)}: {comprobante.numeroCompleto}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-white/70 rounded-lg transition-colors">
+                    <button 
+                        onClick={onClose} 
+                        disabled={enviando}
+                        className="p-1.5 hover:bg-white/70 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         <X size={16} className="text-gray-500" />
                     </button>
                 </div>

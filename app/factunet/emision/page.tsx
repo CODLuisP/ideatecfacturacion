@@ -827,7 +827,7 @@ export default function EmisionRapidaPage() {
   };
 
   //activar boton emitir
-  const puedeEmitir = !emitiendo && !sinSucursal && (!!clienteSeleccionado || clienteVarios) && items.filter(i => !i._esIcbper).length > 0;
+  const puedeEmitir = !emitiendo && !sinSucursal && !!serie && !!correlativoActual && (!!clienteSeleccionado || clienteVarios) && items.filter(i => !i._esIcbper).length > 0;
 
   // ─── Render ────────────────────────────────────────────────
   return (

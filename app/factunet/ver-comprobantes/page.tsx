@@ -89,94 +89,58 @@ export default function VerComprobantesPage() {
 
     // ── Carga inicial ──
     const cargarComprobantes = useCallback(async () => {
-        try {
-            if (isSuperAdmin && sucursalFiltro) {
-                await hookSucursal.fetchComprobantes({ sucursalId: sucursalFiltro, fechaDesde: null, fechaHasta: null })
-            } else if (isSuperAdmin) {
-                await hookEmpresa.fetchComprobantes({ ruc: rucEmpresa, fechaDesde: null, fechaHasta: null })
-            } else {
-                await hookSucursal.fetchComprobantes({ sucursalId, fechaDesde: null, fechaHasta: null })
-            }
-        } catch {
-            showToast('Error al cargar comprobantes', 'error')
+        let data: ComprobanteListado[] = []
+        if (isSuperAdmin && sucursalFiltro) {
+            data = await hookSucursal.fetchComprobantes({ sucursalId: sucursalFiltro, fechaDesde: null, fechaHasta: null })
+        } else if (isSuperAdmin) {
+            data = await hookEmpresa.fetchComprobantes({ ruc: rucEmpresa, fechaDesde: null, fechaHasta: null })
+        } else {
+            data = await hookSucursal.fetchComprobantes({ sucursalId, fechaDesde: null, fechaHasta: null })
         }
-    }, [isSuperAdmin, sucursalFiltro, rucEmpresa, sucursalId, showToast])
+        setComprobantes(data)
+    }, [isSuperAdmin, sucursalFiltro, rucEmpresa, sucursalId])
 
     useEffect(() => {
         if (!user || !accessToken) return 
         cargarComprobantes()
-    }, [cargarComprobantes, user, accessToken])
-
-    // Sincronizar resultados al hook activo
-    useEffect(() => {
-        if (isSuperAdmin && sucursalFiltro) setComprobantes(hookSucursal.comprobantes);
-        else if (isSuperAdmin) setComprobantes(hookEmpresa.comprobantes);
-        else setComprobantes(hookSucursal.comprobantes);
-    }, [hookEmpresa.comprobantes, hookSucursal.comprobantes, isSuperAdmin, sucursalFiltro]);
-
-    // Sincronizar resultado único / cliente / usuario
-    useEffect(() => {
-        if (hookUnico.comprobante) setComprobantes([hookUnico.comprobante])
-        else if (hookUnico.error) showToast('No se encontró el comprobante', 'error')
-    }, [hookUnico.comprobante, hookUnico.error])
-
-    useEffect(() => {
-        if (hookCliente.comprobantes.length > 0) setComprobantes(hookCliente.comprobantes)
-        else if (hookCliente.error) showToast('No se encontraron comprobantes para ese cliente', 'error')
-    }, [hookCliente.comprobantes, hookCliente.error])
-
-    useEffect(() => {
-        if (hookUsuario.comprobantes.length > 0) setComprobantes(hookUsuario.comprobantes)
-        else if (hookUsuario.error) showToast('No se encontraron comprobantes para ese usuario', 'error')
-    }, [hookUsuario.comprobantes, hookUsuario.error])
-
-    useEffect(() => {
-        if (hookClienteSucursal.comprobantes.length > 0) setComprobantes(hookClienteSucursal.comprobantes)
-        else if (hookClienteSucursal.error) showToast('No se encontraron comprobantes para ese cliente', 'error')
-    }, [hookClienteSucursal.comprobantes, hookClienteSucursal.error])
+    }, [ user, accessToken])
 
     const abrirDetalle = useCallback(async (c: ComprobanteListado) => {
         setDetalle(c);
         setDetalleCompleto(null);
-        await hookDetalles.fetchDetalles(c.comprobanteId);
+        const data = await hookDetalles.fetchDetalles(c.comprobanteId);
+        if (data) setDetalleCompleto(data);
     }, [hookDetalles]);
 
-    // Sincronizar detalles cuando lleguen
-    useEffect(() => {
-        if (hookDetalles.detalles) setDetalleCompleto(hookDetalles.detalles);
-    }, [hookDetalles.detalles]);
-
     const buscarAvanzado = async () => {
-        try {
-            if (modoAvanzado === 'fechas') {
-                if (isSuperAdmin && sucursalFiltro) {
-                    await hookSucursal.fetchComprobantes({ sucursalId: sucursalFiltro, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
-                } else if (isSuperAdmin) {
-                    await hookEmpresa.fetchComprobantes({ ruc: rucEmpresa, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
-                } else {
-                    await hookSucursal.fetchComprobantes({ sucursalId, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
-                }
-            } else if (modoAvanzado === 'unico') {
-                if (!avSerie || !avNumero) { showToast('Ingrese serie y número', 'error'); return }
-                setSucursalFiltro(null) 
-                await hookUnico.fetchComprobante({ ruc: rucEmpresa, serie: avSerie, numero: Number(avNumero) })
-            } else if (modoAvanzado === 'cliente') {
-                if (!avClienteDoc) { showToast('Ingrese el número de documento del cliente', 'error'); return }
-                if (isSuperAdmin) {
-                    // SuperAdmin: busca en toda la empresa por ruc
-                    setSucursalFiltro(null)
-                    await hookCliente.fetchComprobantes({ rucEmpresa, clienteNumDoc: avClienteDoc, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
-                } else {
-                    // Otro rol: busca solo en su sucursal
-                    await hookClienteSucursal.fetchComprobantes({ sucursalId, clienteNumDoc: avClienteDoc, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
-                }
-            } else if (modoAvanzado === 'usuario') {
-                if (!avUsuarioId) { showToast('Ingrese el ID de usuario', 'error'); return }
-                setSucursalFiltro(null)
-                await hookUsuario.fetchComprobantes({ rucEmpresa, usuarioId: Number(avUsuarioId), fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+        let data: ComprobanteListado[] = []
+        if (modoAvanzado === 'fechas') {
+            if (isSuperAdmin && sucursalFiltro) {
+                data = await hookSucursal.fetchComprobantes({ sucursalId: sucursalFiltro, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+            } else if (isSuperAdmin) {
+                data = await hookEmpresa.fetchComprobantes({ ruc: rucEmpresa, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+            } else {
+                data = await hookSucursal.fetchComprobantes({ sucursalId, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
             }
-        } catch {
-            showToast('Error al buscar comprobantes', 'error')
+            setComprobantes(data)
+        } else if (modoAvanzado === 'unico') {
+            if (!avSerie || !avNumero) { showToast('Ingrese serie y número', 'error'); return }
+            setSucursalFiltro(null)
+            await hookUnico.fetchComprobante({ ruc: rucEmpresa, serie: avSerie, numero: Number(avNumero) })
+        } else if (modoAvanzado === 'cliente') {
+            if (!avClienteDoc) { showToast('Ingrese el número de documento del cliente', 'error'); return }
+            if (isSuperAdmin) {
+                setSucursalFiltro(null)
+                data = await hookCliente.fetchComprobantes({ rucEmpresa, clienteNumDoc: avClienteDoc, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+            } else {
+                data = await hookClienteSucursal.fetchComprobantes({ sucursalId, clienteNumDoc: avClienteDoc, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+            }
+            setComprobantes(data)
+        } else if (modoAvanzado === 'usuario') {
+            if (!avUsuarioId) { showToast('Ingrese el ID de usuario', 'error'); return }
+            setSucursalFiltro(null)
+            data = await hookUsuario.fetchComprobantes({ rucEmpresa, usuarioId: Number(avUsuarioId), fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+            setComprobantes(data)
         }
     }
 
@@ -200,17 +164,35 @@ export default function VerComprobantesPage() {
     const paginated = filtered.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage);
     useEffect(() => { setCurrentPage(1); }, [search, filtroTipo, filtroEstado]);
 
-    // ── Reenviar SUNAT ──
-    const reenviarSunat = async (c: ComprobanteListado) => {
+    // ── Evnviar SUNAT ──
+    const enviarSunat = async (c: ComprobanteListado) => {
         try {
             const res = await axios.post(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${c.comprobanteId}/enviar-sunat`,
                 null,
                 { headers: { Authorization: `Bearer ${accessToken}` } }
             );
-            if (res.data.exitoso) await cargarComprobantes();
-        } catch { }
-    };
+            const tipoDoc = tipoLabel(c.tipoComprobante)
+            setComprobantes(prev => prev.map(comp => {
+                if (comp.comprobanteId !== c.comprobanteId) return comp
+                return {
+                    ...comp,
+                    estadoSunat: res.data.estadoSunat ?? comp.estadoSunat,
+                    codigoRespuestaSunat: res.data.codigoRespuesta ?? comp.codigoRespuestaSunat,
+                    mensajeRespuestaSunat: res.data.mensajeRespuesta ?? comp.mensajeRespuestaSunat,
+                }
+            }))
+
+            if (res.data.exitoso) {
+                showToast(res.data.mensaje ?? `${tipoDoc} enviada correctamente a SUNAT`, 'success')
+            } else {
+                showToast(`${tipoDoc} ${c.numeroCompleto} rechazada por SUNAT`, 'error')
+            }
+
+        } catch {
+            showToast('Error al enviar a SUNAT', 'error')
+        }
+    }
 
     const generarNotaCredito = (c: ComprobanteListado) => {
         router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`)
@@ -597,7 +579,7 @@ export default function VerComprobantesPage() {
                                         <div className="flex justify-center">
                                             <DropdownOpciones
                                                 comprobante={doc}
-                                                onReenviar={() => reenviarSunat(doc)}
+                                                onEnviarSunat={() => enviarSunat(doc)}
                                                 onResumen={() => agregarResumen(doc)}
                                                 onAnular={() => anularComprobante(doc)}
                                                 onGenerarNotaCredito={() => generarNotaCredito(doc)}
@@ -748,18 +730,19 @@ const StatusIcon = ({ type, status, onClick }: { type: 'pdf' | 'xml' | 'cdr'; st
 // ─── Dropdown Opciones (...) ──────────────────────────────────────────────────
 interface DropdownOpcionesProps {
     comprobante: ComprobanteListado;
-    onReenviar: () => void;
+    onEnviarSunat: () => void;
     onResumen: () => void;
     onAnular: () => void;
     onGenerarNotaCredito: () => void;
     onGenerarNotaDebito: () => void;
 }
 
-const DropdownOpciones = ({ comprobante, onReenviar, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
+const DropdownOpciones = ({ comprobante, onEnviarSunat, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const esAceptado = comprobante.estadoSunat === 'ACEPTADO';
-    const esPendienteORechazado = comprobante.estadoSunat === 'PENDIENTE' || comprobante.estadoSunat === 'RECHAZADO';
+    const esPendiente = comprobante.estadoSunat === 'PENDIENTE';
+    const esRechazado = comprobante.estadoSunat === 'RECHAZADO';
     const esFacturaOBoleta = comprobante.tipoComprobante === '01' || comprobante.tipoComprobante === '03';
 
     useEffect(() => {
@@ -776,25 +759,39 @@ const DropdownOpciones = ({ comprobante, onReenviar, onResumen, onAnular, onGene
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-50">
-                    {/* Reenviar */}
-                    <button
-                        onClick={() => { if (!esPendienteORechazado) return; onReenviar(); setOpen(false); }}
-                        disabled={!esPendienteORechazado}
-                        className={cn("w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors",
-                            esPendienteORechazado ? "text-gray-700 hover:bg-gray-50" : cn("text-gray-300", COLORS.btnDisabled))}>
-                        <RotateCcw size={14} className={esPendienteORechazado ? "text-blue-500" : "text-gray-300"} />
-                        Reenviar a SUNAT
-                    </button>
-                    {/* Agregar a resumen */}
-                    <button
-                        disabled
-                        className={cn("w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-gray-300", COLORS.btnDisabled)}>
-                        <Layers size={14} className="text-gray-300" />
-                        Agregar a envío por resumen
-                    </button>
-                    <div className="border-t border-gray-100" />
-                    {/* Generar Nota */}
-                    {esFacturaOBoleta && (
+                    
+                    {/* Enviar a SUNAT — solo si está PENDIENTE */}
+                    {esPendiente && (
+                        <button
+                            onClick={() => { onEnviarSunat(); setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                            <RotateCcw size={14} className="text-blue-500" />
+                            Enviar a SUNAT
+                        </button>
+                    )}
+
+                    {/* Agregar a resumen — solo boleta PENDIENTE */}
+                    {comprobante.tipoComprobante === '03' && esPendiente && (
+                        <button
+                            onClick={() => { onResumen(); setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                            <Layers size={14} className="text-indigo-500" />
+                            Agregar a envío por resumen
+                        </button>
+                    )}
+
+                    {/* Editar y reenviar — solo RECHAZADO */}
+                    {esRechazado && (
+                        <button
+                            onClick={() => { setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                            <RotateCcw size={14} className="text-amber-500" />
+                            Editar y reenviar
+                        </button>
+                    )}
+
+                    {/* Generar Nota Crédito / Débito — solo factura o boleta ACEPTADA */}
+                    {esFacturaOBoleta && esAceptado && (
                         <>
                             <div className="border-t border-gray-100" />
                             <button
@@ -811,15 +808,20 @@ const DropdownOpciones = ({ comprobante, onReenviar, onResumen, onAnular, onGene
                             </button>
                         </>
                     )}
-                    {/* Anular */}
-                    <button
-                        onClick={() => { if (!esAceptado) return; onAnular(); setOpen(false); }}
-                        disabled={!esAceptado}
-                        className={cn("w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors",
-                            esAceptado ? "text-red-600 hover:bg-red-50" : cn("text-gray-300", COLORS.btnDisabled))}>
-                        <Ban size={14} className={esAceptado ? "text-red-500" : "text-gray-300"} />
-                        Anular
-                    </button>
+
+                    {/* Anular — solo factura o boleta ACEPTADA */}
+                    {esFacturaOBoleta && esAceptado && (
+                        <>
+                            <div className="border-t border-gray-100" />
+                            <button
+                                onClick={() => { onAnular(); setOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-red-600 hover:bg-red-50">
+                                <Ban size={14} className="text-red-500" />
+                                Anular
+                            </button>
+                        </>
+                    )}
+
                 </div>
             )}
         </div>
