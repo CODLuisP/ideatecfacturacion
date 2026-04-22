@@ -801,7 +801,7 @@ const LoginPage: React.FC = () => {
                 <img
                   src="/logofnsb.png"
                   alt=""
-                  className="w-30 h-30 object-contain rounded-lg bg-[#00296b]"
+                  className="w-20 h-20 object-contain rounded-lg bg-[#00296b]"
                 />
 
                 {/* Textos a la derecha, uno debajo del otro */}
