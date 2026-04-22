@@ -13,7 +13,7 @@ interface UseComprobantesClienteSucursalListadoReturn {
   comprobantes: ComprobanteListado[]
   loading: boolean
   error: string | null
-  fetchComprobantes: (params: UseComprobantesClienteSucursalListadoParams) => Promise<void>
+  fetchComprobantes: (params: UseComprobantesClienteSucursalListadoParams) => Promise<ComprobanteListado[]>
   reset: () => void
 }
 
@@ -25,7 +25,7 @@ export const useComprobantesClienteSucursalListado = (): UseComprobantesClienteS
 
   const fetchComprobantes = useCallback(async ({
     sucursalId, clienteNumDoc, fechaDesde, fechaHasta,
-  }: UseComprobantesClienteSucursalListadoParams) => {
+  }: UseComprobantesClienteSucursalListadoParams): Promise<ComprobanteListado[]> => {
     setLoading(true)
     setError(null)
     try {
@@ -41,9 +41,11 @@ export const useComprobantesClienteSucursalListado = (): UseComprobantesClienteS
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
       const data: ComprobanteListado[] = await response.json()
       setComprobantes(data)
+      return data
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al obtener comprobantes")
       setComprobantes([])
+      return []
     } finally {
       setLoading(false)
     }

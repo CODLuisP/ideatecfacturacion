@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react"
 import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/app/components/ui/Toast'
 import { ComprobanteListado } from "../Comprobante"
 
 interface UseComprobantesEmpresaClienteListadoParams {
@@ -13,19 +14,20 @@ interface UseComprobantesEmpresaClienteListadoReturn {
   comprobantes: ComprobanteListado[]
   loading: boolean
   error: string | null
-  fetchComprobantes: (params: UseComprobantesEmpresaClienteListadoParams) => Promise<void>
+  fetchComprobantes: (params: UseComprobantesEmpresaClienteListadoParams) => Promise<ComprobanteListado[]>
   reset: () => void
 }
 
 export const useComprobantesEmpresaClienteListado = (): UseComprobantesEmpresaClienteListadoReturn => {
   const { accessToken } = useAuth()
+  const { showToast } = useToast()
   const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchComprobantes = useCallback(async ({
     rucEmpresa, clienteNumDoc, fechaDesde, fechaHasta,
-  }: UseComprobantesEmpresaClienteListadoParams) => {
+  }: UseComprobantesEmpresaClienteListadoParams): Promise<ComprobanteListado[]> => {
     setLoading(true)
     setError(null)
     try {
@@ -41,9 +43,13 @@ export const useComprobantesEmpresaClienteListado = (): UseComprobantesEmpresaCl
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
       const data: ComprobanteListado[] = await response.json()
       setComprobantes(data)
+      return data
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al obtener comprobantes")
+      const msg = err instanceof Error ? err.message : "Error al obtener comprobantes"
+      setError(msg)
+      showToast('Error al obtener comprobantes del cliente', 'error')
       setComprobantes([])
+      return []
     } finally {
       setLoading(false)
     }
