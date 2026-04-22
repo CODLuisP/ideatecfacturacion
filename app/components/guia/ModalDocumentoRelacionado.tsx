@@ -236,7 +236,7 @@ export default function ModalDocumentoRelacionado({
             codigo: d.codigo ?? "",
             descripcion: d.descripcion,
             cantidad: d.cantidad,
-            unidadMedida: d.unidad, // 👈 en guías el campo se llama "unidad" no "unidadMedida"
+            unidadMedida: d.unidad,
           })) ?? [])
         : (comprobante?.details?.map((d: any) => ({
             productoId: d.productoId,
