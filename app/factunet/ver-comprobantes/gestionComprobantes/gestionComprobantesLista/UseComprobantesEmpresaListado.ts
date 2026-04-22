@@ -33,6 +33,7 @@ export const useComprobantesEmpresaListado = (): UseComprobantesEmpresaListadoRe
       const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/listado/ruc/${ruc}`)
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
+      url.searchParams.append("limit", "200") 
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` }
