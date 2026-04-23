@@ -1,17 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import BoletaPage from "../boleta/page";
 import FacturaPage from "../factura/page";
 import EmisionRapidaPage from "../../emision/page";
+import { sharedVentaStore } from "../sharedVentaStore";
 
 export default function BoletaFacturaElectronicaPage() {
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
   const [complejidad, setComplejidad] = useState<"simple" | "compleja">("simple");
+
+  useEffect(() => {
+    return () => {
+      sharedVentaStore.clear();
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-full space-y-4">

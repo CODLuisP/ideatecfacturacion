@@ -15,6 +15,7 @@ import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursal
 import { useClienteFactura } from '../operaciones/factura/gestionFacturas/useClienteFactura';
 import { ProductoSucursal } from '../productos/gestioProductos/Producto';
 import { useProductosSucursal } from '../productos/gestioProductos/useProductosSucursal';
+import { sharedVentaStore } from '../operaciones/sharedVentaStore';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type TipoComprobante = 'boleta' | 'factura';
@@ -116,21 +117,68 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
 
-  // Al cambiar tipo → resetear cliente
+  // Al cambiar tipo → resetear cliente condicionalmente
   useEffect(() => {
     setTipoDoc(tipo === 'factura' ? '06' : '01');
-    setBusqueda('');
-    setClienteSeleccionado(null);
-    setClienteVarios(false);
-    setCorreoCliente('');
-    setTelefonoCliente('');
-    setEnviarCorreo(false);
-    setEnviarWhatsapp(false);
     if (isSuperAdmin) {
-    setSucursalActual(null); 
-    setCorrelativoActual(null); 
-  }
+      setSucursalActual(null); 
+      setCorrelativoActual(null); 
+    }
+    setClienteVarios(false);
+    
+    // Solo resetear si pasamos a factura y el cliente no es RUC/CE
+    if (tipo === 'factura' && clienteSeleccionado?.tipoDocumento !== '06' && clienteSeleccionado?.tipoDocumento !== '04') {
+      setBusqueda('');
+      setClienteSeleccionado(null);
+      setCorreoCliente('');
+      setTelefonoCliente('');
+      setEnviarCorreo(false);
+      setEnviarWhatsapp(false);
+    }
   }, [tipo]);
+
+  // Cargar estado inicial desde sharedVentaStore
+  useEffect(() => {
+    const data = sharedVentaStore.get();
+
+    if (data.extra) {
+      if (data.extra.porConsumo !== undefined) setPorConsumo(data.extra.porConsumo);
+      if (data.extra.cantidadBolsa !== undefined) setCantidadBolsa(data.extra.cantidadBolsa);
+      if (data.extra.tamañoBolsa !== undefined) setTamañoBolsa(data.extra.tamañoBolsa);
+      if (data.extra.aplicarIcbper !== undefined) setAplicarIcbper(data.extra.aplicarIcbper);
+    }
+
+    if (data.items && data.items.length > 0) {
+      const mapped = data.items.map(i => ({
+        id: i.id || i._id || crypto.randomUUID(),
+        descripcion: i.descripcion,
+        cantidad: i.cantidad,
+        precioUnitario: i.precioUnitario ?? i._precioBase ?? 0,
+        // DetalleLocal uses 'precioVenta', ItemRapido uses 'precioVentaConIGV'
+        precioVentaConIGV: i.precioVenta ?? i.precioVentaConIGV ?? i._precioVentaConIGV ?? i.precioUnitario ?? 0,
+        porcentajeIGV: i.porcentajeIGV ?? 18,
+        productoId: i.productoId,
+        unidadMedida: i.unidadMedida || 'NIU',
+        codigo: i.codigo || null,
+        tipoAfectacionIGV: i.tipoAfectacionIGV || '10',
+        _sucursalProductoId: i._sucursalProductoId,
+        _tipoProducto: i._tipoProducto,
+        _stockDisponible: i._stockDisponible,
+        _esIcbper: i._esIcbper,
+      }));
+      setItems(mapped);
+      setBusquedaProducto(mapped.map(i => i.descripcion || ''));
+      setShowDropdownProducto(mapped.map(() => false));
+    }
+    if (data.cliente) {
+      if (tipoExterno === 'factura' && data.cliente.tipoDocumento !== '06' && data.cliente.tipoDocumento !== '04') {
+        // no cargar cliente inválido para factura
+      } else {
+        setClienteSeleccionado(data.cliente);
+        if (data.cliente.numeroDocumento) setBusqueda(data.cliente.numeroDocumento);
+      }
+    }
+  }, []);
 
   // Sincronizar cliente desde hook (búsqueda API)
   useEffect(() => {
@@ -251,9 +299,13 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const [showDropdownProducto, setShowDropdownProducto] = useState<boolean[]>([]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // guard: skip porConsumo else-branch on first render
+  const porConsumoMountedRef = useRef(false);
+
   //por consumo sin detalle
   useEffect(() => {
     if (porConsumo) {
+      porConsumoMountedRef.current = true;
       setItems(prev => {
         const sinBolsa = prev.filter(i => i._esIcbper);
         const consumoItem: ItemRapido = {
@@ -270,12 +322,17 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         };
         return [consumoItem, ...sinBolsa];
       });
-      setBusquedaProducto(prev => ['Por Consumo', ...prev.filter((_, i) => items[i]?._esIcbper)]);
-      setShowDropdownProducto(prev => [false, ...prev.filter((_, i) => items[i]?._esIcbper)]);
+      setBusquedaProducto(prev => {
+        const sinBolsa = prev.filter(s => s !== "Por Consumo");
+        return ['Por Consumo', ...sinBolsa];
+      });
     } else {
+      if (!porConsumoMountedRef.current) {
+        porConsumoMountedRef.current = true;
+        return;
+      }
       setItems(prev => prev.filter(i => i.id !== 'por-consumo'));
-      setBusquedaProducto(prev => prev.filter((_, i) => items[i]?.id !== 'por-consumo'));
-      setShowDropdownProducto(prev => prev.filter((_, i) => items[i]?.id !== 'por-consumo'));
+      setBusquedaProducto(prev => prev.filter(s => s !== 'Por Consumo'));
     }
   }, [porConsumo]);
 
@@ -435,8 +492,38 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const [aplicarIcbper, setAplicarIcbper] = useState(false);
   const [showBolsaOpts, setShowBolsaOpts] = useState(false);
 
+  // Guard: skip save on first render so we don't overwrite the store
+  // before the load effect reads it (both fire on mount in order)
+  const isFirstSaveRef = useRef(true);
+  useEffect(() => {
+    if (isFirstSaveRef.current) {
+      isFirstSaveRef.current = false;
+      return;
+    }
+    sharedVentaStore.save(clienteSeleccionado, items, {
+      porConsumo,
+      cantidadBolsa,
+      tamañoBolsa,
+      aplicarIcbper,
+    });
+  }, [
+    clienteSeleccionado,
+    items,
+    porConsumo,
+    cantidadBolsa,
+    tamañoBolsa,
+    aplicarIcbper,
+  ]);
+
+  const bolsaMountedRef = useRef(false);
   useEffect(() => {
     if (productosSucursal.length === 0) return;
+
+    if (!bolsaMountedRef.current) {
+      bolsaMountedRef.current = true;
+      if (cantidadBolsa === 0) return;
+    }
+
     const productoBolsa = productosSucursal.find((p: ProductoSucursal) =>
       p.nomProducto.toUpperCase().includes('BOLSA PLASTICA') ||
       p.nomProducto.toUpperCase().includes('BOLSA PLÁSTICA')
@@ -463,7 +550,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       return [...sinBolsa, bolsaItem];
     });
     setBusquedaProducto(prev => {
-      const sinBolsa = prev.filter((_, i) => !items[i]?._esIcbper);
+      const sinBolsa = prev.filter(s => !s.startsWith("BOLSA PLASTICA"));
       if (cantidadBolsa === 0) return sinBolsa;
       return [...sinBolsa, `BOLSA PLASTICA (${tamañoBolsa})`];
     });

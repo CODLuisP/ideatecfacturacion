@@ -42,6 +42,7 @@ import { useSucursal } from "../boleta/gestionBoletas/useSucursal";
 import { useSucursalRuc } from "../boleta/gestionBoletas/useSucursalRuc";
 import { DatePickerLimitado } from "@/app/components/ui/DatePickerLimitado";
 import { ModalGuardarCliente } from "./gestionFacturas/ModalGuardarCliente";
+import { sharedVentaStore } from "../sharedVentaStore";
 
 // ── Tipos afectación gratuita ────────────────────────────────
 const TIPOS_GRATUITOS = ["11", "21", "31"];
@@ -342,6 +343,7 @@ export default function FacturaPage() {
 
   // ── Por consumo ──────────────────────────────────────────────
   const [porConsumo, setPorConsumo] = useState(false);
+  const porConsumoMountedRef = useRef(false);
 
   // ── Detalles / ítems ─────────────────────────────────────────
   const [detalles, setDetalles] = useState<DetalleLocal[]>([]);
@@ -362,6 +364,7 @@ export default function FacturaPage() {
   // ── Por consumo — efecto ─────────────────────────────────────
   useEffect(() => {
     if (porConsumo) {
+      porConsumoMountedRef.current = true;
       setDetalles((prev) => {
         const sinBolsa = prev.filter((d) => d._esIcbper);
         const consumoItem: DetalleLocal = {
@@ -394,6 +397,10 @@ export default function FacturaPage() {
       setBusquedaProducto(["Por Consumo"]);
       setShowDropdownProducto([false]);
     } else {
+      if (!porConsumoMountedRef.current) {
+        porConsumoMountedRef.current = true;
+        return; // skip on first mount to preserve store-loaded data
+      }
       setDetalles((prev) => prev.filter((d) => d._id !== "por-consumo"));
       setBusquedaProducto([]);
       setShowDropdownProducto([]);
@@ -401,9 +408,19 @@ export default function FacturaPage() {
     }
   }, [porConsumo]);
 
+  // guard: skip bolsa else-branch on first render
+  const bolsaMountedRef = useRef(false);
+
   // ── Bolsa plástica — efecto ───────────────────────────────────
   useEffect(() => {
     if (productosSucursal.length === 0) return;
+
+    // On first mount, if we don't have a bolsa quantity change yet, 
+    // we should NOT run the logic that might clear a bolsa loaded from store.
+    if (!bolsaMountedRef.current) {
+      bolsaMountedRef.current = true;
+      if (cantidadBolsa === 0) return;
+    }
 
     const productoBolsa = productosSucursal.find(
       (p: ProductoSucursal) =>
@@ -461,7 +478,8 @@ export default function FacturaPage() {
     });
 
     setBusquedaProducto((prev) => {
-      const sinBolsa = prev.filter((_, i) => !detalles[i]?._esIcbper);
+      // Filter out anything that looks like a bolsa to avoid duplicates or orphans
+      const sinBolsa = prev.filter(s => !s.startsWith("BOLSA PLASTICA"));
       if (cantidadBolsa === 0) return sinBolsa;
       return [...sinBolsa, `BOLSA PLASTICA (${tamañoBolsa})`];
     });
@@ -495,6 +513,121 @@ export default function FacturaPage() {
   const [cargandoPdf, setCargandoPdf] = useState(false);
 
   // ── Effects de inicialización ────────────────────────────────
+  useEffect(() => {
+    const data = sharedVentaStore.get();
+    
+    // Load extra UI state first
+    if (data.extra) {
+      if (data.extra.porConsumo !== undefined) setPorConsumo(data.extra.porConsumo);
+      if (data.extra.cantidadBolsa !== undefined) setCantidadBolsa(data.extra.cantidadBolsa);
+      if (data.extra.tamañoBolsa !== undefined) setTamañoBolsa(data.extra.tamañoBolsa);
+      if (data.extra.aplicarIcbper !== undefined) setAplicarIcbper(data.extra.aplicarIcbper);
+      if (data.extra.descuentoGlobal !== undefined) setDescuentoGlobal(data.extra.descuentoGlobal);
+      if (data.extra.codigoTipoDescGlobal !== undefined) setCodigoTipoDescGlobal(data.extra.codigoTipoDescGlobal);
+    }
+
+    if (data.items && data.items.length > 0) {
+      const mapped = data.items.map((i: any, idx: number) => {
+        const cantidad = i.cantidad || 1;
+        const porcentajeIGV = i.porcentajeIGV ?? 18;
+        const precioUnitario = i.precioUnitario ?? i._precioBase ?? 0;
+        // DetalleLocal uses 'precioVenta', ItemRapido uses 'precioVentaConIGV'
+        const precioVenta = i.precioVenta ?? i.precioVentaConIGV ?? i._precioVentaConIGV ?? precioUnitario;
+        
+        let baseIgv = 0;
+        let montoIGV = 0;
+        let totalVentaItem = 0;
+        let valorVenta = 0;
+        
+        if (i._esIcbper) {
+          baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
+          montoIGV = 0;
+          totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
+          valorVenta = baseIgv;
+        } else {
+          if (i.tipoAfectacionIGV === '10') {
+            baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
+            montoIGV = parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2));
+            totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
+            valorVenta = baseIgv;
+          } else {
+            baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
+            montoIGV = 0;
+            totalVentaItem = baseIgv;
+            valorVenta = baseIgv;
+          }
+        }
+
+        return {
+          item: idx + 1,
+          _id: i.id || i._id || crypto.randomUUID(),
+          productoId: i.productoId,
+          codigo: i.codigo || null,
+          descripcion: i.descripcion,
+          cantidad,
+          unidadMedida: i.unidadMedida || 'NIU',
+          precioUnitario,
+          tipoAfectacionIGV: i.tipoAfectacionIGV || '10',
+          porcentajeIGV,
+          montoIGV,
+          baseIgv,
+          codigoTipoDescuento: i.codigoTipoDescuento || "00",
+          descuentoUnitario: i.descuentoUnitario || 0,
+          descuentoTotal: i.descuentoTotal || 0,
+          valorVenta,
+          precioVenta,
+          totalVentaItem,
+          icbper: i.icbper || 0,
+          factorIcbper: i.factorIcbper || 0,
+          _incluirIGV: i._incluirIGV !== undefined ? i._incluirIGV : true,
+          _precioBase: precioUnitario,
+          _precioVentaConIGV: precioVenta,
+          _precioBaseOriginal: i._precioBaseOriginal || precioUnitario,
+          _sucursalProductoId: i._sucursalProductoId,
+          _tipoProducto: i._tipoProducto,
+          _stockDisponible: i._stockDisponible,
+          _esIcbper: i._esIcbper,
+        };
+      });
+      setDetalles(mapped);
+      setBusquedaProducto(mapped.map((i: any) => i.descripcion || ''));
+      setShowDropdownProducto(mapped.map(() => false));
+    }
+    if (data.cliente) {
+      if (data.cliente.tipoDocumento === '06' || data.cliente.tipoDocumento === '04') {
+        setFactura(prev => ({...prev, cliente: data.cliente}));
+        if (data.cliente.numeroDocumento) setBusqueda(data.cliente.numeroDocumento);
+      }
+    }
+  }, []);
+
+  // Guard: skip save on first render so we don't overwrite the store
+  // before the load effect reads it (both fire on mount in order)
+  const isFirstSaveRef = useRef(true);
+  useEffect(() => {
+    if (isFirstSaveRef.current) {
+      isFirstSaveRef.current = false;
+      return;
+    }
+    sharedVentaStore.save(factura.cliente ?? null, detalles, {
+      porConsumo,
+      cantidadBolsa,
+      tamañoBolsa,
+      aplicarIcbper,
+      descuentoGlobal,
+      codigoTipoDescGlobal,
+    });
+  }, [
+    factura.cliente,
+    detalles,
+    porConsumo,
+    cantidadBolsa,
+    tamañoBolsa,
+    aplicarIcbper,
+    descuentoGlobal,
+    codigoTipoDescGlobal,
+  ]);
+
   useEffect(() => {
     if (!empresa) return;
     setFactura((prev) => ({ ...prev, company: empresa }));
@@ -2761,7 +2894,7 @@ export default function FacturaPage() {
                       <ClipboardList className="w-4 h-4 text-brand-blue" />
                     </div>
                     <label className="text-sm font-bold text-gray-800">
-                      Ítems / Productos
+                      Detalle de Venta
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
