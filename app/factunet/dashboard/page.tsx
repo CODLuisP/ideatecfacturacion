@@ -1,37 +1,26 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart3, FileText, Zap, ChevronRight, X,
   Send, RotateCcw, CheckCircle2, AlertTriangle,
-  XCircle, Bell, ChevronDown, Clock,
-  ShieldCheck, AlertCircle, Calendar, Building2, Hash, AtSign, Eye, Download, Mail
+  XCircle, Bell, Calendar,
+  ShieldCheck, Eye
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip
 } from 'recharts';
 import { useRouter } from 'next/navigation';
-import { RECENT_DOCS, SALES_DATA } from '@/app/components/data/mockData';
 import { Card } from '@/app/components/ui/Card';
 import { Button } from '@/app/components/ui/Button';
 import { Badge } from '@/app/components/ui/Badge';
 import { cn } from '@/app/utils/cn';
+import { useAuth } from '@/context/AuthContext';
+import { useDashboardEmpresa } from './gestionDashboard/UseDashboardEmpresa';
+import { useDashboardSucursal } from './gestionDashboard/UseDashboardSucursal';
+import { DashboardData } from './gestionDashboard/Dashboard';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-
-interface Comprobante {
-  id: string;
-  client: string;
-  ruc: string;
-  date: string;
-  total: string;
-  status: 'Aceptado' | 'Pendiente' | 'Rechazado';
-  type: 'Factura' | 'Boleta' | 'Nota de Crédito' | 'Guía de Remisión';
-  igv: string;
-  subtotal: string;
-  serie: string;
-  correlativo: string;
-}
 
 interface Notificacion {
   id: number;
@@ -44,29 +33,51 @@ interface Notificacion {
   comprobante?: string;
 }
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-
-const ALL_COMPROBANTES: Comprobante[] = [
-  { id: 'F001-00124', client: 'Corporación Lima SAC', ruc: '20501234567', date: '15/01/2025', total: 'S/ 1,180.00', igv: 'S/ 180.00', subtotal: 'S/ 1,000.00', status: 'Aceptado', type: 'Factura', serie: 'F001', correlativo: '00124' },
-  { id: 'B001-00856', client: 'Juan Pérez García', ruc: '10234567890', date: '15/01/2025', total: 'S/ 59.00', igv: 'S/ 9.00', subtotal: 'S/ 50.00', status: 'Aceptado', type: 'Boleta', serie: 'B001', correlativo: '00856' },
-  { id: 'F001-00123', client: 'Inversiones del Norte EIRL', ruc: '20123456789', date: '14/01/2025', total: 'S/ 2,360.00', igv: 'S/ 360.00', subtotal: 'S/ 2,000.00', status: 'Pendiente', type: 'Factura', serie: 'F001', correlativo: '00123' },
-  { id: 'B001-00855', client: 'María Torres Quispe', ruc: '10345678901', date: '14/01/2025', total: 'S/ 118.00', igv: 'S/ 18.00', subtotal: 'S/ 100.00', status: 'Aceptado', type: 'Boleta', serie: 'B001', correlativo: '00855' },
-  { id: 'F001-00122', client: 'Grupo Andino SA', ruc: '20456789012', date: '13/01/2025', total: 'S/ 5,900.00', igv: 'S/ 900.00', subtotal: 'S/ 5,000.00', status: 'Rechazado', type: 'Factura', serie: 'F001', correlativo: '00122' },
-  { id: 'NC01-00012', client: 'Corporación Lima SAC', ruc: '20501234567', date: '13/01/2025', total: 'S/ -590.00', igv: 'S/ -90.00', subtotal: 'S/ -500.00', status: 'Aceptado', type: 'Nota de Crédito', serie: 'NC01', correlativo: '00012' },
-  { id: 'B001-00854', client: 'Carlos Mendoza Ríos', ruc: '10456789012', date: '12/01/2025', total: 'S/ 236.00', igv: 'S/ 36.00', subtotal: 'S/ 200.00', status: 'Aceptado', type: 'Boleta', serie: 'B001', correlativo: '00854' },
-  { id: 'F001-00121', client: 'Tech Solutions Peru SAC', ruc: '20567890123', date: '12/01/2025', total: 'S/ 8,850.00', igv: 'S/ 1,350.00', subtotal: 'S/ 7,500.00', status: 'Aceptado', type: 'Factura', serie: 'F001', correlativo: '00121' },
-  { id: 'GR01-00045', client: 'Distribuidora Central SAC', ruc: '20678901234', date: '11/01/2025', total: 'S/ 0.00', igv: 'S/ 0.00', subtotal: 'S/ 0.00', status: 'Aceptado', type: 'Guía de Remisión', serie: 'GR01', correlativo: '00045' },
-  { id: 'B001-00853', client: 'Ana Lucía Flores', ruc: '10567890123', date: '11/01/2025', total: 'S/ 47.20', igv: 'S/ 7.20', subtotal: 'S/ 40.00', status: 'Pendiente', type: 'Boleta', serie: 'B001', correlativo: '00853' },
-];
+// ─── Mock Notificaciones ───────────────────────────────────────────────────────
 
 const ALL_NOTIFICACIONES: Notificacion[] = [
   { id: 1, title: 'CDR Aceptado', desc: 'Factura F001-00124 aceptada con éxito.', time: 'Hace 5 min', type: 'success', detail: 'El comprobante F001-00124 emitido a Corporación Lima SAC por S/ 1,180.00 fue aceptado correctamente por SUNAT. CDR recibido con estado 0 (Aceptado).', fecha: '15/01/2025 09:32', comprobante: 'F001-00124' },
-  { id: 2, title: 'Pendiente de Envío', desc: '3 boletas pendientes de envío manual.', time: 'Hace 1 hora', type: 'warning', detail: 'Las boletas B001-00853, B001-00851 y B001-00849 no han podido enviarse automáticamente. Por favor, realice el envío manual desde el módulo de emisión.', fecha: '15/01/2025 08:45', comprobante: undefined },
-  { id: 3, title: 'Certificado Digital', desc: 'Vence en 15 días (05/06/2025).', time: 'Sistema', type: 'error', detail: 'Su certificado digital de firma electrónica vence el 05 de junio de 2025. Es imprescindible renovarlo para continuar emitiendo comprobantes electrónicos. Contacte a su proveedor de certificados.', fecha: '15/01/2025 00:00', comprobante: undefined },
-  { id: 4, title: 'Sincronización OSE', desc: 'Sincronización completada con Digiflow.', time: 'Hace 2 horas', type: 'success', detail: 'Se completó la sincronización masiva con el OSE Digiflow. 47 comprobantes enviados, 47 aceptados, 0 rechazados.', fecha: '15/01/2025 07:00', comprobante: undefined },
-  { id: 5, title: 'Factura Rechazada', desc: 'F001-00122 rechazada por SUNAT (2329).', time: 'Hace 3 horas', type: 'error', detail: 'La factura F001-00122 fue rechazada por SUNAT con error 2329: "El RUC del emisor no está habilitado para emitir este tipo de comprobante". Verifique su estado ante SUNAT y reactive su clave SOL.', fecha: '14/01/2025 22:15', comprobante: 'F001-00122' },
-  { id: 6, title: 'Nuevo Periodo Contable', desc: 'Inicio de periodo Enero 2025.', time: 'Hace 1 día', type: 'info', detail: 'Se ha iniciado automáticamente el periodo contable Enero 2025. Los correlativos de facturas y boletas han sido reiniciados según la configuración de su empresa.', fecha: '01/01/2025 00:00', comprobante: undefined },
+  { id: 2, title: 'Pendiente de Envío', desc: '3 boletas pendientes de envío manual.', time: 'Hace 1 hora', type: 'warning', detail: 'Las boletas B001-00853, B001-00851 y B001-00849 no han podido enviarse automáticamente.', fecha: '15/01/2025 08:45' },
+  { id: 3, title: 'Certificado Digital', desc: 'Vence en 15 días (05/06/2025).', time: 'Sistema', type: 'error', detail: 'Su certificado digital de firma electrónica vence el 05 de junio de 2025.', fecha: '15/01/2025 00:00' },
+  { id: 4, title: 'Sincronización OSE', desc: 'Sincronización completada con Digiflow.', time: 'Hace 2 horas', type: 'success', detail: 'Se completó la sincronización masiva con el OSE Digiflow. 47 comprobantes enviados, 47 aceptados.', fecha: '15/01/2025 07:00' },
+  { id: 5, title: 'Factura Rechazada', desc: 'F001-00122 rechazada por SUNAT (2329).', time: 'Hace 3 horas', type: 'error', detail: 'La factura F001-00122 fue rechazada por SUNAT con error 2329.', fecha: '14/01/2025 22:15', comprobante: 'F001-00122' },
+  { id: 6, title: 'Nuevo Periodo Contable', desc: 'Inicio de periodo Enero 2025.', time: 'Hace 1 día', type: 'info', detail: 'Se ha iniciado automáticamente el periodo contable Enero 2025.', fecha: '01/01/2025 00:00' },
 ];
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+const formatFecha = (fechaStr: string) => {
+  const date = new Date(fechaStr);
+  return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const formatMoneda = (valor: number) =>
+  `S/ ${valor.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const getUltimos7Dias = () => {
+  const hasta = new Date();
+  const desde = new Date();
+  desde.setDate(desde.getDate() - 6);
+  return {
+    desde: desde.toISOString().split('T')[0],
+    hasta: hasta.toISOString().split('T')[0],
+  };
+};
+
+const getHoy = () => {
+  const hoy = new Date().toISOString().split('T')[0];
+  return { desde: hoy, hasta: hoy };
+};
+
+const estadoSunatLabel = (estado: string) => {
+  const map: Record<string, 'success' | 'warning' | 'error'> = {
+    ACEPTADO: 'success',
+    PENDIENTE: 'warning',
+    RECHAZADO: 'error',
+    ACEPTADO_CON_OBSERVACIONES: 'warning',
+  };
+  return map[estado?.toUpperCase()] ?? 'warning';
+};
 
 // ─── Modal Base ────────────────────────────────────────────────────────────────
 
@@ -123,9 +134,7 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         icon={<Bell size={18} />}
         iconColor="bg-red-100 text-red-600"
       />
-
       <div className="flex flex-1 overflow-hidden" style={{ minHeight: 0, height: '520px' }}>
-        {/* Lista */}
         <div className="w-[42%] border-r border-slate-100 overflow-y-auto shrink-0">
           {ALL_NOTIFICACIONES.map((notif) => {
             const cfg = iconConfig[notif.type];
@@ -151,8 +160,6 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             );
           })}
         </div>
-
-        {/* Detalle */}
         {selected ? (
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             <div className="flex items-start gap-3">
@@ -171,11 +178,9 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </p>
               </div>
             </div>
-
             <div className="bg-slate-50 rounded-xl p-4">
               <p className="text-sm text-slate-700 leading-relaxed">{selected.detail}</p>
             </div>
-
             {selected.comprobante && (
               <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/50">
                 <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">Comprobante Relacionado</p>
@@ -190,7 +195,6 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </div>
               </div>
             )}
-
             {selected.type === 'error' && (
               <div>
                 <p className="text-xs font-bold text-slate-700 mb-2">Acciones recomendadas</p>
@@ -228,17 +232,124 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
+// ─── Filtro de Fechas ──────────────────────────────────────────────────────────
+
+interface FiltroFechasProps {
+  desde: string;
+  hasta: string;
+  onDesdeChange: (v: string) => void;
+  onHastaChange: (v: string) => void;
+  onAplicar: () => void;
+  onLimpiar: () => void;
+  loading: boolean;
+}
+
+const FiltroFechas: React.FC<FiltroFechasProps> = ({
+  desde, hasta, onDesdeChange, onHastaChange, onAplicar, onLimpiar, loading
+}) => (
+  <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+      <Calendar size={14} className="text-gray-400 shrink-0" />
+      <span className="text-xs text-gray-500 font-medium">Desde</span>
+      <input
+        type="date"
+        value={desde}
+        onChange={e => onDesdeChange(e.target.value)}
+        className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer"
+      />
+    </div>
+    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+      <Calendar size={14} className="text-gray-400 shrink-0" />
+      <span className="text-xs text-gray-500 font-medium">Hasta</span>
+      <input
+        type="date"
+        value={hasta}
+        onChange={e => onHastaChange(e.target.value)}
+        className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer"
+      />
+    </div>
+    <Button
+      variant="primary"
+      onClick={onAplicar}
+      disabled={loading}
+      className="px-4 py-2 text-sm"
+    >
+      {loading ? 'Cargando...' : 'Aplicar'}
+    </Button>
+    <Button
+      variant="outline"
+      onClick={onLimpiar}
+      disabled={loading}
+      className="px-4 py-2 text-sm"
+    >
+      Limpiar
+    </Button>
+  </div>
+);
+
 // ─── Dashboard Page ────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.rol === 'admin';
+
+  const hookEmpresa = useDashboardEmpresa();
+  const hookSucursal = useDashboardSucursal();
+
+  const { dashboard, loading, fetchDashboard } = isSuperAdmin ? hookEmpresa : hookSucursal;
+
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
 
-  const statusBadgeClass = (status: string) => ({
-    Aceptado: 'success',
-    Pendiente: 'warning',
-    Rechazado: 'error',
-  }[status] as 'success' | 'warning' | 'error');
+  // Filtro de fechas para KPIs y conteos (default: hoy)
+  const hoy = getHoy();
+
+  // Filtro de fechas para rendimiento (default: últimos 7 días)
+  const ultimos7 = getUltimos7Dias();
+  const [desdeChart, setDesdeChart] = useState(ultimos7.desde);
+  const [hastaChart, setHastaChart] = useState(ultimos7.hasta);
+
+useEffect(() => {
+  if (!user) return;
+  const hoy = getHoy();
+  if (isSuperAdmin) {
+    hookEmpresa.fetchDashboard({
+      ruc: user.ruc,
+      desde: hoy.desde,
+      hasta: hoy.hasta,
+      limite: 5,
+    });
+  } else {
+    hookSucursal.fetchDashboard({
+      sucursalId: Number(user.sucursalID),
+      desde: hoy.desde,
+      hasta: hoy.hasta,
+      limite: 5,
+    });
+  }
+}, [user]);
+
+  // Datos para el gráfico de rendimiento
+  const chartData = useMemo(() => {
+    const dias: { name: string; sales: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const fecha = new Date();
+      fecha.setDate(fecha.getDate() - i);
+      const fechaStr = fecha.toISOString().split('T')[0]; // 2026-04-17
+
+      const encontrado = (dashboard?.rendimientoVentas ?? []).find(r =>
+        r.fecha.startsWith(fechaStr)
+      );
+
+      dias.push({
+        name: fecha.toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit' }),
+        sales: encontrado ? Number(encontrado.totalVentas.toFixed(2)) : 0,
+      });
+    }
+    return dias;
+  }, [dashboard?.rendimientoVentas]);
+
+  const statusBadgeClass = (status: string) => estadoSunatLabel(status);
 
   return (
     <>
@@ -247,21 +358,59 @@ export default function DashboardPage() {
       <div className="space-y-4 animate-in fade-in duration-500">
 
         {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {[
-            { label: 'Ventas del Día', value: 'S/ 4,250.80', icon: BarChart3, color: 'text-brand-red', bg: 'bg-red-50' },
-            { label: 'Facturas Emitidas', value: '124', icon: FileText, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Boletas Emitidas', value: '856', icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' },
-            { label: 'Estado SUNAT', value: 'Conectado', icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
+            {
+              label: 'Ventas del Día',
+              value: loading ? '...' : formatMoneda(dashboard?.ventasDelDia ?? 0),
+              icon: BarChart3,
+              color: 'text-brand-red',
+              bg: 'bg-red-50',
+            },
+            {
+              label: 'Facturas Emitidas',
+              value: loading ? '...' : String(dashboard?.facturasEmitidas ?? 0),
+              icon: FileText,
+              color: 'text-emerald-600',
+              bg: 'bg-emerald-50',
+            },
+            {
+              label: 'Boletas Emitidas',
+              value: loading ? '...' : String(dashboard?.boletasEmitidas ?? 0),
+              icon: FileText,
+              color: 'text-purple-600',
+              bg: 'bg-purple-50',
+            },
+            {
+              label: 'Notas de Crédito',
+              value: loading ? '...' : String(dashboard?.notasCreditoEmitidas ?? 0),
+              icon: FileText,
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+            },
+            {
+              label: 'Notas de Débito',
+              value: loading ? '...' : String(dashboard?.notasDebitoEmitidas ?? 0),
+              icon: FileText,
+              color: 'text-orange-600',
+              bg: 'bg-orange-50',
+            },
+            {
+              label: 'Estado SUNAT',
+              value: 'Conectado',
+              icon: Zap,
+              color: 'text-amber-600',
+              bg: 'bg-amber-50',
+            },
           ].map((kpi, i) => (
             <Card key={i} className="p-0">
-              <div className="p-2 flex items-center gap-4">
-                <div className={cn("p-3 rounded-xl", kpi.bg)}>
-                  <kpi.icon className={cn("w-6 h-6", kpi.color)} />
+              <div className="p-3 flex items-center gap-3">
+                <div className={cn("p-2.5 rounded-xl shrink-0", kpi.bg)}>
+                  <kpi.icon className={cn("w-5 h-5", kpi.color)} />
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{kpi.label}</p>
-                  <p className="text-xl font-bold text-gray-900 mt-0.5">{kpi.value}</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-tight">{kpi.label}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5 truncate">{kpi.value}</p>
                 </div>
               </div>
             </Card>
@@ -270,23 +419,42 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Sales Chart */}
-          <Card className="lg:col-span-2" title="Rendimiento de Ventas" subtitle="Resumen de los últimos 7 días">
+          <Card
+            className="lg:col-span-2"
+            title="Rendimiento de Ventas"
+            subtitle="Resumen de los últimos 7 días"
+          >
             <div className="h-75 w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={SALES_DATA}>
-                  <defs>
-                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0052CC" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#0052CC" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                  <Area type="monotone" dataKey="sales" stroke="#0052CC" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                  Cargando datos...
+                </div>
+              ) : chartData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                  Sin datos en el período seleccionado
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0052CC" stopOpacity={0.1} />
+                        <stop offset="95%" stopColor="#0052CC" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      formatter={(value: number | undefined) => [
+                        `S/ ${(value ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
+                        'Ventas'
+                      ]}                    />
+                    <Area type="monotone" dataKey="sales" stroke="#0052CC" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </Card>
 
@@ -317,7 +485,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Comprobantes Recientes — sin columna Acciones */}
+        {/* Comprobantes Recientes */}
         <Card
           title="Comprobantes Recientes"
           action={
@@ -342,21 +510,35 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {ALL_COMPROBANTES.slice(0, 5).map((doc, i) => (
-                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-brand-blue">{doc.id}</span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{doc.client}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{doc.date}</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-900">{doc.total}</td>
-                    <td className="px-6 py-4">
-                      <Badge variant={statusBadgeClass(doc.status)}>
-                        {doc.status}
-                      </Badge>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                      Cargando comprobantes...
                     </td>
                   </tr>
-                ))}
+                ) : (dashboard?.comprobantesRecientes ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                      Sin comprobantes recientes
+                    </td>
+                  </tr>
+                ) : (
+                  (dashboard?.comprobantesRecientes ?? []).map((doc, i) => (
+                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-medium text-brand-blue">{doc.numeroCompleto}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">{doc.clienteRznSocial}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{formatFecha(doc.fechaEmision)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatMoneda(doc.importeTotal)}</td>
+                      <td className="px-6 py-4">
+                        <Badge variant={statusBadgeClass(doc.estadoSunat)}>
+                          {doc.estadoSunat}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
