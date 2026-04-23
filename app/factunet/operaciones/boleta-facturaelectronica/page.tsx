@@ -6,10 +6,12 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import BoletaPage from "../boleta/page";
 import FacturaPage from "../factura/page";
+import EmisionRapidaPage from "../../emision/page";
 
 export default function BoletaFacturaElectronicaPage() {
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
+  const [complejidad, setComplejidad] = useState<"simple" | "compleja">("simple");
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -33,25 +35,48 @@ export default function BoletaFacturaElectronicaPage() {
           </div>
         </div>
 
-        <div className="flex items-center">
-          <label htmlFor="tipo-comprobante" className="mr-3 font-semibold text-gray-700">
-            Tipo:
-          </label>
-          <select
-            id="tipo-comprobante"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as "boleta" | "factura")}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
-          >
-            <option value="boleta">Boleta de Venta</option>
-            <option value="factura">Factura Electrónica</option>
-          </select>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center">
+            <label htmlFor="complejidad-comprobante" className="mr-3 font-semibold text-gray-700">
+              Modo:
+            </label>
+            <select
+              id="complejidad-comprobante"
+              value={complejidad}
+              onChange={(e) => setComplejidad(e.target.value as "simple" | "compleja")}
+              className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
+            >
+              <option value="simple">Emisión Rápida</option>
+              <option value="compleja">Emisión Completa</option>
+            </select>
+          </div>
+
+          <div className="flex items-center">
+            <label htmlFor="tipo-comprobante" className="mr-3 font-semibold text-gray-700">
+              Tipo:
+            </label>
+            <select
+              id="tipo-comprobante"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as "boleta" | "factura")}
+              className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
+            >
+              <option value="boleta">Boleta de Venta</option>
+              <option value="factura">Factura Electrónica</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Contenido Dinámico */}
       <div className="flex-1">
-        {tipo === "boleta" ? <BoletaPage /> : <FacturaPage />}
+        {complejidad === "simple" ? (
+          <EmisionRapidaPage tipoExterno={tipo} />
+        ) : tipo === "boleta" ? (
+          <BoletaPage />
+        ) : (
+          <FacturaPage />
+        )}
       </div>
     </div>
   );

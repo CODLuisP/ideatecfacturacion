@@ -57,7 +57,7 @@ function calcItem(item: ItemRapido) {
   return { baseIgv, montoIGV: 0, totalVentaItem: baseIgv, valorVenta: baseIgv };
 }
 
-export default function EmisionRapidaPage() {
+export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoComprobante }) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const isSuperAdmin = user?.rol === 'superadmin';
@@ -71,7 +71,8 @@ export default function EmisionRapidaPage() {
   const { sucursales, loadingSucursales } = useSucursalRuc(isSuperAdmin);
 
   // ── Tipo comprobante ───────────────────────────────────────
-  const [tipo, setTipo] = useState<TipoComprobante>('boleta');
+  const [tipoLocal, setTipoLocal] = useState<TipoComprobante>('boleta');
+  const tipo = tipoExterno ?? tipoLocal;
 
   //guardar url del PDF
   const [pdfUrlEmitido, setPdfUrlEmitido] = useState<string | null>(null);
@@ -831,37 +832,30 @@ export default function EmisionRapidaPage() {
 
   // ─── Render ────────────────────────────────────────────────
   return (
-    <div className="space-y-2 animate-in fade-in duration-500 -mt-4">
+    <div className="space-y-2 animate-in fade-in duration-500 -mt-2">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Zap className="w-6 h-6 text-brand-blue" />
-            Emisión
-          </h2>
-          <p className="mx-7 text-sm text-gray-400 mt-0.5 font-stretch-50% tracking-wide pl-1">
-            {new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-              .replace(/^\w/, c => c.toUpperCase())}
-          </p>
-        </div>
+     
 
         {/* Toggle Boleta / Factura */}
-        <div className="flex items-center gap-1 bg-gray-100/80 border border-gray-200 p-1 rounded-xl">
-          <button type="button" onClick={() => setTipo('boleta')}
-            className={`px-6 py-2 rounded-lg text-xs font-semibold transition-colors border
-              ${tipo === 'boleta'
-                ? 'bg-brand-blue text-white border-brand-blue shadow-sm'
-                : 'bg-blue-50 text-brand-blue border-blue-200 hover:bg-blue-100'}`}>
-            Boleta
-          </button>
-          <button type="button" onClick={() => setTipo('factura')}
-            className={`px-6 py-2 rounded-lg text-xs font-semibold transition-colors border
-              ${tipo === 'factura'
-                ? 'bg-brand-blue text-white border-brand-blue shadow-sm'
-                : 'bg-blue-50 text-brand-blue border-blue-200 hover:bg-blue-100'}`}>
-            Factura
-          </button>
-        </div>
+        {!tipoExterno && (
+          <div className="flex items-center gap-1 bg-gray-100/80 border border-gray-200 p-1 rounded-xl">
+            <button type="button" onClick={() => setTipoLocal('boleta')}
+              className={`px-6 py-2 rounded-lg text-xs font-semibold transition-colors border
+                ${tipo === 'boleta'
+                  ? 'bg-brand-blue text-white border-brand-blue shadow-sm'
+                  : 'bg-blue-50 text-brand-blue border-blue-200 hover:bg-blue-100'}`}>
+              Boleta
+            </button>
+            <button type="button" onClick={() => setTipoLocal('factura')}
+              className={`px-6 py-2 rounded-lg text-xs font-semibold transition-colors border
+                ${tipo === 'factura'
+                  ? 'bg-brand-blue text-white border-brand-blue shadow-sm'
+                  : 'bg-blue-50 text-brand-blue border-blue-200 hover:bg-blue-100'}`}>
+              Factura
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -1268,8 +1262,8 @@ export default function EmisionRapidaPage() {
             )}
 
           {/* Serie destacada */}
-          <div className="bg-linear-to-br from-brand-blue to-blue-700 rounded-2xl p-2 text-white shadow-lg">
-            <p className="text-xl font-black tracking-tight text-center drop-shadow-sm">
+          <div className="bg-linear-to-br from-brand-blue to-blue-700 rounded-lg p-2 text-white">
+            <p className="text-[14px] font-black tracking-tight text-center drop-shadow-sm">
               {isSuperAdmin && !sucursalActual
                 ? <span className="text-sm font-medium opacity-60">Seleccionar sucursal para ver serie y correlativo</span>
                 : loadingSucursal
