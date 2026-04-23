@@ -41,7 +41,7 @@ export const Sidebar = ({
   {isOpen && (
     <div className="overflow-hidden whitespace-nowrap flex flex-col">
       <h1 className="text-2xl font-extrabold text-blue-50 tracking-tight leading-tight">
-        FACTU<span className="text-[#e01919]">NET</span>
+        FACTU<span className="text-[#f15050]">NET</span>
       </h1>
       <p className="text-[10px] text-blue-50/70 font-medium tracking-wide">
         Sistema de Facturación
