@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const activeView = (pathname.split('/').pop() as View) || 'dashboard';
+  const activeView = (pathname.split('/')[2] as View) || 'dashboard';
 
   React.useEffect(() => {
     if (pathname === '/factunet' || pathname === '/factunet/') {
@@ -42,8 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'emision', label: 'Emisión', icon: FileText },
-    { id: 'operaciones', label: 'Operaciones', icon: Grip },
+    { id: 'operaciones', label: 'Emisión', icon: Grip },
     { id: 'ver-comprobantes', label: 'Comprobantes', icon: FileBox },
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'productos', label: 'Productos', icon: Package },

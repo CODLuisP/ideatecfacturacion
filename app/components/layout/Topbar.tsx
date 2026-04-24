@@ -13,10 +13,12 @@ import {
   Globe,
   MapPin,
   FlaskConical,
+  Zap,
 } from "lucide-react";
 import { View } from "@/app/types";
 import { signOut } from "next-auth/react";
 import { useAuth } from "@/context/AuthContext";
+import { DateChip } from "./DateChip";
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -67,13 +69,9 @@ export const Topbar = ({
   const isSuperAdmin = user?.username === "superAdminOpen";
   const isBeta = user?.environment === "beta";
 
-  // 👇 Logo: si hay logoBase64 en el user del contexto, construye el data URL;
-  //    de lo contrario usa el fallback /user.png
   const logoSrc = user?.logoBase64
     ? `data:image/png;base64,${user.logoBase64}`
     : "/user.png";
-
-  // Sin useEffect de fetch: el AuthContext ya se encarga de traer y actualizar el logo
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -95,8 +93,9 @@ export const Topbar = ({
           isBeta ? "bg-amber-50 border-amber-300" : "bg-white border-gray-100"
         }`}
       >
-        {/* Left */}
+        {/* ── Izquierda ── */}
         <div className="flex items-center gap-3">
+          {/* Botón hamburguesa */}
           <button
             onClick={toggleSidebar}
             className={`p-2 rounded-lg transition-colors ${
@@ -111,18 +110,22 @@ export const Topbar = ({
               <ChevronRight className="w-5 h-5" />
             )}
           </button>
+
+          {/* Breadcrumb */}
           <div className="hidden md:flex items-center gap-1.5 text-sm text-gray-400">
             <span className="hover:text-gray-600 cursor-pointer transition-colors">
               Sistema
             </span>
             <ChevronRight className="w-3 h-3" />
             <span className="font-semibold text-gray-800 capitalize">
-              {activeView}
+              {activeView === "operaciones" ? "Emisión" : activeView}
             </span>
           </div>
+
+          <DateChip />
         </div>
 
-        {/* Right */}
+        {/* ── Derecha ── */}
         <div className="flex items-center gap-3">
           {/* Context badge */}
           <div className="flex items-center gap-2 px-3 py-2">
@@ -174,10 +177,13 @@ export const Topbar = ({
             )}
           </div>
 
-          {/* Notification Bell */}
+          {/* Campana de notificaciones */}
           <div className="relative" ref={notifRef}>
             <button
-              onClick={() => { setNotifOpen((v) => !v); setUserOpen(false); }}
+              onClick={() => {
+                setNotifOpen((v) => !v);
+                setUserOpen(false);
+              }}
               className={`p-2.5 rounded-xl relative group transition-all ${
                 isBeta
                   ? "hover:bg-amber-100 text-amber-500"
@@ -186,7 +192,9 @@ export const Topbar = ({
             >
               <Bell
                 className={`w-5 h-5 transition-colors ${
-                  isBeta ? "group-hover:text-amber-700" : "group-hover:text-blue-600"
+                  isBeta
+                    ? "group-hover:text-amber-700"
+                    : "group-hover:text-blue-600"
                 }`}
               />
               {unreadCount > 0 && (
@@ -197,7 +205,9 @@ export const Topbar = ({
             {notifOpen && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <span className="text-sm font-bold text-gray-900">Notificaciones</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    Notificaciones
+                  </span>
                   {unreadCount > 0 && (
                     <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                       {unreadCount} nuevas
@@ -208,15 +218,23 @@ export const Topbar = ({
                   {notifications.map((n) => (
                     <li
                       key={n.id}
-                      className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${n.unread ? "bg-blue-50/30" : ""}`}
+                      className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
+                        n.unread ? "bg-blue-50/30" : ""
+                      }`}
                     >
                       <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
                         {n.icon}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 leading-tight">{n.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{n.desc}</p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-medium">{n.time}</p>
+                        <p className="text-sm font-semibold text-gray-800 leading-tight">
+                          {n.title}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {n.desc}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                          {n.time}
+                        </p>
                       </div>
                       {n.unread && (
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
@@ -235,22 +253,27 @@ export const Topbar = ({
 
           <div className="h-7 w-px bg-gray-100" />
 
-          {/* User Dropdown */}
+          {/* Menú de usuario */}
           <div className="relative" ref={userRef}>
             <button
-              onClick={() => { setUserOpen((v) => !v); setNotifOpen(false); }}
+              onClick={() => {
+                setUserOpen((v) => !v);
+                setNotifOpen(false);
+              }}
               className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-all group ${
                 isBeta ? "hover:bg-amber-100" : "hover:bg-gray-50"
               }`}
             >
               <div className="text-right hidden md:block">
-                <p className="text-sm font-bold text-gray-900 leading-none">{user?.username}</p>
+                <p className="text-sm font-bold text-gray-900 leading-none">
+                  {user?.username}
+                </p>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5">
                   {isSuperAdmin
                     ? "Super Admin"
                     : user?.rol === "admin"
-                    ? "Administrador"
-                    : user?.rol}
+                      ? "Administrador"
+                      : user?.rol}
                 </p>
               </div>
               <div
@@ -260,7 +283,6 @@ export const Topbar = ({
                     : "border-gray-200 group-hover:border-gray-300"
                 }`}
               >
-                {/* 👇 logoSrc se recalcula automáticamente cuando user.logoBase64 cambia */}
                 <img
                   src={logoSrc}
                   alt="Avatar"
@@ -269,14 +291,18 @@ export const Topbar = ({
                 />
               </div>
               <ChevronRight
-                className={`w-3 h-3 text-gray-700 transition-transform duration-200 ${userOpen ? "rotate-90" : ""}`}
+                className={`w-3 h-3 text-gray-700 transition-transform duration-200 ${
+                  userOpen ? "rotate-90" : ""
+                }`}
               />
             </button>
 
             {userOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                  <p className="text-sm font-bold text-gray-900">{user?.username}</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {user?.username}
+                  </p>
                   <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
                   {!isSuperAdmin && user?.nombreSucursal && (
                     <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
@@ -300,19 +326,31 @@ export const Topbar = ({
 
                 <ul className="py-1.5">
                   <li>
-                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
-                      <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
-                        <User className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
-                      </div>
-                      <span className="font-medium">Mi perfil</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group">
+                    <button
+                      onClick={() =>
+                        (window.location.href =
+                          "http://localhost:3000/factunet/empresa")
+                      }
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
+                    >
                       <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
                         <Settings className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
                       </div>
-                      <span className="font-medium">Configuración</span>
+                      <span className="font-medium">Empresa</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() =>
+                        (window.location.href =
+                          "http://localhost:3000/factunet/sunat")
+                      }
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
+                    >
+                      <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
+                        <Zap className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
+                      </div>
+                      <span className="font-medium">SUNAT</span>
                     </button>
                   </li>
                 </ul>
@@ -334,6 +372,7 @@ export const Topbar = ({
         </div>
       </header>
 
+      {/* Banner de entorno Beta */}
       {isBeta && (
         <div className="sticky top-16 z-30 bg-amber-400 border-b border-amber-500 px-6 py-2 flex items-center gap-3">
           <FlaskConical className="w-4 h-4 text-amber-900 shrink-0" />
@@ -342,7 +381,9 @@ export const Topbar = ({
           </span>
           <p className="text-amber-900 text-xs font-medium">
             Estás en el entorno de pruebas —{" "}
-            <strong className="font-bold">No emitas comprobantes reales a SUNAT.</strong>{" "}
+            <strong className="font-bold">
+              No emitas comprobantes reales a SUNAT.
+            </strong>{" "}
             Los documentos generados aquí no tienen validez tributaria.
           </p>
         </div>
@@ -350,10 +391,18 @@ export const Topbar = ({
 
       <style jsx>{`
         @keyframes fade-in {
-          from { opacity: 0; transform: translateY(-6px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(-6px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-        .animate-fade-in { animation: fade-in 0.15s ease-out both; }
+        .animate-fade-in {
+          animation: fade-in 0.15s ease-out both;
+        }
       `}</style>
     </>
   );

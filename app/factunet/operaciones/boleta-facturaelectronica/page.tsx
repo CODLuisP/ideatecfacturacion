@@ -51,10 +51,10 @@ export default function BoletaFacturaElectronicaPage() {
               id="complejidad-comprobante"
               value={complejidad}
               onChange={(e) => setComplejidad(e.target.value as "simple" | "compleja")}
-              className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
+              className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
             >
-              <option value="simple">Emisión Rápida</option>
-              <option value="compleja">Emisión Completa</option>
+              <option value="simple">Emisión Simple</option>
+              <option value="compleja">Emisión Detallada</option>
             </select>
           </div>
 
@@ -66,7 +66,7 @@ export default function BoletaFacturaElectronicaPage() {
               id="tipo-comprobante"
               value={tipo}
               onChange={(e) => setTipo(e.target.value as "boleta" | "factura")}
-              className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
+              className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
             >
               <option value="boleta">Boleta de Venta</option>
               <option value="factura">Factura Electrónica</option>
