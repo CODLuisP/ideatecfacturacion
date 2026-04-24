@@ -293,9 +293,10 @@ export default function ClientesPage() {
   }), [clientes, search, filterStatus, filterTipo, filtroSucursal]);
 
   const activeFilters = (filterStatus !== 'Todos' ? 1 : 0) + (filterTipo !== 'Todos' ? 1 : 0);
+  const totalWidth = isSuperAdmin ? 1400 : 1270; 
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500">
+    <div className="space-y-3 animate-in fade-in duration-500">
 
       {/* ── Modales ────────────────────────────────────────────────────────── */}
       {clienteCorreo && (
@@ -339,7 +340,7 @@ export default function ClientesPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por RUC, DNI o Nombre..."
-            className="w-full pl-10 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm"
+            className="w-full pl-10 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm text-sm"
           />
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           {search && (
@@ -356,7 +357,7 @@ export default function ClientesPage() {
                 value={filtroSucursal}
                  onChange={(e) => setFiltroSucursal(Number(e.target.value))}
                 className={cn(
-                  "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                  "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
                   filtroSucursal
                     ? "bg-blue-50 border-blue-300 text-blue-700"
                     : "bg-white border-gray-200 text-gray-600"
@@ -399,7 +400,7 @@ export default function ClientesPage() {
               value={filterTipo}
               onChange={e => setFilterTipo(e.target.value as typeof filterTipo)}
               className={cn(
-                "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
                 filterTipo !== 'Todos'
                   ? 'bg-blue-50 border-blue-300 text-blue-700'
                   : 'bg-white border-gray-200 text-gray-600'
@@ -416,7 +417,7 @@ export default function ClientesPage() {
           {activeFilters > 0 && (
             <button
               onClick={() => { setFilterStatus('Todos'); setFilterTipo('Todos'); setFiltroSucursal(0); }}
-              className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors"
             >
               <X size={12} /> Limpiar ({activeFilters})
             </button>
@@ -432,64 +433,45 @@ export default function ClientesPage() {
         <p className="text-sm text-gray-500">
           Mostrando <span className="font-semibold text-gray-900">{filtered.length}</span> de <span className="font-semibold text-gray-900">{clientes.length}</span> clientes
         </p>
-        {(search || activeFilters > 0) && filtered.length === 0 && (
-          <p className="text-sm text-amber-600 font-medium">Sin resultados para esta búsqueda</p>
-        )}
       </div>
 
       {/* ── Tabla ─────────────────────────────────────────────────────────── */}
-
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-2xl">Documento</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Razón Social / Nombre</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nombre Comercial</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dirección</th>
-                {isSuperAdmin && (<th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sucursal</th>)}
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Correo</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Teléfono</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha Creación</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-2xl">Acciones</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-xl" style={{minWidth:120}}>Documento</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:180}}>Razón Social / Nombre</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:140}}>Nombre Comercial</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:160}}>Dirección</th>
+                {isSuperAdmin && (<th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:120}}>Sucursal</th>)}
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:180}}>Correo</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:110}}>Teléfono</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:120}}>Fecha Creación</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{minWidth:90}}>Estado</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-xl" style={{minWidth:150}}>Acciones</th>
               </tr>
             </thead>
           </table>
         </div>
 
         <div
-          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] scrollbar-thin"
-          style={{
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#CBD5E1 transparent',
-          }}
+          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-290px)]"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 transparent' }}
         >
           <style>{`
-            .tbody-scroll::-webkit-scrollbar {
-              width: 6px;
-              height: 6px;
-            }
-            .tbody-scroll::-webkit-scrollbar-track {
-              background: transparent;
-            }
-            .tbody-scroll::-webkit-scrollbar-thumb {
-              background-color: #CBD5E1;
-              border-radius: 999px;
-            }
-            .tbody-scroll::-webkit-scrollbar-thumb:hover {
-              background-color: #94A3B8;
-            }
-            .tbody-scroll::-webkit-scrollbar-corner {
-              background: transparent;
-            }
+            .tbody-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+            .tbody-scroll::-webkit-scrollbar-track { background: transparent; }
+            .tbody-scroll::-webkit-scrollbar-thumb { background-color: #CBD5E1; border-radius: 999px; }
+            .tbody-scroll::-webkit-scrollbar-thumb:hover { background-color: #94A3B8; }
+            .tbody-scroll::-webkit-scrollbar-corner { background: transparent; }
           `}</style>
           <table className="w-full text-left border-collapse tbody-scroll">
             <tbody className="divide-y divide-gray-100">
               {loadingClientes ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={isSuperAdmin ? 10 : 9} className="px-6 py-16 text-center">
                     <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
                       <div className="w-5 h-5 border-2 border-gray-300 border-t-brand-blue rounded-full animate-spin" />
                       Cargando clientes...
@@ -498,37 +480,37 @@ export default function ClientesPage() {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-gray-400">
+                  <td colSpan={isSuperAdmin ? 10 : 9} className="px-6 py-16 text-center text-sm text-gray-400">
                     No se encontraron clientes con ese criterio.
                   </td>
                 </tr>
               ) : filtered.map((client) => (
                 <tr key={client.clienteId} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" style={{minWidth:120}}>
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase">{client.tipoDocumento.tipoDocumentoNombre}</p>
                       <p className="text-sm font-mono text-gray-700">{client.numeroDocumento}</p>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{client.razonSocialNombre}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{client.nombreComercial ?? '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600" title={formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}>
+                  <td className="px-6 py-4 text-sm font-semibold text-gray-900" style={{minWidth:180}}>{client.razonSocialNombre}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600" style={{minWidth:140}}>{client.nombreComercial ?? '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600" style={{minWidth:160}} title={formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}>
                     {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
                   </td>
                   {isSuperAdmin && (
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-gray-600" style={{minWidth:120}}>
                       {sucursales.find(s => s.sucursalId === client.sucursalID)?.nombre ?? "-"}
                     </td>
                   )}
-                  <td className="px-6 py-4 text-sm text-gray-600">{client.correo ?? '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{client.telefono ?? '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatFecha(client.fechaCreacion)}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-sm text-gray-600" style={{minWidth:180}}>{client.correo ?? '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600" style={{minWidth:110}}>{client.telefono ?? '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500" style={{minWidth:120}}>{formatFecha(client.fechaCreacion)}</td>
+                  <td className="px-6 py-4" style={{minWidth:90}}>
                     <Badge variant={client.estado ? 'success' : 'default'}>
                       {client.estado ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" style={{minWidth:150}}>
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => setClienteCorreo(client)}
@@ -559,7 +541,6 @@ export default function ClientesPage() {
           </table>
         </div>
       </Card>
-
 
       {/* ── Modal: Nuevo Cliente ──────────────────────────────────────────── */}
       <AgregarCliente

@@ -151,81 +151,75 @@ export default function ProductosPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-3 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-
-          {/* Buscador — izquierda */}
-          <div className="relative flex-1 max-w-md">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar productos por código o nombre..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm"
-            />
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
-
-          {/* Filtros + acciones — derecha */}
-          <div className="flex items-center gap-2">
-
-            {/* Categoría */}
-            <div className="relative">
-              <select
-                value={filterCategoria}
-                onChange={(e) => setFilterCategoria(e.target.value)}
-                className={cn(
-                  "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
-                  filterCategoria !== "Todos"
-                    ? "bg-blue-50 border-blue-300 text-blue-700"
-                    : "bg-white border-gray-200 text-gray-600"
-                )}
-              >
-                <option value="Todos">Categoría: Todos</option>
-                {categorias.map((cat) => (
-                  <option key={cat.categoriaId} value={cat.categoriaNombre}>
-                    {cat.categoriaNombre}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+            {/* Buscador — izquierda */}
+            <div className="relative min-w-48 flex-1 max-w-md">
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar productos por código o nombre..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm text-sm"
+                />
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
 
-            {/* Filtros Avanzados */}
-            <button
-              onClick={() => setShowFiltrosAvanzados((prev) => !prev)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-xl transition-all whitespace-nowrap",
-                filtrosAvanzadosActivos
-                  ? "bg-green-50 border-green-300 text-green-700"
-                  : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
-              )}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
-              </svg>
-              Filtros avanzados
-              {filtrosAvanzadosActivos && (
-                <span className="bg-green-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {[filtroStock, ...filtroAfectacion, ...filtroTipoProducto].filter(Boolean).length}
-                </span>
-              )}
-            </button>
+            {/* Filtros + acciones — derecha, bajan juntos */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                    <select
+                        value={filterCategoria}
+                        onChange={(e) => setFilterCategoria(e.target.value)}
+                        className={cn(
+                            "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                            filterCategoria !== "Todos"
+                                ? "bg-blue-50 border-blue-300 text-blue-700"
+                                : "bg-white border-gray-200 text-gray-600"
+                        )}
+                    >
+                        <option value="Todos">Categoría: Todos</option>
+                        {categorias.map((cat) => (
+                            <option key={cat.categoriaId} value={cat.categoriaNombre}>
+                                {cat.categoriaNombre}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
 
-            {/* Separador */}
-            <div className="w-px h-6 bg-gray-200" />
+                <button
+                    onClick={() => setShowFiltrosAvanzados((prev) => !prev)}
+                    className={cn(
+                        "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-xl transition-all whitespace-nowrap",
+                        filtrosAvanzadosActivos
+                            ? "bg-green-50 border-green-300 text-green-700"
+                            : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                    )}
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                    Filtros avanzados
+                    {filtrosAvanzadosActivos && (
+                        <span className="bg-green-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            {[filtroStock, ...filtroAfectacion, ...filtroTipoProducto].filter(Boolean).length}
+                        </span>
+                    )}
+                </button>
 
-            {/* Botones acción */}
-            <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-              <Upload className="w-4 h-4" /> Importar
-            </Button>
-            <Button onClick={() => setIsNewOpen(true)}>
-              <Plus className="w-4 h-4" /> Nuevo Producto
-            </Button>
-          </div>
+                <div className="w-px h-6 bg-gray-200" />
+
+                <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                    <Upload className="w-4 h-4" /> Importar
+                </Button>
+                <Button onClick={() => setIsNewOpen(true)}>
+                    <Plus className="w-4 h-4" /> Nuevo Producto
+                </Button>
+            </div>
         </div>
 
         {/* Panel filtros avanzados — barra full width compacta */}
@@ -373,11 +367,23 @@ export default function ProductosPage() {
           </div>
         )}
       </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          Mostrando <span className="font-semibold text-gray-900">{productos.length}</span> productos
+        </p>
+      </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div  className="overflow-y-auto bg-gray-50 rounded-xl p-4" 
+        style={{ 
+          maxHeight: showFiltrosAvanzados ? 'calc(100vh - 275px)' : 'calc(100vh - 215px)', 
+          scrollbarWidth: 'thin', 
+          scrollbarColor: '#CBD5E1 transparent' 
+        }}
+      >        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
         {loadingProductos  && (
-          Array.from({ length: 9 }).map((_, i) => (
+          Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="animate-pulse border border-gray-200 rounded-xl p-4 space-y-4">
               <div className="h-3 bg-gray-200 rounded w-1/3" />
               <div className="h-4 bg-gray-200 rounded w-2/3" />
@@ -472,6 +478,7 @@ export default function ProductosPage() {
           </Card>
         ))}
       </div>
+    </div>
 
       <AgregarProducto
         isOpen={isNewOpen}

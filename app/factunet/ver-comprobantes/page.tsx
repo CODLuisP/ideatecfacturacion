@@ -28,6 +28,7 @@ import { ModalEnvioCorreoWhatsapp } from '@/app/components/modalVerComprobantes/
 import { tipoLabel, formatFecha, formatFechaHora, COLORS } from './gestionComprobantes/helpers';
 import { useRouter } from 'next/navigation'
 import { Card } from '@/app/components/ui/Card';
+import { Button } from '@/app/components/ui/Button';
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = ['Todos', 'Factura', 'Boleta', 'Nota de Crédito', 'Nota de Débito'];
@@ -209,7 +210,7 @@ export default function VerComprobantesPage() {
     };
 
     return (
-        <div className="space-y-4 animate-in fade-in duration-500">
+        <div className="space-y-3 animate-in fade-in duration-500">
 
             {/* Modales */}
             {detalle && (
@@ -284,19 +285,25 @@ export default function VerComprobantesPage() {
                         </div>
                     )}
 
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 flex-wrap flex-1">
-                            <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <div className="flex items-start justify-between gap-2">
+
+                        {/* Div 1: Buscar + Filtros */}
+                        <div className="flex-1 flex flex-wrap items-center gap-2">
+                            <div className="relative w-full sm:w-auto sm:flex-1 min-w-48 max-w-sm">
+                                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input type="text" value={search} onChange={e => setSearch(e.target.value)}
                                     placeholder="Buscar por cliente, RUC/DNI o N° comprobante..."
-                                    className="w-96 pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm" />
+                                    className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm" />
+                                {search && (
+                                    <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                        <X size={14} />
+                                    </button>
+                                )}
                             </div>
-                            <div className="h-7 w-px bg-gray-200 hidden md:block" />
                             <DropdownFiltro label="Tipo de comprobante" value={filtroTipo} options={TIPOS_OPTS} onChange={v => { setFiltroTipo(v); }} />
                             <DropdownFiltro label="Estado SUNAT" value={filtroEstado} options={ESTADOS_OPTS} onChange={v => { setFiltroEstado(v); }} colorMap={ESTADO_COLORS_MAP} />
                             <button onClick={() => setShowAvanzado(o => !o)}
-                                className={cn("flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-all shadow-sm",
+                                className={cn("flex items-center gap-2 px-3 py-2.5 text-sm font-medium border rounded-xl transition-all shadow-sm",
                                     showAvanzado ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")}>
                                 <Filter size={14} /> Opciones avanzadas
                                 <ChevronDown size={13} className={cn("transition-transform", showAvanzado && "rotate-180")} />
@@ -308,18 +315,21 @@ export default function VerComprobantesPage() {
                                 </button>
                             )}
                         </div>
-                        <div className="relative shrink-0">
+
+                        {/* Div 2: Nuevo Comprobante */}
+                        <div className="shrink-0">
                             <button
                                 onClick={() => router.push('/factunet/operaciones')}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors">
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-colors">
                                 <Plus size={14} /> Nuevo Comprobante
                             </button>
                         </div>
+
                     </div>
 
                     {showAvanzado && (
                         <div className="border border-blue-100 bg-blue-50/40 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit">
+                            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit flex-wrap">
                                 {([
                                     { key: 'fechas', label: 'Por fechas (Sucursal)' },
                                     { key: 'unico', label: 'Comprobante único' },
@@ -428,7 +438,7 @@ export default function VerComprobantesPage() {
             </div>
 
             {/* ── Contador ── */}
-            <div className="flex items-center justify-between -mt-2">
+            <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">
                     Total <span className="font-semibold text-gray-900">{comprobantes.length}</span> comprobantes
                 </p>
@@ -441,12 +451,12 @@ export default function VerComprobantesPage() {
                 .comp-table tbody {
                     display: block;
                     overflow-y: auto;
-                    max-height: calc(100vh - 320px);
+                    max-height: calc(100vh - 295px);
                     scrollbar-width: thin;
                     scrollbar-color: #CBD5E1 transparent;
                 }
                 .comp-table-avanzado tbody {
-                    max-height: calc(100vh - 460px);
+                    max-height: calc(100vh - 425px);
                 }
                 .comp-table thead tr,
                 .comp-table tbody tr {
@@ -463,8 +473,8 @@ export default function VerComprobantesPage() {
                 <div className="overflow-x-auto">
                     <table className={cn("w-full text-left border-collapse comp-table", showAvanzado && "comp-table-avanzado")}>
                         <thead>
-                            <tr className="bg-gray-100">
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32 rounded-tl-2xl">FECHA</th>
+                            <tr className="bg-gray-100" style={{borderTopLeftRadius: '12px', borderTopRightRadius: '12px', overflow: 'hidden'}}>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">FECHA</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-52">COMPROBANTE</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-50">CLIENTE</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">PDF</th>
@@ -474,7 +484,7 @@ export default function VerComprobantesPage() {
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">CORREO</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">WHATSAPP</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-19">VER</th>
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21 rounded-tr-2xl">OPCIONES</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">OPCIONES</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
