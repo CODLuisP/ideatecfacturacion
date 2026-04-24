@@ -34,10 +34,14 @@ interface Sucursal {
   correlativoFactura: number;
   serieBoleta: string;
   correlativoBoleta: number;
-  serieNotaCredito: string;
-  correlativoNotaCredito: number;
-  serieNotaDebito: string;
-  correlativoNotaDebito: number;
+  serieNotaCreditoFactura: string;
+  correlativoNotaCreditoFactura: number;
+  serieNotaCreditoBoleta: string;
+  correlativoNotaCreditoBoleta: number;
+  serieNotaDebitoFactura: string;
+  correlativoNotaDebitoFactura: number;
+  serieNotaDebitoBoleta: string;
+  correlativoNotaDebitoBoleta: number;
   serieGuiaRemision: string;
   correlativoGuiaRemision: number;
   serieGuiaTransportista: string;
@@ -357,12 +361,18 @@ function SucursalCard({
         <SucursalSerieRow label="Boleta" serie={sucursal.serieBoleta} correlativo={sucursal.correlativoBoleta}
           onSerieChange={(v) => upd('serieBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoBoleta')(v)}
           prefix="B" hint="B001" readOnly={readOnly} />
-        <SucursalSerieRow label="Nota de Crédito" serie={sucursal.serieNotaCredito} correlativo={sucursal.correlativoNotaCredito}
-          onSerieChange={(v) => upd('serieNotaCredito')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCredito')(v)}
+        <SucursalSerieRow label="Nota de Crédito (Factura)" serie={sucursal.serieNotaCreditoFactura} correlativo={sucursal.correlativoNotaCreditoFactura}
+          onSerieChange={(v) => upd('serieNotaCreditoFactura')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCreditoFactura')(v)}
           prefix="F" hint="FC01" readOnly={readOnly} />
-        <SucursalSerieRow label="Nota de Débito" serie={sucursal.serieNotaDebito} correlativo={sucursal.correlativoNotaDebito}
-          onSerieChange={(v) => upd('serieNotaDebito')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebito')(v)}
+        <SucursalSerieRow label="Nota de Crédito (Boleta)" serie={sucursal.serieNotaCreditoBoleta} correlativo={sucursal.correlativoNotaCreditoBoleta}
+          onSerieChange={(v) => upd('serieNotaCreditoBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCreditoBoleta')(v)}
+          prefix="B" hint="BC01" readOnly={readOnly} />
+        <SucursalSerieRow label="Nota de Débito (Factura)" serie={sucursal.serieNotaDebitoFactura} correlativo={sucursal.correlativoNotaDebitoFactura}
+          onSerieChange={(v) => upd('serieNotaDebitoFactura')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebitoFactura')(v)}
           prefix="F" hint="FD01" readOnly={readOnly} />
+        <SucursalSerieRow label="Nota de Débito (Boleta)" serie={sucursal.serieNotaDebitoBoleta} correlativo={sucursal.correlativoNotaDebitoBoleta}
+          onSerieChange={(v) => upd('serieNotaDebitoBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebitoBoleta')(v)}
+          prefix="B" hint="BD01" readOnly={readOnly} />
         <SucursalSerieRow label="Guía de Remisión" serie={sucursal.serieGuiaRemision} correlativo={sucursal.correlativoGuiaRemision}
           onSerieChange={(v) => upd('serieGuiaRemision')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaRemision')(v)}
           prefix="T" hint="T001" readOnly={readOnly} />
@@ -559,10 +569,14 @@ export default function ConfiguracionPage() {
         correlativoFactura:           sucursal.correlativoFactura,
         serieBoleta:                  sucursal.serieBoleta,
         correlativoBoleta:            sucursal.correlativoBoleta,
-        serieNotaCredito:             sucursal.serieNotaCredito,
-        correlativoNotaCredito:       sucursal.correlativoNotaCredito,
-        serieNotaDebito:              sucursal.serieNotaDebito,
-        correlativoNotaDebito:        sucursal.correlativoNotaDebito,
+        serieNotaCreditoFactura:           sucursal.serieNotaCreditoFactura,
+        correlativoNotaCreditoFactura:     sucursal.correlativoNotaCreditoFactura,
+        serieNotaCreditoBoleta:            sucursal.serieNotaCreditoBoleta,
+        correlativoNotaCreditoBoleta:      sucursal.correlativoNotaCreditoBoleta,
+        serieNotaDebitoFactura:            sucursal.serieNotaDebitoFactura,
+        correlativoNotaDebitoFactura:      sucursal.correlativoNotaDebitoFactura,
+        serieNotaDebitoBoleta:             sucursal.serieNotaDebitoBoleta,
+        correlativoNotaDebitoBoleta:       sucursal.correlativoNotaDebitoBoleta,
         serieGuiaRemision:            sucursal.serieGuiaRemision,
         correlativoGuiaRemision:      sucursal.correlativoGuiaRemision,
         serieGuiaTransportista:       sucursal.serieGuiaTransportista,
