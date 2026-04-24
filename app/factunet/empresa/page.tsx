@@ -169,15 +169,19 @@ interface LogoUploaderProps {
   canEdit: boolean;
   onFileSelected: (file: File, previewDataUrl: string) => void;
   onLogoRemove: () => void;
+  onError: (msg: string) => void;
 }
-function LogoUploader({ logoDataUrl, uploading, canEdit, onFileSelected, onLogoRemove }: LogoUploaderProps) {
+function LogoUploader({ logoDataUrl, uploading, canEdit, onFileSelected, onLogoRemove,onError  }: LogoUploaderProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const handle = (file: File | undefined) => {
     if (!file || !canEdit) return;
     if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type)) return;
-    if (file.size > 2 * 1024 * 1024) return;
+    if (file.size > 2 * 1024 * 1024) {
+      onError('La imagen pesa más de 2MB. Carga una imagen de máximo 2MB.'); // 👈 agrega esto
+      return;
+    }    
     const reader = new FileReader();
     reader.onload = () => onFileSelected(file, reader.result as string);
     reader.readAsDataURL(file);
@@ -603,6 +607,7 @@ export default function ConfiguracionPage() {
                 canEdit={canEdit}
                 onFileSelected={handleFileSelected}
                 onLogoRemove={handleLogoRemove}
+                onError={(msg) => showToast(msg, 'error')}
               />
 
               <div className="md:col-span-2">
