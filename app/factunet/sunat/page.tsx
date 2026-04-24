@@ -279,6 +279,8 @@ export default function SunatPage() {
   const [savingConfig,  setSavingConfig]  = useState(false);
   const [showConfirm,   setShowConfirm]   = useState(false);
 
+  const [igv, setIgv] = useState<'18' | '10.5'>('18');
+
   const upd = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setConfig((c) => ({ ...c, [key]: e.target.value, saved: false }));
 
@@ -529,6 +531,49 @@ export default function SunatPage() {
               )}
             </div>
           </CollapsibleSection>
+
+          {/* ── Tipo de IGV Aplicado ── */}
+<CollapsibleSection
+  title="Tipo de IGV Aplicado"
+  subtitle="Tasa de IGV predeterminada en tus comprobantes"
+  badge={<Badge variant="info">Estático</Badge>}
+>
+  <div className="space-y-4">
+    <InfoBanner variant="info">
+      La tasa seleccionada se aplicará por defecto al crear cualquier comprobante electrónico.
+      Podrás modificarla individualmente en cada comprobante si el caso lo requiere.
+    </InfoBanner>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {([
+        { key: '18', label: '18%', desc: 'Tasa general del IGV' },
+        { key: '10.5', label: '10.5%', desc: 'Tasa reducida aplicable a ciertos sectores' },
+      ] as const).map((tasa) => (
+        <label
+          key={tasa.key}
+          className={cn(
+            'flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all',
+            igv === tasa.key
+              ? 'border-[#023e7d] bg-blue-50/60'
+              : 'border-gray-200 hover:border-gray-300 bg-gray-50/30'
+          )}
+        >
+          <input
+            type="radio"
+            name="igv"
+            value={tasa.key}
+            checked={igv === tasa.key}
+            onChange={() => setIgv(tasa.key)}
+            className="mt-0.5 accent-brand-blue"
+          />
+          <div>
+            <p className="text-sm font-bold text-gray-900">{tasa.label}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{tasa.desc}</p>
+          </div>
+        </label>
+      ))}
+    </div>
+  </div>
+</CollapsibleSection>
 
           {/* ── Botón guardar ── */}
           <div className="flex justify-end gap-3 pt-2">
