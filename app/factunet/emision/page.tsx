@@ -6,7 +6,7 @@ import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
 import { numeroALetras } from '@/app/components/ui/numeroALetras';
 import { useToast } from '@/app/components/ui/Toast';
 import axios from 'axios';
-import { Cliente } from '../clientes/gestionClientes/Cliente';
+import { Cliente } from '../clientes/gestionClientes/typesCliente';
 import { useClientesRuc } from '../clientes/gestionClientes/useClientesRuc';
 import { useClienteBoleta } from '../operaciones/boleta/gestionBoletas/useClienteBoleta';
 import { useEmpresaEmisor } from '../operaciones/boleta/gestionBoletas/useEmpresaEmisor';

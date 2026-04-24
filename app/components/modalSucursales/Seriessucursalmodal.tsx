@@ -14,18 +14,22 @@ export function SeriesSucursalModal({
 }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    serieFactura: sucursal.serieFactura,
-    correlativoFactura: sucursal.correlativoFactura,
-    serieBoleta: sucursal.serieBoleta,
-    correlativoBoleta: sucursal.correlativoBoleta,
-    serieNotaCredito: sucursal.serieNotaCredito,
-    correlativoNotaCredito: sucursal.correlativoNotaCredito,
-    serieNotaDebito: sucursal.serieNotaDebito,
-    correlativoNotaDebito: sucursal.correlativoNotaDebito,
-    serieGuiaRemision: sucursal.serieGuia,
-    correlativoGuiaRemision: sucursal.correlativoGuia,
-    serieGuiaTransportista: "V001",
-    correlativoGuiaTransportista: 1,
+    serieFactura:                   sucursal.serieFactura,
+    correlativoFactura:             sucursal.correlativoFactura,
+    serieBoleta:                    sucursal.serieBoleta,
+    correlativoBoleta:              sucursal.correlativoBoleta,
+    serieNotaCreditoFactura:        sucursal.serieNotaCreditoFactura,
+    correlativoNotaCreditoFactura:  sucursal.correlativoNotaCreditoFactura,
+    serieNotaCreditoBoleta:         sucursal.serieNotaCreditoBoleta,
+    correlativoNotaCreditoBoleta:   sucursal.correlativoNotaCreditoBoleta,
+    serieNotaDebitoFactura:         sucursal.serieNotaDebitoFactura,
+    correlativoNotaDebitoFactura:   sucursal.correlativoNotaDebitoFactura,
+    serieNotaDebitoBoleta:          sucursal.serieNotaDebitoBoleta,
+    correlativoNotaDebitoBoleta:    sucursal.correlativoNotaDebitoBoleta,
+    serieGuiaRemision:              sucursal.serieGuiaRemision,
+    correlativoGuiaRemision:        sucursal.correlativoGuiaRemision,
+    serieGuiaTransportista:         sucursal.serieGuiaTransportista,
+    correlativoGuiaTransportista:   sucursal.correlativoGuiaTransportista,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,12 +43,14 @@ export function SeriesSucursalModal({
   };
 
   const rows = [
-    { label: "Factura",            serieKey: "serieFactura",           corrKey: "correlativoFactura" },
-    { label: "Boleta",             serieKey: "serieBoleta",            corrKey: "correlativoBoleta" },
-    { label: "Nota de Crédito",    serieKey: "serieNotaCredito",       corrKey: "correlativoNotaCredito" },
-    { label: "Nota de Débito",     serieKey: "serieNotaDebito",        corrKey: "correlativoNotaDebito" },
-    { label: "Guía de Remisión",   serieKey: "serieGuiaRemision",      corrKey: "correlativoGuiaRemision" },
-    { label: "Guía Transportista", serieKey: "serieGuiaTransportista", corrKey: "correlativoGuiaTransportista" },
+    { label: "Factura",              serieKey: "serieFactura",               corrKey: "correlativoFactura" },
+    { label: "Boleta",               serieKey: "serieBoleta",                corrKey: "correlativoBoleta" },
+    { label: "Nota Crédito Factura", serieKey: "serieNotaCreditoFactura",    corrKey: "correlativoNotaCreditoFactura" },
+    { label: "Nota Crédito Boleta",  serieKey: "serieNotaCreditoBoleta",     corrKey: "correlativoNotaCreditoBoleta" },
+    { label: "Nota Débito Factura",  serieKey: "serieNotaDebitoFactura",     corrKey: "correlativoNotaDebitoFactura" },
+    { label: "Nota Débito Boleta",   serieKey: "serieNotaDebitoBoleta",      corrKey: "correlativoNotaDebitoBoleta" },
+    { label: "Guía de Remisión",     serieKey: "serieGuiaRemision",          corrKey: "correlativoGuiaRemision" },
+    { label: "Guía Transportista",   serieKey: "serieGuiaTransportista",     corrKey: "correlativoGuiaTransportista" },
   ];
 
   return (

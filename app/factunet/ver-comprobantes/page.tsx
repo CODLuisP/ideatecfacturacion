@@ -3,8 +3,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
     ChevronDown, RefreshCw, Mail, MessageCircle, CheckCircle2, X,
     Eye, Check, Filter, Search, MoreHorizontal, RotateCcw, Layers, Ban,
-    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-    FileText
+    FileText,
+    Plus
 } from 'lucide-react';
 import { useToast } from '@/app/components/ui/Toast'
 import { cn } from '@/app/utils/cn';
@@ -27,6 +27,7 @@ import { ModalDetalle } from '@/app/components/modalVerComprobantes/ModalDetalle
 import { ModalEnvioCorreoWhatsapp } from '@/app/components/modalVerComprobantes/ModalEnvioCorreoWhatsapp';
 import { tipoLabel, formatFecha, formatFechaHora, COLORS } from './gestionComprobantes/helpers';
 import { useRouter } from 'next/navigation'
+import { Card } from '@/app/components/ui/Card';
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = ['Todos', 'Factura', 'Boleta', 'Nota de Crédito', 'Nota de Débito'];
@@ -58,8 +59,6 @@ export default function VerComprobantesPage() {
     const [detalle, setDetalle] = useState<ComprobanteListado | null>(null);
     const [detalleCompleto, setDetalleCompleto] = useState<ComprobanteDetalles | null>(null);
     const [search, setSearch] = useState('');
-    const [resultsPerPage, setResultsPerPage] = useState(10);
-    const [currentPage, setCurrentPage] = useState(1);
     const [filtroTipo, setFiltroTipo] = useState('Todos');
     const [filtroEstado, setFiltroEstado] = useState('Todos');
     const [modalEnvio, setModalEnvio] = useState<{ comprobante: ComprobanteListado; tipo: 'email' | 'whatsapp' } | null>(null);
@@ -160,10 +159,7 @@ export default function VerComprobantesPage() {
     }, [comprobantes, search, filtroTipo, filtroEstado])
 
     // ── Paginación ──
-    const totalPages = Math.max(1, Math.ceil(filtered.length / resultsPerPage));
-    const paginated = filtered.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage);
-    useEffect(() => { setCurrentPage(1); }, [search, filtroTipo, filtroEstado]);
-
+    const paginated = filtered;    
     // ── Evnviar SUNAT ──
     const enviarSunat = async (c: ComprobanteListado) => {
         try {
@@ -213,7 +209,7 @@ export default function VerComprobantesPage() {
     };
 
     return (
-        <div className="space-y-0 animate-in fade-in duration-500">
+        <div className="space-y-4 animate-in fade-in duration-500">
 
             {/* Modales */}
             {detalle && (
@@ -267,16 +263,11 @@ export default function VerComprobantesPage() {
                 />
             )}
 
-            <div className="border border-gray-200 border-dashed bg-white shadow-sm rounded-xl overflow-hidden">
+            <div className="sticky top-0 z-20">
+                <div className="space-y-3">
 
-                {/* ── Cabecera con filtros ── */}
-                <div className="p-4 space-y-3 border-b border-gray-100">
-
-                    {/* Fila 1: fechas + sucursal (superadmin) + buscar */}
-                    <div className="flex flex-wrap items-end gap-3">
-
-                        {/* Selector sucursal solo superadmin */}
-                        {isSuperAdmin && (
+                    {isSuperAdmin && (
+                        <div className="flex flex-wrap items-end gap-3">
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1">
                                     Sucursal {loadingSucursales && <RefreshCw size={10} className="animate-spin text-blue-400" />}
@@ -290,10 +281,9 @@ export default function VerComprobantesPage() {
                                     ))}
                                 </select>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
-                    {/* Fila 2: búsqueda + filtros dropdown + opciones avanzadas + paginación */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                         <div className="flex items-center gap-2 flex-wrap flex-1">
                             <div className="relative">
@@ -303,17 +293,14 @@ export default function VerComprobantesPage() {
                                     className="w-96 pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm" />
                             </div>
                             <div className="h-7 w-px bg-gray-200 hidden md:block" />
-                            <DropdownFiltro label="Tipo de comprobante" value={filtroTipo} options={TIPOS_OPTS} onChange={v => { setFiltroTipo(v); setCurrentPage(1); }} />
-                            <DropdownFiltro label="Estado SUNAT" value={filtroEstado} options={ESTADOS_OPTS} onChange={v => { setFiltroEstado(v); setCurrentPage(1); }} colorMap={ESTADO_COLORS_MAP} />
-
-                            {/* Opciones avanzadas aquí */}
+                            <DropdownFiltro label="Tipo de comprobante" value={filtroTipo} options={TIPOS_OPTS} onChange={v => { setFiltroTipo(v); }} />
+                            <DropdownFiltro label="Estado SUNAT" value={filtroEstado} options={ESTADOS_OPTS} onChange={v => { setFiltroEstado(v); }} colorMap={ESTADO_COLORS_MAP} />
                             <button onClick={() => setShowAvanzado(o => !o)}
                                 className={cn("flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-all shadow-sm",
                                     showAvanzado ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")}>
                                 <Filter size={14} /> Opciones avanzadas
                                 <ChevronDown size={13} className={cn("transition-transform", showAvanzado && "rotate-180")} />
                             </button>
-
                             {(filtroTipo !== 'Todos' || filtroEstado !== 'Todos') && (
                                 <button onClick={() => { setFiltroTipo('Todos'); setFiltroEstado('Todos'); }}
                                     className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors">
@@ -322,21 +309,16 @@ export default function VerComprobantesPage() {
                             )}
                         </div>
                         <div className="relative shrink-0">
-                            <select value={resultsPerPage} onChange={e => { setResultsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                className="appearance-none pl-3 pr-8 py-2 text-sm font-medium border border-gray-200 bg-white rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 outline-none">
-                                <option value={10}>10</option>
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                            </select>
-                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                            <button
+                                onClick={() => router.push('/factunet/operaciones')}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors">
+                                <Plus size={14} /> Nuevo Comprobante
+                            </button>
                         </div>
                     </div>
 
-                    {/* Panel opciones avanzadas */}
                     {showAvanzado && (
                         <div className="border border-blue-100 bg-blue-50/40 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
-
-                            {/* Tabs modo */}
                             <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit">
                                 {([
                                     { key: 'fechas', label: 'Por fechas (Sucursal)' },
@@ -344,41 +326,30 @@ export default function VerComprobantesPage() {
                                     { key: 'cliente', label: 'Por cliente' },
                                     ...(isSuperAdmin ? [{ key: 'usuario', label: 'Por usuario' }] : []),
                                 ] as const).map(tab => (
-                                <button key={tab.key} onClick={() => {
-                                    setModoAvanzado(tab.key as any)
-                                    setAvSerie('')
-                                    setAvNumero('')
-                                    setAvClienteDoc('')
-                                    setAvUsuarioId('')
-                                    setAvFechaDesde('')
-                                    setAvFechaHasta('')
-                                }}
-                                    className={cn("px-3 py-1.5 text-xs font-semibold rounded-md transition-colors",
-                                        modoAvanzado === tab.key ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100")}>
-                                    {tab.label}
-                                </button>
+                                    <button key={tab.key} onClick={() => {
+                                        setModoAvanzado(tab.key as any)
+                                        setAvSerie(''); setAvNumero(''); setAvClienteDoc('');
+                                        setAvUsuarioId(''); setAvFechaDesde(''); setAvFechaHasta('')
+                                    }}
+                                        className={cn("px-3 py-1.5 text-xs font-semibold rounded-md transition-colors",
+                                            modoAvanzado === tab.key ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100")}>
+                                        {tab.label}
+                                    </button>
                                 ))}
                             </div>
 
-                            {/* Campos según modo */}
                             <div className="flex flex-wrap items-end gap-3">
                                 {modoAvanzado === 'fechas' && (
                                     <>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha desde</label>
-                                            <input type="date" value={avFechaDesde}
-                                                max={hoy}
-                                                onChange={e => {
-                                                    setAvFechaDesde(e.target.value)
-                                                    if (avFechaHasta && e.target.value > avFechaHasta) setAvFechaHasta('')
-                                                }}
+                                            <input type="date" value={avFechaDesde} max={hoy}
+                                                onChange={e => { setAvFechaDesde(e.target.value); if (avFechaHasta && e.target.value > avFechaHasta) setAvFechaHasta('') }}
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha hasta</label>
-                                            <input type="date" value={avFechaHasta}
-                                                min={avFechaDesde || undefined}
-                                                max={hoy}
+                                            <input type="date" value={avFechaHasta} min={avFechaDesde || undefined} max={hoy}
                                                 onChange={e => setAvFechaHasta(e.target.value)}
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
                                         </div>
@@ -388,14 +359,12 @@ export default function VerComprobantesPage() {
                                     <>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Serie</label>
-                                            <input value={avSerie} onChange={e => setAvSerie(e.target.value)}
-                                                placeholder="F001"
+                                            <input value={avSerie} onChange={e => setAvSerie(e.target.value)} placeholder="F001"
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-28" />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Número</label>
-                                            <input type="number" value={avNumero} onChange={e => setAvNumero(e.target.value)}
-                                                placeholder="135"
+                                            <input type="number" value={avNumero} onChange={e => setAvNumero(e.target.value)} placeholder="135"
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-28" />
                                         </div>
                                     </>
@@ -404,21 +373,18 @@ export default function VerComprobantesPage() {
                                     <>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Nº Doc. Cliente</label>
-                                            <input value={avClienteDoc} onChange={e => setAvClienteDoc(e.target.value)}
-                                                placeholder="20601234567"
+                                            <input value={avClienteDoc} onChange={e => setAvClienteDoc(e.target.value)} placeholder="20601234567"
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-36" />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha desde</label>
-                                            <input type="date" value={avFechaDesde}
-                                                max={hoy}
+                                            <input type="date" value={avFechaDesde} max={hoy}
                                                 onChange={e => { setAvFechaDesde(e.target.value); if (avFechaHasta && e.target.value > avFechaHasta) setAvFechaHasta('') }}
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha hasta</label>
-                                            <input type="date" value={avFechaHasta}
-                                                min={avFechaDesde || undefined} max={hoy}
+                                            <input type="date" value={avFechaHasta} min={avFechaDesde || undefined} max={hoy}
                                                 onChange={e => setAvFechaHasta(e.target.value)}
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
                                         </div>
@@ -428,32 +394,27 @@ export default function VerComprobantesPage() {
                                     <>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">ID Usuario</label>
-                                            <input type="number" value={avUsuarioId} onChange={e => setAvUsuarioId(e.target.value)}
-                                                placeholder="1"
+                                            <input type="number" value={avUsuarioId} onChange={e => setAvUsuarioId(e.target.value)} placeholder="1"
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-28" />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha desde</label>
-                                            <input type="date" value={avFechaDesde}
-                                                max={hoy}
+                                            <input type="date" value={avFechaDesde} max={hoy}
                                                 onChange={e => { setAvFechaDesde(e.target.value); if (avFechaHasta && e.target.value > avFechaHasta) setAvFechaHasta('') }}
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha hasta</label>
-                                            <input type="date" value={avFechaHasta}
-                                                min={avFechaDesde || undefined} max={hoy}
+                                            <input type="date" value={avFechaHasta} min={avFechaDesde || undefined} max={hoy}
                                                 onChange={e => setAvFechaHasta(e.target.value)}
                                                 className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
                                         </div>
                                     </>
                                 )}
-
                                 <button onClick={buscarAvanzado} disabled={loading}
                                     className={cn("flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors self-end", COLORS.btnPrimary, loading && COLORS.btnDisabled)}>
                                     <Search size={14} /> Buscar
                                 </button>
-
                                 <button onClick={() => {
                                     setAvSerie(''); setAvNumero(''); setAvClienteDoc(''); setAvUsuarioId('');
                                     setAvFechaDesde(''); setAvFechaHasta(''); setSucursalFiltro(null); cargarComprobantes();
@@ -464,26 +425,59 @@ export default function VerComprobantesPage() {
                         </div>
                     )}
                 </div>
+            </div>
 
-                {/* ── Tabla ── */}
-                <div className="overflow-x-auto w-full">
-                    <table className="w-full text-left border-collapse">
+            {/* ── Contador ── */}
+            <div className="flex items-center justify-between -mt-2">
+                <p className="text-sm text-gray-500">
+                    Total <span className="font-semibold text-gray-900">{comprobantes.length}</span> comprobantes
+                </p>
+                {(!!search || filtroTipo !== 'Todos' || filtroEstado !== 'Todos') && filtered.length === 0 && (
+                    <p className="text-sm text-amber-600 font-medium">Sin resultados para esta búsqueda</p>
+                )}
+            </div>
+
+            <style>{`
+                .comp-table tbody {
+                    display: block;
+                    overflow-y: auto;
+                    max-height: calc(100vh - 320px);
+                    scrollbar-width: thin;
+                    scrollbar-color: #CBD5E1 transparent;
+                }
+                .comp-table-avanzado tbody {
+                    max-height: calc(100vh - 460px);
+                }
+                .comp-table thead tr,
+                .comp-table tbody tr {
+                    display: table;
+                    width: 100%;
+                    table-layout: fixed;
+                }
+                .comp-table thead {
+                    width: 100%;
+                }
+            `}</style>
+
+            <Card className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className={cn("w-full text-left border-collapse comp-table", showAvanzado && "comp-table-avanzado")}>
                         <thead>
-                            <tr className="border-t border-b border-gray-100/60 bg-white">
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">FECHA</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">COMPROBANTE</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">CLIENTE</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">PDF</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">XML</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">CDR</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">SUNAT</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">CORREO</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">WHATSAPP</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">VER</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">OPCIONES</th>
+                            <tr className="bg-gray-100">
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32 rounded-tl-2xl">FECHA</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-52">COMPROBANTE</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-50">CLIENTE</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">PDF</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">XML</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">CDR</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-27.5">SUNAT</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">CORREO</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">WHATSAPP</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-19">VER</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21 rounded-tr-2xl">OPCIONES</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100/60">
+                        <tbody className="divide-y divide-gray-100">
                             {loading ? (
                                 <tr>
                                     <td colSpan={11} className="px-6 py-16 text-center">
@@ -500,82 +494,35 @@ export default function VerComprobantesPage() {
                                     </td>
                                 </tr>
                             ) : paginated.map((doc) => (
-                                <tr key={doc.comprobanteId} className="hover:bg-gray-50/50 transition-colors bg-white">
-                                    <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
-                                        {formatFecha(doc.fechaCreacion)}
-                                    </td>
-                                    <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
-                                        {tipoLabel(doc.tipoComprobante)}: {doc.numeroCompleto}
-                                    </td>
-                                    <td className="px-5 py-4">
+                                <tr key={doc.comprobanteId} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap w-32">{formatFecha(doc.fechaCreacion)}</td>
+                                    <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap w-52">{tipoLabel(doc.tipoComprobante)}: {doc.numeroCompleto}</td>
+                                    <td className="px-5 py-4 w-50">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium text-gray-900">{doc.cliente.numeroDocumento}</span>
                                             <span className="text-sm text-gray-600">{doc.cliente.razonSocial}</span>
                                         </div>
                                     </td>
-
-                                    {/* PDF */}
-                                    <td className="px-5 py-4 text-center">
+                                    <td className="px-5 py-4 text-center w-16"><div className="flex justify-center"><StatusIcon type="pdf" status="available" onClick={() => abrirDetalle(doc)} /></div></td>
+                                    <td className="px-5 py-4 text-center w-16"><div className="flex justify-center"><StatusIcon type="xml" status="available" /></div></td>
+                                    <td className="px-5 py-4 text-center w-16"><div className="flex justify-center"><StatusIcon type="cdr" status="available" /></div></td>
+                                    <td className="px-5 py-4 text-center w-27.5"><div className="flex justify-center"><BadgeSunat estado={doc.estadoSunat} /></div></td>
+                                    <td className="px-5 py-4 text-center w-21">
                                         <div className="flex justify-center">
-                                            <StatusIcon type="pdf" status="available" onClick={() => abrirDetalle(doc)} />
+                                            <BtnEnvio tipo="email" enviado={doc.cliente.enviadoPorCorreo} fecha={formatFechaHora(doc.fechaCreacion)} onClick={() => setModalEnvio({ comprobante: doc, tipo: 'email' })} />
                                         </div>
                                     </td>
-
-                                    {/* XML */}
-                                    <td className="px-5 py-4 text-center">
+                                    <td className="px-5 py-4 text-center w-24">
                                         <div className="flex justify-center">
-                                            <StatusIcon type="xml" status="available" />
+                                            <BtnEnvio tipo="whatsapp" enviado={doc.cliente.enviadoPorWhatsApp} fecha={formatFechaHora(doc.fechaCreacion)} onClick={() => setModalEnvio({ comprobante: doc, tipo: 'whatsapp' })} />
                                         </div>
                                     </td>
-
-                                    {/* CDR */}
-                                    <td className="px-5 py-4 text-center">
-                                        <div className="flex justify-center">
-                                            <StatusIcon type="cdr" status="available" />
-                                        </div>
-                                    </td>
-
-                                    {/* SUNAT */}
-                                    <td className="px-5 py-4 text-center">
-                                        <div className="flex justify-center">
-                                            <BadgeSunat estado={doc.estadoSunat} />
-                                        </div>
-                                    </td>
-
-                                    {/* Correo */}
-                                    <td className="px-5 py-4 text-center">
-                                        <div className="flex justify-center">
-                                            <BtnEnvio
-                                                tipo="email"
-                                                enviado={doc.cliente.enviadoPorCorreo}
-                                                fecha={formatFechaHora(doc.fechaCreacion)}
-                                                onClick={() => setModalEnvio({ comprobante: doc, tipo: 'email' })}
-                                            />
-                                        </div>
-                                    </td>
-
-                                    {/* WhatsApp */}
-                                    <td className="px-5 py-4 text-center">
-                                        <div className="flex justify-center">
-                                            <BtnEnvio
-                                                tipo="whatsapp"
-                                                enviado={doc.cliente.enviadoPorWhatsApp}
-                                                fecha={formatFechaHora(doc.fechaCreacion)}
-                                                onClick={() => setModalEnvio({ comprobante: doc, tipo: 'whatsapp' })}
-                                            />
-                                        </div>
-                                    </td>
-
-                                    {/* Ver */}
-                                    <td className="px-5 py-4 text-center">
-                                        <button onClick={() => abrirDetalle(doc)}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                                    <td className="px-5 py-4 text-center w-19">
+                                        <button onClick={() => abrirDetalle(doc)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                                             <Eye size={13} /> Ver
                                         </button>
                                     </td>
-
-                                    {/* Opciones */}
-                                    <td className="px-5 py-4 text-center">
+                                    <td className="px-5 py-4 text-center w-21">
                                         <div className="flex justify-center">
                                             <DropdownOpciones
                                                 comprobante={doc}
@@ -592,41 +539,7 @@ export default function VerComprobantesPage() {
                         </tbody>
                     </table>
                 </div>
-
-                {/* ── Pie: paginación ── */}
-                <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-white flex-wrap gap-3">
-                    <p className="text-sm text-gray-500">
-                        Mostrando <span className="font-semibold text-gray-700">{Math.min((currentPage - 1) * resultsPerPage + 1, filtered.length)}</span>–<span className="font-semibold text-gray-700">{Math.min(currentPage * resultsPerPage, filtered.length)}</span> de <span className="font-semibold text-gray-700">{filtered.length}</span> resultados
-                    </p>
-
-                    <div className="flex items-center gap-1">
-                        <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
-                            className={cn("p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors", currentPage === 1 && COLORS.btnDisabled)}>
-                            <ChevronsLeft size={14} className="text-gray-600" />
-                        </button>
-                        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                            className={cn("p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors", currentPage === 1 && COLORS.btnDisabled)}>
-                            <ChevronLeft size={14} className="text-gray-600" />
-                        </button>
-                        <span className="px-3 py-1.5 text-sm font-medium text-gray-700">{currentPage} / {totalPages}</span>
-                        <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                            className={cn("p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors", currentPage === totalPages && COLORS.btnDisabled)}>
-                            <ChevronRight size={14} className="text-gray-600" />
-                        </button>
-                        <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}
-                            className={cn("p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors", currentPage === totalPages && COLORS.btnDisabled)}>
-                            <ChevronsRight size={14} className="text-gray-600" />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                        <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
-                            <CheckCircle2 size={9} className="text-white" strokeWidth={2.5} />
-                        </span>
-                        Ya enviado (puede reenviar)
-                    </div>
-                </div>
-            </div>
+            </Card>
         </div>
     );
 }

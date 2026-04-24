@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
-import { Cliente } from './Cliente';
+import { Cliente } from './typesCliente';
 
 export function useClientesSucursal(sucursalId?: number, enabled: boolean = true) {
   const { showToast } = useToast();

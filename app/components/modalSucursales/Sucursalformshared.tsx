@@ -67,7 +67,7 @@ export function SerieRowModal({
   form: NuevaSucursalForm;
   setForm: React.Dispatch<React.SetStateAction<NuevaSucursalForm>>;
   prefix: string;
-  hint: string;
+  hint?: string;
 }) {
   return (
     <div className="flex gap-3 items-start">
@@ -79,7 +79,7 @@ export function SerieRowModal({
           onChange={(e) =>
             setForm((f) => ({ ...f, [serieKey]: e.target.value }))
           }
-          placeholder={hint}
+          placeholder={hint ?? ""}
           maxLength={4}
         />
         <p className="text-[10px] text-gray-400 italic">

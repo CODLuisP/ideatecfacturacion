@@ -28,7 +28,7 @@ import {
   Sucursal,
 } from "./gestionBoletas/Boleta";
 import { useClienteBoleta } from "./gestionBoletas/useClienteBoleta";
-import { Cliente } from "../../clientes/gestionClientes/Cliente";
+import { Cliente } from "../../clientes/gestionClientes/typesCliente";
 import { useSucursal } from "./gestionBoletas/useSucursal";
 import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { ProductoSucursal } from "../../productos/gestioProductos/Producto";

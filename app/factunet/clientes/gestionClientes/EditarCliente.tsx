@@ -3,7 +3,7 @@ import axios from "axios";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { Modal } from "@/app/components/ui/Modal";
-import { Cliente, Direccion } from "./Cliente";
+import { Cliente, Direccion } from "./typesCliente";
 import { useToast } from "@/app/components/ui/Toast";
 import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -70,6 +70,9 @@ export const EditarClienteModal: React.FC<Props> = ({
 
     setIsSubmitting(true);
 
+    const emptyToNull = (val: string | null | undefined) =>
+      !val || val.trim() === "" ? null : val;
+
     try {
       const payloadCliente = {
         clienteId: form.clienteId,
@@ -91,34 +94,42 @@ export const EditarClienteModal: React.FC<Props> = ({
       // ─── Dirección para cualquier tipo de documento ───
       if (form.direccion && form.direccion.length > 0) {
         const d = form.direccion[0];
-        const tieneDatos =
-          d.direccionLineal || d.distrito || d.provincia || d.departamento || d.ubigeo;
+        const tieneDatos = esDni
+          ? d.direccionLineal || d.tipoDireccion
+          : d.direccionLineal || d.distrito || d.provincia || d.departamento || d.ubigeo;
 
         if (tieneDatos) {
-          const payloadDireccion = {
-            direccionLineal: d.direccionLineal,
-            ubigeo: d.ubigeo,
-            departamento: d.departamento,
-            provincia: d.provincia,
-            distrito: d.distrito,
-            tipoDireccion: d.tipoDireccion,
-          };
+          const payloadDireccion = esDni
+            ? {
+                direccionLineal: emptyToNull(d.direccionLineal),
+                ubigeo: null,
+                departamento: null,
+                provincia: null,
+                distrito: null,
+                tipoDireccion: emptyToNull(d.tipoDireccion),
+              }
+            : {
+                direccionLineal: d.direccionLineal,
+                ubigeo: d.ubigeo,
+                departamento: d.departamento,
+                provincia: d.provincia,
+                distrito: d.distrito,
+                tipoDireccion: d.tipoDireccion,
+              };
 
           if (d.direccionId && d.direccionId > 0) {
             // ya existe → PUT
             await axios.put(
               `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion/${d.direccionId}`,
               { ...payloadDireccion, direccionId: d.direccionId },
-              { headers: { Authorization: `Bearer ${accessToken}` } 
-            }
-          );
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
           } else {
             // nueva dirección → POST
             await axios.post(
               `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion`,
-                { ...payloadDireccion, clienteId: form.clienteId },
-                { headers: { Authorization: `Bearer ${accessToken}` } 
-              }
+              { ...payloadDireccion, clienteId: form.clienteId },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
             );
           }
         }
@@ -269,38 +280,10 @@ export const EditarClienteModal: React.FC<Props> = ({
             {mostrarDireccion && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 pb-4">
                 <InputBase
-                  label="Ubigeo"
-                  labelOptional="(opcional)"
-                  value={form.direccion?.[0]?.ubigeo ?? ""}
-                  onChange={(e) => updateDireccion("ubigeo", e.target.value)}
-                  showError={false}
-                />
-                <InputBase
                   label="Dirección"
                   labelOptional="(opcional)"
                   value={form.direccion?.[0]?.direccionLineal ?? ""}
                   onChange={(e) => updateDireccion("direccionLineal", e.target.value)}
-                  showError={false}
-                />
-                <InputBase
-                  label="Distrito"
-                  labelOptional="(opcional)"
-                  value={form.direccion?.[0]?.distrito ?? ""}
-                  onChange={(e) => updateDireccion("distrito", e.target.value)}
-                  showError={false}
-                />
-                <InputBase
-                  label="Provincia"
-                  labelOptional="(opcional)"
-                  value={form.direccion?.[0]?.provincia ?? ""}
-                  onChange={(e) => updateDireccion("provincia", e.target.value)}
-                  showError={false}
-                />
-                <InputBase
-                  label="Departamento"
-                  labelOptional="(opcional)"
-                  value={form.direccion?.[0]?.departamento ?? ""}
-                  onChange={(e) => updateDireccion("departamento", e.target.value)}
                   showError={false}
                 />
                 <InputBase

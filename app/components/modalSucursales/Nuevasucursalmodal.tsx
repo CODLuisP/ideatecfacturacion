@@ -43,16 +43,22 @@ export function NuevaSucursalModal({
     usuario: "",
     password: "",
     confirmPassword: "",
-    serieFactura: nextSerie(sucursales, "F", "serieFactura"),
-    correlativoFactura: 1,
-    serieBoleta: nextSerie(sucursales, "B", "serieBoleta"),
-    correlativoBoleta: 1,
-    serieNotaCredito: nextSerie(sucursales, "FC", "serieNotaCredito"),
-    correlativoNotaCredito: 1,
-    serieNotaDebito: nextSerie(sucursales, "FD", "serieNotaDebito"),
-    correlativoNotaDebito: 1,
-    serieGuia: nextSerie(sucursales, "T", "serieGuia"),
-    correlativoGuia: 1,
+    serieFactura:                  nextSerie(sucursales, "F", "serieFactura"),
+    correlativoFactura:            1,
+    serieBoleta:                   nextSerie(sucursales, "B", "serieBoleta"),
+    correlativoBoleta:             1,
+    serieNotaCreditoFactura:       nextSerie(sucursales, "FC", "serieNotaCreditoFactura"),
+    correlativoNotaCreditoFactura: 1,
+    serieNotaCreditoBoleta:        nextSerie(sucursales, "BC", "serieNotaCreditoBoleta"),
+    correlativoNotaCreditoBoleta:  1,
+    serieNotaDebitoFactura:        nextSerie(sucursales, "FD", "serieNotaDebitoFactura"),
+    correlativoNotaDebitoFactura:  1,
+    serieNotaDebitoBoleta:         nextSerie(sucursales, "BD", "serieNotaDebitoBoleta"),
+    correlativoNotaDebitoBoleta:   1,
+    serieGuiaRemision:             nextSerie(sucursales, "T", "serieGuiaRemision"),
+    correlativoGuiaRemision:       1,
+    serieGuiaTransportista:        nextSerie(sucursales, "V", "serieGuiaTransportista"),
+    correlativoGuiaTransportista:  1,
   });
 
   const upd =
@@ -210,11 +216,14 @@ export function NuevaSucursalModal({
                   <span className="ml-auto text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Generadas automáticamente</span>
                 </div>
                 <div className="space-y-4">
-                  <SerieRowModal label="Factura" serieKey="serieFactura" correlativoKey="correlativoFactura" form={form} setForm={setForm} prefix="F" hint={`F${nextCode}`} />
-                  <SerieRowModal label="Boleta" serieKey="serieBoleta" correlativoKey="correlativoBoleta" form={form} setForm={setForm} prefix="B" hint={`B${nextCode}`} />
-                  <SerieRowModal label="Nota de Crédito" serieKey="serieNotaCredito" correlativoKey="correlativoNotaCredito" form={form} setForm={setForm} prefix="F" hint="FC01" />
-                  <SerieRowModal label="Nota de Débito" serieKey="serieNotaDebito" correlativoKey="correlativoNotaDebito" form={form} setForm={setForm} prefix="F" hint="FD01" />
-                  <SerieRowModal label="Guía de Remisión" serieKey="serieGuia" correlativoKey="correlativoGuia" form={form} setForm={setForm} prefix="T" hint={`T${nextCode}`} />
+                  <SerieRowModal label="Factura"              serieKey="serieFactura"               correlativoKey="correlativoFactura"               form={form} setForm={setForm} prefix="F" />
+                  <SerieRowModal label="Boleta"               serieKey="serieBoleta"                correlativoKey="correlativoBoleta"                form={form} setForm={setForm} prefix="B" />
+                  <SerieRowModal label="Nota Crédito Factura" serieKey="serieNotaCreditoFactura"    correlativoKey="correlativoNotaCreditoFactura"    form={form} setForm={setForm} prefix="FC" />
+                  <SerieRowModal label="Nota Crédito Boleta"  serieKey="serieNotaCreditoBoleta"     correlativoKey="correlativoNotaCreditoBoleta"     form={form} setForm={setForm} prefix="BC" />
+                  <SerieRowModal label="Nota Débito Factura"  serieKey="serieNotaDebitoFactura"     correlativoKey="correlativoNotaDebitoFactura"     form={form} setForm={setForm} prefix="FD" />
+                  <SerieRowModal label="Nota Débito Boleta"   serieKey="serieNotaDebitoBoleta"      correlativoKey="correlativoNotaDebitoBoleta"      form={form} setForm={setForm} prefix="BD" />
+                  <SerieRowModal label="Guía de Remisión"     serieKey="serieGuiaRemision"          correlativoKey="correlativoGuiaRemision"          form={form} setForm={setForm} prefix="T" />
+                  <SerieRowModal label="Guía Transportista"   serieKey="serieGuiaTransportista"     correlativoKey="correlativoGuiaTransportista"     form={form} setForm={setForm} prefix="V" />
                 </div>
               </div>
             </div>

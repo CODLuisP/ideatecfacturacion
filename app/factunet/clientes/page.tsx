@@ -13,7 +13,7 @@ import { ModalEliminar } from '@/app/components/ui/ModalEliminar';
 import { AgregarCliente } from './gestionClientes/AgregarCliente';
 import { EditarClienteModal } from './gestionClientes/EditarCliente';
 import { EnviarCorreoCliente } from './gestionClientes/EnviarCorreoCliente';
-import { Direccion, Cliente } from './gestionClientes/Cliente';
+import { Direccion, Cliente } from './gestionClientes/typesCliente';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 import { useClientesRuc } from './gestionClientes/useClientesRuc';
@@ -173,23 +173,20 @@ export default function ClientesPage() {
       };
 
       // ── DNI ──
+      const emptyToNull = (val: string) => val.trim() === '' ? null : val;
       if (nuevoCliente.tipoDocumentoId === "01") {
-        if (nuevoCliente.correo) {
-          payload.correo = nuevoCliente.correo;
-        }
-        if (nuevoCliente.telefono) {
-          payload.telefono = nuevoCliente.telefono;
-        }
+        if (nuevoCliente.correo) payload.correo = nuevoCliente.correo;
+        if (nuevoCliente.telefono) payload.telefono = nuevoCliente.telefono;
         const d = nuevoCliente.direccion;
-        const tieneDireccion = d.direccionLineal || d.distrito || d.provincia || d.departamento || d.ubigeo;
+        const tieneDireccion = d.direccionLineal || d.tipoDireccion;
         if (tieneDireccion) {
           payload.direccion = {
-            ubigeo: d.ubigeo,
-            direccionLineal: d.direccionLineal,
-            departamento: d.departamento,
-            provincia: d.provincia,
-            distrito: d.distrito,
-            tipoDireccion: d.tipoDireccion
+            ubigeo: null,
+            direccionLineal: emptyToNull(d.direccionLineal),
+            departamento: null,
+            provincia: null,
+            distrito: null,
+            tipoDireccion: emptyToNull(d.tipoDireccion)
           };
         }
       }
@@ -298,7 +295,7 @@ export default function ClientesPage() {
   const activeFilters = (filterStatus !== 'Todos' ? 1 : 0) + (filterTipo !== 'Todos' ? 1 : 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 animate-in fade-in duration-500">
 
       {/* ── Modales ────────────────────────────────────────────────────────── */}
       {clienteCorreo && (
@@ -442,126 +439,126 @@ export default function ClientesPage() {
 
       {/* ── Tabla ─────────────────────────────────────────────────────────── */}
 
-<Card className="p-0 overflow-hidden">
-  <div className="overflow-x-auto">
-    <table className="w-full text-left border-collapse">
-      <thead>
-        <tr className="bg-gray-100">
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-2xl">Documento</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Razón Social / Nombre</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nombre Comercial</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dirección</th>
-          {isSuperAdmin && (<th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sucursal</th>)}
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Correo</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Teléfono</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha Creación</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-2xl">Acciones</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
+      <Card className="p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-2xl">Documento</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Razón Social / Nombre</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nombre Comercial</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dirección</th>
+                {isSuperAdmin && (<th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sucursal</th>)}
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Correo</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Teléfono</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha Creación</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-2xl">Acciones</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
 
-  <div
-    className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] scrollbar-thin"
-    style={{
-      scrollbarWidth: 'thin',
-      scrollbarColor: '#CBD5E1 transparent',
-    }}
-  >
-    <style>{`
-      .tbody-scroll::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      .tbody-scroll::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .tbody-scroll::-webkit-scrollbar-thumb {
-        background-color: #CBD5E1;
-        border-radius: 999px;
-      }
-      .tbody-scroll::-webkit-scrollbar-thumb:hover {
-        background-color: #94A3B8;
-      }
-      .tbody-scroll::-webkit-scrollbar-corner {
-        background: transparent;
-      }
-    `}</style>
-    <table className="w-full text-left border-collapse tbody-scroll">
-      <tbody className="divide-y divide-gray-100">
-        {loadingClientes ? (
-          <tr>
-            <td colSpan={9} className="px-6 py-16 text-center">
-              <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
-                <div className="w-5 h-5 border-2 border-gray-300 border-t-brand-blue rounded-full animate-spin" />
-                Cargando clientes...
-              </div>
-            </td>
-          </tr>
-        ) : filtered.length === 0 ? (
-          <tr>
-            <td colSpan={9} className="px-6 py-16 text-center text-sm text-gray-400">
-              No se encontraron clientes con ese criterio.
-            </td>
-          </tr>
-        ) : filtered.map((client) => (
-          <tr key={client.clienteId} className="hover:bg-gray-50/50 transition-colors">
-            <td className="px-6 py-4">
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase">{client.tipoDocumento.tipoDocumentoNombre}</p>
-                <p className="text-sm font-mono text-gray-700">{client.numeroDocumento}</p>
-              </div>
-            </td>
-            <td className="px-6 py-4 text-sm font-semibold text-gray-900">{client.razonSocialNombre}</td>
-            <td className="px-6 py-4 text-sm text-gray-600">{client.nombreComercial ?? '-'}</td>
-            <td className="px-6 py-4 text-sm text-gray-600" title={formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}>
-              {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
-            </td>
-            {isSuperAdmin && (
-              <td className="px-6 py-4 text-sm text-gray-600">
-                {sucursales.find(s => s.sucursalId === client.sucursalID)?.nombre ?? "-"}
-              </td>
-            )}
-            <td className="px-6 py-4 text-sm text-gray-600">{client.correo ?? '-'}</td>
-            <td className="px-6 py-4 text-sm text-gray-600">{client.telefono ?? '-'}</td>
-            <td className="px-6 py-4 text-sm text-gray-500">{formatFecha(client.fechaCreacion)}</td>
-            <td className="px-6 py-4">
-              <Badge variant={client.estado ? 'success' : 'default'}>
-                {client.estado ? 'Activo' : 'Inactivo'}
-              </Badge>
-            </td>
-            <td className="px-6 py-4">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setClienteCorreo(client)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
-                  title="Enviar correo"
-                >
-                  <Send size={12} /> Correo
-                </button>
-                <button
-                  onClick={() => setClienteEditar(client)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
-                  title="Editar"
-                >
-                  <Edit2 size={12} />
-                </button>
-                <button
-                  onClick={() => setEliminarCliente(client)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors whitespace-nowrap"
-                  title="Eliminar"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</Card>
+        <div
+          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] scrollbar-thin"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#CBD5E1 transparent',
+          }}
+        >
+          <style>{`
+            .tbody-scroll::-webkit-scrollbar {
+              width: 6px;
+              height: 6px;
+            }
+            .tbody-scroll::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .tbody-scroll::-webkit-scrollbar-thumb {
+              background-color: #CBD5E1;
+              border-radius: 999px;
+            }
+            .tbody-scroll::-webkit-scrollbar-thumb:hover {
+              background-color: #94A3B8;
+            }
+            .tbody-scroll::-webkit-scrollbar-corner {
+              background: transparent;
+            }
+          `}</style>
+          <table className="w-full text-left border-collapse tbody-scroll">
+            <tbody className="divide-y divide-gray-100">
+              {loadingClientes ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-16 text-center">
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                      <div className="w-5 h-5 border-2 border-gray-300 border-t-brand-blue rounded-full animate-spin" />
+                      Cargando clientes...
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-gray-400">
+                    No se encontraron clientes con ese criterio.
+                  </td>
+                </tr>
+              ) : filtered.map((client) => (
+                <tr key={client.clienteId} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase">{client.tipoDocumento.tipoDocumentoNombre}</p>
+                      <p className="text-sm font-mono text-gray-700">{client.numeroDocumento}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{client.razonSocialNombre}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{client.nombreComercial ?? '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600" title={formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}>
+                    {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
+                  </td>
+                  {isSuperAdmin && (
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {sucursales.find(s => s.sucursalId === client.sucursalID)?.nombre ?? "-"}
+                    </td>
+                  )}
+                  <td className="px-6 py-4 text-sm text-gray-600">{client.correo ?? '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{client.telefono ?? '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatFecha(client.fechaCreacion)}</td>
+                  <td className="px-6 py-4">
+                    <Badge variant={client.estado ? 'success' : 'default'}>
+                      {client.estado ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setClienteCorreo(client)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
+                        title="Enviar correo"
+                      >
+                        <Send size={12} /> Correo
+                      </button>
+                      <button
+                        onClick={() => setClienteEditar(client)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
+                        title="Editar"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button
+                        onClick={() => setEliminarCliente(client)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors whitespace-nowrap"
+                        title="Eliminar"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
 
       {/* ── Modal: Nuevo Cliente ──────────────────────────────────────────── */}
