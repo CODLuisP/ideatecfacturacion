@@ -101,7 +101,7 @@ function SeriesBadge({ label, value }: { label: string; value?: string }) {
       </span>
       <span
         className={cn(
-          "text-xs font-mono font-semibold px-2 py-0.5 rounded-md border inline-block",
+          "text-xs font-semibold px-2 py-0.5 rounded-md border inline-block",
           value
             ? "bg-gray-50 text-gray-700 border-gray-200"
             : "bg-gray-50 text-gray-300 border-gray-100",
@@ -147,7 +147,7 @@ function SucursalCard({
       <div className="pl-5 pr-4 pt-4 pb-4">
         {/* Top row: badges */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[11px] font-mono font-bold border border-gray-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[11px]  font-bold border border-gray-200">
             <Hash className="w-2.5 h-2.5" />
             {s.codigo}
           </span>
@@ -481,11 +481,37 @@ export default function SucursalesPage() {
         )}
       </div>
 
-      {/* ── Cards ── */}
+{/* ── Cards ── */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-400">Cargando sucursales...</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+              <div className="pl-5 pr-4 pt-4 pb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-5 w-14 bg-gray-100 rounded-md" />
+                  <div className="h-5 w-16 bg-gray-100 rounded-full" />
+                </div>
+                <div className="h-4 bg-gray-100 rounded w-2/3 mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
+                <div className="border-t border-gray-100 pt-3 mb-4">
+                  <div className="h-2.5 bg-gray-100 rounded w-1/3 mb-2.5" />
+                  <div className="grid grid-cols-5 gap-2">
+                    {[1, 2, 3, 4, 5].map((j) => (
+                      <div key={j} className="space-y-1">
+                        <div className="h-2 bg-gray-100 rounded w-full" />
+                        <div className="h-6 bg-gray-100 rounded-md w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-1.5 border-t border-gray-100 pt-3">
+                  <div className="h-7 w-16 bg-gray-100 rounded-lg" />
+                  <div className="h-7 w-16 bg-gray-100 rounded-lg" />
+                  <div className="h-7 w-20 bg-gray-100 rounded-lg" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">

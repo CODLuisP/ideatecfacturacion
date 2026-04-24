@@ -101,7 +101,7 @@ function UsuarioCard({ u, canEdit, onEdit, onDelete }: {
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:border-gray-200 transition-colors group">
 
       {/* Header — limpio, sin fondo de color */}
-      <div className="px-5 pt-5 pb-4">
+      <div className="px-3 pt-3 pb-2">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={cn(
@@ -119,17 +119,17 @@ function UsuarioCard({ u, canEdit, onEdit, onDelete }: {
           </div>
 
           {canEdit && (
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex gap-1">
               <button
                 onClick={onEdit}
-                className="p-1.5 rounded-lg text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-all"
+className="p-1.5 rounded-lg text-blue-500 bg-blue-50 hover:text-blue-700 hover:bg-blue-100 transition-all"
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={onDelete}
-                className="p-1.5 rounded-lg text-gray-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
-              >
+className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:text-rose-700 hover:bg-rose-100 transition-all"            
+>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -142,7 +142,7 @@ function UsuarioCard({ u, canEdit, onEdit, onDelete }: {
       </div>
 
       {/* Descripción del rol */}
-      <div className="px-5 py-0 border-t border-b border-gray-50">
+      <div className="px-3 py-0 border-t border-b border-gray-50">
         <div className={cn("flex items-start gap-2 p-2.5 rounded-xl")}>
           <Icon className={cn("w-3.5 h-3.5 shrink-0 mt-0.5", cfg.text)} />
           <p className={cn("text-[11px] leading-relaxed")}>
@@ -154,11 +154,11 @@ function UsuarioCard({ u, canEdit, onEdit, onDelete }: {
       {/* Info */}
       <div className="px-5 py-3 space-y-2">
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Mail className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-          <span className="truncate">{u.email}</span>
+          <Mail className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+<span className="truncate text-gray-400">{u.email || "Sin correo"}</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-400">
-          <Clock className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+          <Clock className="w-3.5 h-3.5 text-gray-500 shrink-0" />
           <span>
             {u.fechaUltimoAcceso
               ? new Date(u.fechaUltimoAcceso).toLocaleDateString("es-PE", {
