@@ -1,4 +1,3 @@
-// ─── Types ────────────────────────────────────────────────────────────────────
 export interface Sucursal {
   id: string;
   codigo: string;
@@ -9,12 +8,18 @@ export interface Sucursal {
   correlativoFactura: number;
   serieBoleta: string;
   correlativoBoleta: number;
-  serieNotaCredito: string;
-  correlativoNotaCredito: number;
-  serieNotaDebito: string;
-  correlativoNotaDebito: number;
-  serieGuia: string;
-  correlativoGuia: number;
+  serieNotaCreditoFactura: string;
+  correlativoNotaCreditoFactura: number;
+  serieNotaCreditoBoleta: string;
+  correlativoNotaCreditoBoleta: number;
+  serieNotaDebitoFactura: string;
+  correlativoNotaDebitoFactura: number;
+  serieNotaDebitoBoleta: string;
+  correlativoNotaDebitoBoleta: number;
+  serieGuiaRemision: string;
+  correlativoGuiaRemision: number;
+  serieGuiaTransportista: string;
+  correlativoGuiaTransportista: number;
 }
 
 export interface NuevaSucursalForm {
@@ -27,12 +32,18 @@ export interface NuevaSucursalForm {
   correlativoFactura: number;
   serieBoleta: string;
   correlativoBoleta: number;
-  serieNotaCredito: string;
-  correlativoNotaCredito: number;
-  serieNotaDebito: string;
-  correlativoNotaDebito: number;
-  serieGuia: string;
-  correlativoGuia: number;
+  serieNotaCreditoFactura: string;
+  correlativoNotaCreditoFactura: number;
+  serieNotaCreditoBoleta: string;
+  correlativoNotaCreditoBoleta: number;
+  serieNotaDebitoFactura: string;
+  correlativoNotaDebitoFactura: number;
+  serieNotaDebitoBoleta: string;
+  correlativoNotaDebitoBoleta: number;
+  serieGuiaRemision: string;
+  correlativoGuiaRemision: number;
+  serieGuiaTransportista: string;
+  correlativoGuiaTransportista: number;
 }
 
 export interface EditSucursalForm {

@@ -5,7 +5,7 @@ import axios from "axios";
 import { CheckCircle2, Mail, Send, AlertCircle } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { Modal } from "@/app/components/ui/Modal";
-import { Cliente } from "./Cliente";
+import { Cliente } from "./typesCliente";
 import { useAuth } from "@/context/AuthContext";
 
 interface Props {

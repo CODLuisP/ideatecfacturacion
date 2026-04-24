@@ -371,53 +371,13 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
           {mostrarDireccion && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <InputBase
-                label="Ubigeo"
-                labelOptional="(opcional)"
-                value={nuevoCliente.direccion.ubigeo}
-                onChange={(e) =>
-                  setNuevoCliente((f: any) => ({ ...f, direccion: { ...f.direccion, ubigeo: e.target.value } }))
-                }
-                placeholder="Ubigeo"
-                showError={false}
-              />
-              <InputBase
                 label="Dirección"
                 labelOptional="(opcional)"
                 value={nuevoCliente.direccion.direccionLineal}
                 onChange={(e) =>
                   setNuevoCliente((f: any) => ({ ...f, direccion: { ...f.direccion, direccionLineal: e.target.value } }))
                 }
-                placeholder="Ej: Av. Perú n° 123"
-                showError={false}
-              />
-              <InputBase
-                label="Distrito"
-                labelOptional="(opcional)"
-                value={nuevoCliente.direccion.distrito}
-                onChange={(e) =>
-                  setNuevoCliente((f: any) => ({ ...f, direccion: { ...f.direccion, distrito: e.target.value } }))
-                }
-                placeholder="Distrito"
-                showError={false}
-              />
-              <InputBase
-                label="Provincia"
-                labelOptional="(opcional)"
-                value={nuevoCliente.direccion.provincia}
-                onChange={(e) =>
-                  setNuevoCliente((f: any) => ({ ...f, direccion: { ...f.direccion, provincia: e.target.value } }))
-                }
-                placeholder="Provincia"
-                showError={false}
-              />
-              <InputBase
-                label="Departamento"
-                labelOptional="(opcional)"
-                value={nuevoCliente.direccion.departamento}
-                onChange={(e) =>
-                  setNuevoCliente((f: any) => ({ ...f, direccion: { ...f.direccion, departamento: e.target.value } }))
-                }
-                placeholder="Departamento"
+                placeholder="Ej: Av. Perú n° 123 - Cajamarca"
                 showError={false}
               />
               <InputBase
@@ -434,8 +394,7 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
           )}
         </div>
       )
-    
-      }
+    }
 
       <div className="pt-4 flex justify-end gap-3">
         <Button variant="outline" type="button" onClick={handleCancelarNuevo}>

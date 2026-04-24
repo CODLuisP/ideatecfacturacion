@@ -29,7 +29,7 @@ import {
   Sucursal,
 } from "./gestionFacturas/Factura";
 import { useClienteFactura } from "./gestionFacturas/useClienteFactura";
-import { Cliente } from "../../clientes/gestionClientes/Cliente";
+import { Cliente } from "../../clientes/gestionClientes/typesCliente";
 import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { ProductoSucursal } from "../../productos/gestioProductos/Producto";
 import { useProductosSucursal } from "../../productos/gestioProductos/useProductosSucursal";

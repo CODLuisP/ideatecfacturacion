@@ -182,16 +182,19 @@ function SucursalCard({
 
         {/* Series */}
         <div className="border-t border-gray-100 pt-3 mb-4">
-          <p className="text-[10px] font-semibold  text-gray-600 uppercase mb-2.5">
-            Series de comprobantes
-          </p>
-          <div className="grid grid-cols-5 gap-2">
-            <SeriesBadge label="Factura" value={s.serieFactura} />
-            <SeriesBadge label="Boleta" value={s.serieBoleta} />
-            <SeriesBadge label="N.Crédito" value={s.serieNotaCredito} />
-            <SeriesBadge label="N.Débito" value={s.serieNotaDebito} />
-            <SeriesBadge label="Guía" value={s.serieGuia} />
-          </div>
+            <p className="text-[10px] font-semibold  text-gray-600 uppercase mb-2.5">
+              Series de comprobantes
+            </p>
+            <div className="grid grid-cols-4 gap-2">
+              <SeriesBadge label="Factura"    value={s.serieFactura} />
+              <SeriesBadge label="Boleta"     value={s.serieBoleta} />
+              <SeriesBadge label="Nota Crédito Fact."   value={s.serieNotaCreditoFactura} />
+              <SeriesBadge label="Nota Crédito Bol."    value={s.serieNotaCreditoBoleta} />
+              <SeriesBadge label="Nota Débito Fact."   value={s.serieNotaDebitoFactura} />
+              <SeriesBadge label="Nota Débito Bol."    value={s.serieNotaDebitoBoleta} />
+              <SeriesBadge label="Guía Remisión"  value={s.serieGuiaRemision} />
+              <SeriesBadge label="Guía Transp." value={s.serieGuiaTransportista} />
+            </div>
         </div>
 
         {/* Botones de acción */}
@@ -287,9 +290,12 @@ export default function SucursalesPage() {
     let count = 0;
     if (s.serieFactura) count++;
     if (s.serieBoleta) count++;
-    if (s.serieNotaCredito) count++;
-    if (s.serieNotaDebito) count++;
-    if (s.serieGuia) count++;
+    if (s.serieNotaCreditoFactura) count++;
+    if (s.serieNotaCreditoBoleta) count++;
+    if (s.serieNotaDebitoFactura) count++;
+    if (s.serieNotaDebitoBoleta) count++;
+    if (s.serieGuiaRemision) count++;
+    if (s.serieGuiaTransportista) count++;
     return acc + count;
   }, 0);
 
@@ -316,12 +322,18 @@ export default function SucursalesPage() {
         correlativoFactura: s.correlativoFactura ?? 1,
         serieBoleta: s.serieBoleta,
         correlativoBoleta: s.correlativoBoleta ?? 1,
-        serieNotaCredito: s.serieNotaCredito,
-        correlativoNotaCredito: s.correlativoNotaCredito ?? 1,
-        serieNotaDebito: s.serieNotaDebito,
-        correlativoNotaDebito: s.correlativoNotaDebito ?? 1,
-        serieGuia: s.serieGuiaRemision,
-        correlativoGuia: s.correlativoGuiaRemision ?? 1,
+        serieNotaCreditoFactura: s.serieNotaCreditoFactura,
+        correlativoNotaCreditoFactura: s.correlativoNotaCreditoFactura ?? 1,
+        serieNotaCreditoBoleta: s.serieNotaCreditoBoleta,
+        correlativoNotaCreditoBoleta: s.correlativoNotaCreditoBoleta ?? 1,
+        serieNotaDebitoFactura: s.serieNotaDebitoFactura,
+        correlativoNotaDebitoFactura: s.correlativoNotaDebitoFactura ?? 1,
+        serieNotaDebitoBoleta: s.serieNotaDebitoBoleta,
+        correlativoNotaDebitoBoleta: s.correlativoNotaDebitoBoleta ?? 1,
+        serieGuiaRemision: s.serieGuiaRemision,
+        correlativoGuiaRemision: s.correlativoGuiaRemision ?? 1,
+        serieGuiaTransportista: s.serieGuiaTransportista,
+        correlativoGuiaTransportista: s.correlativoGuiaTransportista ?? 1,
       }));
       setSucursales(data);
       setEstadoSucursales((prev) => {
@@ -350,19 +362,22 @@ export default function SucursalesPage() {
           codEstablecimiento: nextCodigo(sucursales),
           nombre: form.nombre,
           direccion: form.direccion,
-          nombreSucursal: form.nombre,
           serieFactura: form.serieFactura,
           correlativoFactura: form.correlativoFactura,
           serieBoleta: form.serieBoleta,
           correlativoBoleta: form.correlativoBoleta,
-          serieNotaCredito: form.serieNotaCredito,
-          correlativoNotaCredito: form.correlativoNotaCredito,
-          serieNotaDebito: form.serieNotaDebito,
-          correlativoNotaDebito: form.correlativoNotaDebito,
-          serieGuiaRemision: form.serieGuia,
-          correlativoGuiaRemision: form.correlativoGuia,
-          serieGuiaTransportista: "V001",
-          correlativoGuiaTransportista: 1,
+          serieNotaCreditoFactura: form.serieNotaCreditoFactura,
+          correlativoNotaCreditoFactura: form.correlativoNotaCreditoFactura,
+          serieNotaCreditoBoleta: form.serieNotaCreditoBoleta,
+          correlativoNotaCreditoBoleta: form.correlativoNotaCreditoBoleta,
+          serieNotaDebitoFactura: form.serieNotaDebitoFactura,
+          correlativoNotaDebitoFactura: form.correlativoNotaDebitoFactura,
+          serieNotaDebitoBoleta: form.serieNotaDebitoBoleta,
+          correlativoNotaDebitoBoleta: form.correlativoNotaDebitoBoleta,
+          serieGuiaRemision: form.serieGuiaRemision,
+          correlativoGuiaRemision: form.correlativoGuiaRemision,
+          serieGuiaTransportista: form.serieGuiaTransportista,
+          correlativoGuiaTransportista: form.correlativoGuiaTransportista,
           usernameAdminSucursal: form.usuario,
         },
         { headers: { Authorization: `Bearer ${accessToken}` } },
