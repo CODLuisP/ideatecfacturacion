@@ -1,19 +1,24 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   ShieldCheck,
-  Eye, EyeOff, ChevronDown,
-  Info, AlertTriangle, Loader2, Lock,
-} from 'lucide-react';
-import axios from 'axios';
-import { useToast } from '@/app/components/ui/Toast';
-import { Button } from '@/app/components/ui/Button';
-import { Badge } from '@/app/components/ui/Badge';
-import { cn } from '@/app/utils/cn';
-import { CertificadoDigitalCard } from '@/app/components/sunartComponentes/Certificadodigitalcard';
-import { useAuth } from '@/context/AuthContext';
-import { EstadoConexionSunatCard } from '@/app/components/sunartComponentes/Estadoconexionsunatcard';
-import { ApisSunat } from '@/app/utils/ApisSunat';
+  Eye,
+  EyeOff,
+  ChevronDown,
+  Info,
+  AlertTriangle,
+  Loader2,
+  Lock,
+} from "lucide-react";
+import axios from "axios";
+import { useToast } from "@/app/components/ui/Toast";
+import { Button } from "@/app/components/ui/Button";
+import { Badge } from "@/app/components/ui/Badge";
+import { cn } from "@/app/utils/cn";
+import { CertificadoDigitalCard } from "@/app/components/sunartComponentes/Certificadodigitalcard";
+import { useAuth } from "@/context/AuthContext";
+import { EstadoConexionSunatCard } from "@/app/components/sunartComponentes/Estadoconexionsunatcard";
+import { ApisSunat } from "@/app/utils/ApisSunat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Config {
@@ -21,7 +26,7 @@ interface Config {
   solPassword: string;
   clientId: string;
   clientSecret: string;
-  environment: 'produccion' | 'beta';
+  environment: "produccion" | "beta";
   saved: boolean;
 }
 
@@ -34,45 +39,67 @@ export interface CompanyData {
 // ─── ConfirmModal ─────────────────────────────────────────────────────────────
 interface ConfirmModalProps {
   open: boolean;
-  environment: 'produccion' | 'beta';
+  environment: "produccion" | "beta";
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function ConfirmModal({ open, environment, onConfirm, onCancel }: ConfirmModalProps) {
+function ConfirmModal({
+  open,
+  environment,
+  onConfirm,
+  onCancel,
+}: ConfirmModalProps) {
   if (!open) return null;
-  const isProduccion = environment === 'produccion';
+  const isProduccion = environment === "produccion";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onCancel}
+      />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
-        <div className={cn(
-          'w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4',
-          isProduccion ? 'bg-emerald-50' : 'bg-amber-50'
-        )}>
-          <ShieldCheck className={cn('w-6 h-6', isProduccion ? 'text-emerald-600' : 'text-amber-600')} />
+        <div
+          className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4",
+            isProduccion ? "bg-emerald-50" : "bg-amber-50",
+          )}
+        >
+          <ShieldCheck
+            className={cn(
+              "w-6 h-6",
+              isProduccion ? "text-emerald-600" : "text-amber-600",
+            )}
+          />
         </div>
         <h3 className="text-base font-bold text-gray-900 text-center mb-1">
           ¿Confirmar configuración de SUNAT?
         </h3>
         <p className="text-xs text-gray-500 text-center mb-5">
-          Estás a punto de guardar las credenciales para el entorno de{' '}
-          <span className={cn('font-bold', isProduccion ? 'text-emerald-600' : 'text-amber-600')}>
-            {isProduccion ? 'Producción' : 'Beta / Homologación'}
+          Estás a punto de guardar las credenciales para el entorno de{" "}
+          <span
+            className={cn(
+              "font-bold",
+              isProduccion ? "text-emerald-600" : "text-amber-600",
+            )}
+          >
+            {isProduccion ? "Producción" : "Beta / Homologación"}
           </span>
         </p>
-        <div className={cn(
-          'p-3 rounded-xl border flex gap-2 text-xs mb-5',
-          isProduccion
-            ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-            : 'bg-amber-50 border-amber-100 text-amber-700'
-        )}>
+        <div
+          className={cn(
+            "p-3 rounded-xl border flex gap-2 text-xs mb-5",
+            isProduccion
+              ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+              : "bg-amber-50 border-amber-100 text-amber-700",
+          )}
+        >
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
             {isProduccion
-              ? 'Estas credenciales se usarán para emitir comprobantes electrónicos reales ante SUNAT. Asegúrate de que los datos sean correctos.'
-              : 'Estas credenciales corresponden al ambiente de pruebas. Los comprobantes emitidos no tendrán validez tributaria.'}
+              ? "Estas credenciales se usarán para emitir comprobantes electrónicos reales ante SUNAT. Asegúrate de que los datos sean correctos."
+              : "Estas credenciales corresponden al ambiente de pruebas. Los comprobantes emitidos no tendrán validez tributaria."}
           </p>
         </div>
         <div className="flex gap-3">
@@ -87,8 +114,10 @@ function ConfirmModal({ open, environment, onConfirm, onCancel }: ConfirmModalPr
             type="button"
             onClick={onConfirm}
             className={cn(
-              'flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm hover:shadow-md',
-              isProduccion ? 'bg-[#023e7d] hover:bg-[#012f5e]' : 'bg-amber-500 hover:bg-amber-600'
+              "flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm hover:shadow-md",
+              isProduccion
+                ? "bg-[#023e7d] hover:bg-[#012f5e]"
+                : "bg-amber-500 hover:bg-amber-600",
             )}
           >
             Sí, guardar
@@ -110,7 +139,15 @@ interface SecretInputProps {
   disabled?: boolean;
 }
 
-function SecretInput({ label, placeholder, value, onChange, required, hint, disabled }: SecretInputProps) {
+function SecretInput({
+  label,
+  placeholder,
+  value,
+  onChange,
+  required,
+  hint,
+  disabled,
+}: SecretInputProps) {
   const [show, setShow] = useState(false);
   return (
     <div className="space-y-1.5">
@@ -120,17 +157,17 @@ function SecretInput({ label, placeholder, value, onChange, required, hint, disa
       </label>
       <div className="relative">
         <input
-          type={show ? 'text' : 'password'}
+          type={show ? "text" : "password"}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
           required={required}
           disabled={disabled}
           className={cn(
-            'w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm pr-10 transition-colors',
+            "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm pr-10 transition-colors",
             disabled
-              ? 'opacity-50 cursor-not-allowed'
-              : 'focus:border-brand-blue'
+              ? "opacity-50 cursor-not-allowed"
+              : "focus:border-brand-blue",
           )}
         />
         {!disabled && (
@@ -139,7 +176,11 @@ function SecretInput({ label, placeholder, value, onChange, required, hint, disa
             onClick={() => setShow(!show)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {show ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
           </button>
         )}
         {disabled && (
@@ -162,7 +203,15 @@ interface TextInputProps {
   disabled?: boolean;
 }
 
-function TextInput({ label, placeholder, value, onChange, required, hint, disabled }: TextInputProps) {
+function TextInput({
+  label,
+  placeholder,
+  value,
+  onChange,
+  required,
+  hint,
+  disabled,
+}: TextInputProps) {
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
@@ -178,10 +227,10 @@ function TextInput({ label, placeholder, value, onChange, required, hint, disabl
           required={required}
           disabled={disabled}
           className={cn(
-            'w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm transition-colors',
+            "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm transition-colors",
             disabled
-              ? 'opacity-50 cursor-not-allowed pr-10'
-              : 'focus:border-brand-blue'
+              ? "opacity-50 cursor-not-allowed pr-10"
+              : "focus:border-brand-blue",
           )}
         />
         {disabled && (
@@ -212,7 +261,13 @@ interface CollapsibleProps {
   badge?: React.ReactNode;
 }
 
-function CollapsibleSection({ title, subtitle, defaultOpen = false, children, badge }: CollapsibleProps) {
+function CollapsibleSection({
+  title,
+  subtitle,
+  defaultOpen = false,
+  children,
+  badge,
+}: CollapsibleProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -228,7 +283,12 @@ function CollapsibleSection({ title, subtitle, defaultOpen = false, children, ba
           </div>
           <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
         </div>
-        <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform shrink-0 ml-4', open && 'rotate-180')} />
+        <ChevronDown
+          className={cn(
+            "w-4 h-4 text-gray-400 transition-transform shrink-0 ml-4",
+            open && "rotate-180",
+          )}
+        />
       </button>
       {open && (
         <div className="px-6 pb-6 border-t border-gray-100 pt-5">
@@ -240,14 +300,25 @@ function CollapsibleSection({ title, subtitle, defaultOpen = false, children, ba
 }
 
 // ─── InfoBanner ───────────────────────────────────────────────────────────────
-function InfoBanner({ children, variant = 'info' }: { children: React.ReactNode; variant?: 'info' | 'warning' }) {
+function InfoBanner({
+  children,
+  variant = "info",
+}: {
+  children: React.ReactNode;
+  variant?: "info" | "warning";
+}) {
   const styles = {
-    info:    'bg-blue-50 border-blue-100 text-blue-700',
-    warning: 'bg-amber-50 border-amber-100 text-amber-700',
+    info: "bg-blue-50 border-blue-100 text-blue-700",
+    warning: "bg-amber-50 border-amber-100 text-amber-700",
   };
-  const Icon = variant === 'warning' ? AlertTriangle : Info;
+  const Icon = variant === "warning" ? AlertTriangle : Info;
   return (
-    <div className={cn('p-3 rounded-xl border flex gap-2 text-xs', styles[variant])}>
+    <div
+      className={cn(
+        "p-3 rounded-xl border flex gap-2 text-xs",
+        styles[variant],
+      )}
+    >
       <Icon className="w-4 h-4 shrink-0 mt-0.5" />
       <p>{children}</p>
     </div>
@@ -259,27 +330,28 @@ export default function SunatPage() {
   const { showToast } = useToast();
   const { user, setEnvironment, accessToken } = useAuth();
 
-  console.log('User data in SUNAT page:', user);
+  console.log("User data in SUNAT page:", user);
 
   // ── Permisos ──────────────────────────────────────────────────────────────
-  const canEditCredentials = user?.rol === 'superadmin' || user?.rol === 'admin';
+  const canEditCredentials =
+    user?.rol === "superadmin" || user?.rol === "admin";
 
   const [config, setConfig] = useState<Config>({
-    solUser:      '',
-    solPassword:  '',
-    clientId:     '',
-    clientSecret: '',
-    environment:  'produccion',
-    saved:        false,
+    solUser: "",
+    solPassword: "",
+    clientId: "",
+    clientSecret: "",
+    environment: "produccion",
+    saved: false,
   });
 
-  const [envLoaded,     setEnvLoaded]     = useState(false);
-  const [companyData,   setCompanyData]   = useState<CompanyData | null>(null);
-  const [loadingCompany,setLoadingCompany]= useState(true);
-  const [savingConfig,  setSavingConfig]  = useState(false);
-  const [showConfirm,   setShowConfirm]   = useState(false);
+  const [envLoaded, setEnvLoaded] = useState(false);
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+  const [loadingCompany, setLoadingCompany] = useState(true);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const [igv, setIgv] = useState<'18' | '10.5'>('18');
+  const [igv, setIgv] = useState<"18" | "10.5">("18");
 
   const upd = (key: keyof Config) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setConfig((c) => ({ ...c, [key]: e.target.value, saved: false }));
@@ -297,23 +369,25 @@ export default function SunatPage() {
         const data = res.data;
 
         setCompanyData({
-          certificadoPem:      data.certificadoPem      ?? null,
+          certificadoPem: data.certificadoPem ?? null,
           certificadoPassword: data.certificadoPassword ?? null,
-          environment:         data.environment         ?? 'produccion',
+          environment: data.environment ?? "produccion",
         });
 
         setConfig({
-          solUser:      data.solUsuario   ?? '',
-          solPassword:  data.solClave     ?? '',
-          clientId:     data.clientId     ?? '',
-          clientSecret: data.clientSecret ?? '',
-          environment: (data.environment === 'beta' ? 'beta' : 'produccion'),
+          solUser: data.solUsuario ?? "",
+          solPassword: data.solClave ?? "",
+          clientId: data.clientId ?? "",
+          clientSecret: data.clientSecret ?? "",
+          environment: data.environment === "beta" ? "beta" : "produccion",
           saved: !!(data.solUsuario && data.solClave),
         });
 
+        setIgv((String(data.igv ?? "18") as "18" | "10.5"));
+
         setEnvLoaded(true);
       } catch {
-        showToast('Error al cargar la configuración de SUNAT', 'error');
+        showToast("Error al cargar la configuración de SUNAT", "error");
         setEnvLoaded(true);
       } finally {
         setLoadingCompany(false);
@@ -337,16 +411,18 @@ export default function SunatPage() {
       // Si no puede editar credenciales, solo guarda el entorno
       const body = canEditCredentials
         ? {
-            solUsuario:   config.solUser     || null,
-            solClave:     config.solPassword || null,
-            environment:  config.environment,
-            clientId:     config.clientId     || null,
+            solUsuario: config.solUser || null,
+            solClave: config.solPassword || null,
+            environment: config.environment,
+            clientId: config.clientId || null,
             clientSecret: config.clientSecret || null,
-            logoBase64:   user?.logoBase64   ?? null,
+            logoBase64: user?.logoBase64 ?? null,
+            igv: igv,
           }
         : {
             environment: config.environment,
-            logoBase64:   user?.logoBase64   ?? null,
+            logoBase64: user?.logoBase64 ?? null,
+            igv: igv,
           };
 
       await axios.put(ApisSunat.updateCompany(user!.ruc), body, {
@@ -354,9 +430,9 @@ export default function SunatPage() {
       });
       setEnvironment(config.environment);
       setConfig((c) => ({ ...c, saved: true }));
-      showToast('Configuración guardada correctamente', 'success');
+      showToast("Configuración guardada correctamente", "success");
     } catch {
-      showToast('Error al guardar la configuración', 'error');
+      showToast("Error al guardar la configuración", "error");
     } finally {
       setSavingConfig(false);
     }
@@ -372,11 +448,10 @@ export default function SunatPage() {
       />
 
       <div className="space-y-6 animate-in fade-in duration-500">
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <EstadoConexionSunatCard className="lg:col-span-2" />
           <CertificadoDigitalCard
-            ruc={user?.ruc ?? ''}
+            ruc={user?.ruc ?? ""}
             initialData={companyData}
             loadingInitial={loadingCompany}
             logoBase64={user?.logoBase64 ?? null}
@@ -384,10 +459,11 @@ export default function SunatPage() {
         </div>
 
         <form onSubmit={handleSubmitIntent} className="space-y-4">
-
           {/* ── Entorno — cualquier usuario puede cambiar ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <p className="text-sm font-bold text-gray-900 mb-1">Entorno de Operación</p>
+            <p className="text-sm font-bold text-gray-900 mb-1">
+              Entorno de Operación
+            </p>
             <p className="text-xs text-gray-500 mb-4">
               Define si trabajas en producción real o en pruebas con SUNAT
             </p>
@@ -399,19 +475,31 @@ export default function SunatPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {([
-                  { key: 'produccion', label: 'Producción',          desc: 'Comprobantes reales enviados a SUNAT', accent: 'emerald' },
-                  { key: 'beta',       label: 'Beta / Homologación', desc: 'Ambiente de pruebas de SUNAT',        accent: 'amber'   },
-                ] as const).map((env) => (
+                {(
+                  [
+                    {
+                      key: "produccion",
+                      label: "Producción",
+                      desc: "Comprobantes reales enviados a SUNAT",
+                      accent: "emerald",
+                    },
+                    {
+                      key: "beta",
+                      label: "Beta / Homologación",
+                      desc: "Ambiente de pruebas de SUNAT",
+                      accent: "amber",
+                    },
+                  ] as const
+                ).map((env) => (
                   <label
                     key={env.key}
                     className={cn(
-                      'flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all',
+                      "flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all",
                       config.environment === env.key
-                        ? env.accent === 'emerald'
-                          ? 'border-emerald-300 bg-emerald-50/60'
-                          : 'border-amber-300 bg-amber-50/60'
-                        : 'border-gray-200 hover:border-gray-300 bg-gray-50/30'
+                        ? env.accent === "emerald"
+                          ? "border-emerald-300 bg-emerald-50/60"
+                          : "border-amber-300 bg-amber-50/60"
+                        : "border-gray-200 hover:border-gray-300 bg-gray-50/30",
                     )}
                   >
                     <input
@@ -419,11 +507,19 @@ export default function SunatPage() {
                       name="environment"
                       value={env.key}
                       checked={config.environment === env.key}
-                      onChange={() => setConfig((c) => ({ ...c, environment: env.key, saved: false }))}
+                      onChange={() =>
+                        setConfig((c) => ({
+                          ...c,
+                          environment: env.key,
+                          saved: false,
+                        }))
+                      }
                       className="mt-0.5 accent-brand-blue"
                     />
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{env.label}</p>
+                      <p className="text-sm font-bold text-gray-900">
+                        {env.label}
+                      </p>
                       <p className="text-xs text-gray-500 mt-0.5">{env.desc}</p>
                     </div>
                   </label>
@@ -438,9 +534,11 @@ export default function SunatPage() {
             title="Credenciales SOL"
             subtitle="Usuario y Clave SOL de SUNAT — requeridas para todos los comprobantes electrónicos"
             badge={
-              config.solUser && config.solPassword
-                ? <Badge variant="success">Configurado</Badge>
-                : <Badge variant="error">Requerido</Badge>
+              config.solUser && config.solPassword ? (
+                <Badge variant="success">Configurado</Badge>
+              ) : (
+                <Badge variant="error">Requerido</Badge>
+              )
             }
           >
             <div className="space-y-4">
@@ -452,8 +550,9 @@ export default function SunatPage() {
               ) : (
                 <>
                   <InfoBanner variant="info">
-                    Las credenciales SOL son necesarias para autenticarse con SUNAT y enviar Facturas,
-                    Boletas y Notas de Crédito/Débito. Obtenlas en{' '}
+                    Las credenciales SOL son necesarias para autenticarse con
+                    SUNAT y enviar Facturas, Boletas y Notas de Crédito/Débito.
+                    Obtenlas en{" "}
                     <strong>sunat.gob.pe → Operaciones en Línea (SOL)</strong>.
                   </InfoBanner>
 
@@ -465,7 +564,7 @@ export default function SunatPage() {
                       label="Usuario SOL"
                       placeholder="Ej: 20601234567ADMIN"
                       value={config.solUser}
-                      onChange={upd('solUser')}
+                      onChange={upd("solUser")}
                       disabled={!canEditCredentials}
                       hint="Formato: RUC + nombre de usuario SOL registrado en SUNAT"
                     />
@@ -473,7 +572,7 @@ export default function SunatPage() {
                       label="Clave SOL"
                       placeholder="••••••••"
                       value={config.solPassword}
-                      onChange={upd('solPassword')}
+                      onChange={upd("solPassword")}
                       disabled={!canEditCredentials}
                       hint="Clave de acceso a los servicios en línea de SUNAT"
                     />
@@ -488,9 +587,11 @@ export default function SunatPage() {
             title="Guía de Remisión Electrónica"
             subtitle="Client ID y Client Secret requeridos solo para emitir Guías de Remisión Electrónicas"
             badge={
-              config.clientId && config.clientSecret
-                ? <Badge variant="success">Configurado</Badge>
-                : <Badge variant="info">Opcional</Badge>
+              config.clientId && config.clientSecret ? (
+                <Badge variant="success">Configurado</Badge>
+              ) : (
+                <Badge variant="info">Opcional</Badge>
+              )
             }
           >
             <div className="space-y-4">
@@ -502,8 +603,9 @@ export default function SunatPage() {
               ) : (
                 <>
                   <InfoBanner variant="info">
-                    Las Guías de Remisión Electrónicas requieren credenciales adicionales proporcionadas
-                    por SUNAT. No se requieren para Facturas ni Boletas.
+                    Las Guías de Remisión Electrónicas requieren credenciales
+                    adicionales proporcionadas por SUNAT. No se requieren para
+                    Facturas ni Boletas.
                   </InfoBanner>
 
                   {/* Aviso si no tiene permiso */}
@@ -514,7 +616,7 @@ export default function SunatPage() {
                       label="Client ID"
                       placeholder="Tu Client ID de SUNAT"
                       value={config.clientId}
-                      onChange={upd('clientId')}
+                      onChange={upd("clientId")}
                       disabled={!canEditCredentials}
                       hint="ID de cliente proporcionado por SUNAT para guías de remisión"
                     />
@@ -522,7 +624,7 @@ export default function SunatPage() {
                       label="Client Secret"
                       placeholder="••••••••••••••••"
                       value={config.clientSecret}
-                      onChange={upd('clientSecret')}
+                      onChange={upd("clientSecret")}
                       disabled={!canEditCredentials}
                       hint="Secreto de cliente proporcionado por SUNAT para guías de remisión"
                     />
@@ -533,58 +635,70 @@ export default function SunatPage() {
           </CollapsibleSection>
 
           {/* ── Tipo de IGV Aplicado ── */}
-<CollapsibleSection
-  title="Tipo de IGV Aplicado"
-  subtitle="Tasa de IGV predeterminada en tus comprobantes"
-  badge={<Badge variant="info">Estático</Badge>}
->
-  <div className="space-y-4">
-    <InfoBanner variant="info">
-      La tasa seleccionada se aplicará por defecto al crear cualquier comprobante electrónico.
-      Podrás modificarla individualmente en cada comprobante si el caso lo requiere.
-    </InfoBanner>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {([
-        { key: '18', label: '18%', desc: 'Tasa general del IGV' },
-        { key: '10.5', label: '10.5%', desc: 'Tasa reducida aplicable a ciertos sectores' },
-      ] as const).map((tasa) => (
-        <label
-          key={tasa.key}
-          className={cn(
-            'flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all',
-            igv === tasa.key
-              ? 'border-[#023e7d] bg-blue-50/60'
-              : 'border-gray-200 hover:border-gray-300 bg-gray-50/30'
-          )}
-        >
-          <input
-            type="radio"
-            name="igv"
-            value={tasa.key}
-            checked={igv === tasa.key}
-            onChange={() => setIgv(tasa.key)}
-            className="mt-0.5 accent-brand-blue"
-          />
-          <div>
-            <p className="text-sm font-bold text-gray-900">{tasa.label}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{tasa.desc}</p>
-          </div>
-        </label>
-      ))}
-    </div>
-  </div>
-</CollapsibleSection>
+          <CollapsibleSection
+            title="Tipo de IGV Aplicado"
+            subtitle="Tasa de IGV predeterminada en tus comprobantes"
+            badge={<Badge variant="info">Estático</Badge>}
+          >
+            <div className="space-y-4">
+              <InfoBanner variant="info">
+                La tasa seleccionada se aplicará por defecto al crear cualquier
+                comprobante electrónico. Podrás modificarla individualmente en
+                cada comprobante si el caso lo requiere.
+              </InfoBanner>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(
+                  [
+                    { key: "18", label: "18%", desc: "Tasa general del IGV" },
+                    {
+                      key: "10.5",
+                      label: "10.5%",
+                      desc: "Tasa reducida aplicable a ciertos sectores",
+                    },
+                  ] as const
+                ).map((tasa) => (
+                  <label
+                    key={tasa.key}
+                    className={cn(
+                      "flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all",
+                      igv === tasa.key
+                        ? "border-[#023e7d] bg-blue-50/60"
+                        : "border-gray-200 hover:border-gray-300 bg-gray-50/30",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="igv"
+                      value={tasa.key}
+                      checked={igv === tasa.key}
+                      onChange={() => setIgv(tasa.key)}
+                      className="mt-0.5 accent-brand-blue"
+                    />
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">
+                        {tasa.label}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {tasa.desc}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </CollapsibleSection>
 
           {/* ── Botón guardar ── */}
           <div className="flex justify-end gap-3 pt-2">
             <Button type="submit" disabled={savingConfig || loadingCompany}>
-              {savingConfig
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <ShieldCheck className="w-4 h-4" />}
-              {savingConfig ? 'Guardando...' : 'Guardar Configuración'}
+              {savingConfig ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              {savingConfig ? "Guardando..." : "Guardar Configuración"}
             </Button>
           </div>
-
         </form>
       </div>
     </>
