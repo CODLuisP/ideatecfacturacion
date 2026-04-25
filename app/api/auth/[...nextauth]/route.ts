@@ -63,6 +63,7 @@ export const authOptions: AuthOptions = {
             nombreSucursal: data.user.nombreSucursal ?? null,
             nombreEmpresa: data.user.nombreEmpresa ?? null,
             environment: data.user.environment ?? null,
+            igv: data.user.igv ?? 18,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
           };
@@ -77,7 +78,6 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }) {
       // Al hacer login, guardar datos del usuario
       if (user) {
-        console.log("🆕 Nuevo login - Token válido por 24 horas");
         token.id = user.id;
         token.email = user.email;
         token.username = user.username;
@@ -86,6 +86,7 @@ export const authOptions: AuthOptions = {
         token.sucursalID = user.sucursalID;
         token.nombreSucursal = user.nombreSucursal;
         token.nombreEmpresa = user.nombreEmpresa;
+        token.igv = user.igv;
         token.environment = user.environment;
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
@@ -101,6 +102,7 @@ export const authOptions: AuthOptions = {
         ruc: token.ruc as string,
         sucursalID: token.sucursalID as string | null,
         nombreSucursal: token.nombreSucursal as string | null,
+        igv: token.igv as number,
         nombreEmpresa: token.nombreEmpresa as string | null,
         environment: token.environment as string | null
       };

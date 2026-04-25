@@ -8,6 +8,7 @@ declare module "next-auth" {
     sucursalID?: string | null;
     nombreSucursal?: string | null;
     nombreEmpresa?: string | null;
+    igv: number;
     environment?: string | null;
     razonSocial?: string;
     accessToken?: string;
@@ -23,6 +24,7 @@ declare module "next-auth" {
       rol?: string;
       ruc?: string;
       sucursalID: string | null;
+      igv: number;
       nombreSucursal: string | null;
       nombreEmpresa?: string | null;
       environment?: string | null;
@@ -40,6 +42,7 @@ declare module "next-auth/jwt" {
     rol?: string;
     ruc?: string;
     sucursalID?: string | null;
+    igv: number;
     nombreSucursal?: string | null;
     nombreEmpresa?: string | null;
     environment?: string | null;
