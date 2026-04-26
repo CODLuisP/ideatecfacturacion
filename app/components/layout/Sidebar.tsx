@@ -1,6 +1,5 @@
 "use client";
-import React from "react";
-import { ShieldCheck, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { signOut } from "next-auth/react"; 
 
 import { cn } from "@/app/utils/cn";
