@@ -21,7 +21,9 @@ import { Card } from "@/app/components/ui/Card";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/app/components/ui/Toast";
-import { BtnEnvio } from '@/app/components/ui/BtnEnvio';
+import { BtnEnvio } from "@/app/components/ui/BtnEnvio";
+import { ModalDetalleGuia } from "./ModalDetalleGuia";
+import { ModalEnvioGuia, GuiaEnvioData } from "./ModalEnvioGuia";
 import axios from "axios";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -40,25 +42,25 @@ const ESTADO_COLORS_MAP: Record<string, string> = {
 
 // ─── Tipo DTO (refleja la respuesta del backend) ──────────────────────────────
 interface GuiaDto {
-    guiaId: number;
-    sucursalId?: number;
-    tipoDoc: string;
-    numeroCompleto?: string;
-    fechaEmision: string;
-    fechaCreacion: string;
-    destinatarioNumDoc?: string;
-    destinatarioRznSocial?: string;
-    partidaDireccion?: string;
-    llegadaDireccion?: string;
-    transportistaRznSocial?: string;
-    transportistaPlaca?: string;
-    clienteCorreo?: string;
-    enviadoPorCorreo: boolean;
-    clienteWhatsapp?: string;
-    enviadoPorWhatsapp: boolean;
-    estadoSunat: string;
-    codigoRespuestaSunat?: string;
-    mensajeRespuestaSunat?: string;
+  guiaId: number;
+  sucursalId?: number;
+  tipoDoc: string;
+  numeroCompleto?: string;
+  fechaEmision: string;
+  fechaCreacion: string;
+  destinatarioNumDoc?: string;
+  destinatarioRznSocial?: string;
+  partidaDireccion?: string;
+  llegadaDireccion?: string;
+  transportistaRznSocial?: string;
+  transportistaPlaca?: string;
+  clienteCorreo?: string;
+  enviadoPorCorreo: boolean;
+  clienteWhatsapp?: string;
+  enviadoPorWhatsapp: boolean;
+  estadoSunat: string;
+  codigoRespuestaSunat?: string;
+  mensajeRespuestaSunat?: string;
 }
 
 // ─── Page Principal ───────────────────────────────────────────────────────────
@@ -72,6 +74,11 @@ export default function GuiasRemisionPage() {
 
   // ── Tipo de guía activa ──
   const [tipoGuia, setTipoGuia] = useState<TipoGuia>("remitente");
+  const [guiaIdDetalle, setGuiaIdDetalle] = useState<number | null>(null);
+  const [modalEnvio, setModalEnvio] = useState<{
+    guia: GuiaEnvioData;
+    tipo: "email" | "whatsapp";
+  } | null>(null);
 
   // ── Datos y loading ──
   const [guias, setGuias] = useState<GuiaDto[]>([]);
@@ -197,6 +204,24 @@ export default function GuiasRemisionPage() {
 
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
+      {guiaIdDetalle && (
+        <ModalDetalleGuia
+          guiaId={guiaIdDetalle}
+          accessToken={accessToken ?? ""}
+          ruc={rucEmpresa}
+          onClose={() => setGuiaIdDetalle(null)}
+        />
+      )}
+
+      {modalEnvio && (
+        <ModalEnvioGuia
+          guia={modalEnvio.guia}
+          tipo={modalEnvio.tipo}
+          accessToken={accessToken ?? ""}
+          onClose={() => setModalEnvio(null)}
+        />
+      )}
+
       <div className="sticky top-0 z-20">
         <div className="space-y-3">
           {/* ── Switch tipo de guía ── */}
@@ -484,12 +509,16 @@ export default function GuiasRemisionPage() {
               guias={filtered}
               loading={loading}
               showAvanzado={showAvanzado}
+              onVerDetalle={setGuiaIdDetalle}
+              onEnvio={(g, tipo) => setModalEnvio({ guia: g, tipo })}
             />
           ) : (
             <TablaTransportista
               guias={filtered}
               loading={loading}
               showAvanzado={showAvanzado}
+              onVerDetalle={setGuiaIdDetalle}
+              onEnvio={(g, tipo) => setModalEnvio({ guia: g, tipo })}
             />
           )}
         </div>
@@ -515,10 +544,14 @@ function TablaRemitente({
   guias,
   loading,
   showAvanzado,
+  onVerDetalle,
+  onEnvio,
 }: {
   guias: GuiaDto[];
   loading: boolean;
   showAvanzado: boolean;
+  onVerDetalle: (id: number) => void;
+  onEnvio: (guia: GuiaDto, tipo: "email" | "whatsapp") => void;
 }) {
   return (
     <table
@@ -535,20 +568,24 @@ function TablaRemitente({
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
             N° GUÍA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
             DESTINATARIO
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
             PUNTO PARTIDA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
             PUNTO LLEGADA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">
             TRANSPORTISTA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">CORREO</th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">WHATSAPP</th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">
+            CORREO
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+            WHATSAPP
+          </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-28">
             SUNAT
           </th>
@@ -626,22 +663,33 @@ function TablaRemitente({
                 </span>
               </td>
               <td className="px-5 py-4 text-center w-21">
-    <div className="flex justify-center">
-        <BtnEnvio tipo="email" enviado={g.enviadoPorCorreo} onClick={() => {}} />
-    </div>
-</td>
-<td className="px-5 py-4 text-center w-24">
-    <div className="flex justify-center">
-        <BtnEnvio tipo="whatsapp" enviado={g.enviadoPorWhatsapp} onClick={() => {}} />
-    </div>
-</td>
+                <div className="flex justify-center">
+                  <BtnEnvio
+                    tipo="email"
+                    enviado={g.enviadoPorCorreo}
+                    onClick={() => onEnvio(g, "email")}
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-4 text-center w-24">
+                <div className="flex justify-center">
+                  <BtnEnvio
+                    tipo="whatsapp"
+                    enviado={g.enviadoPorWhatsapp}
+                    onClick={() => onEnvio(g, "whatsapp")}
+                  />
+                </div>
+              </td>
               <td className="px-5 py-4 text-center w-28">
                 <div className="flex justify-center">
                   <BadgeSunat estado={g.estadoSunat} />
                 </div>
               </td>
               <td className="px-5 py-4 text-center w-16">
-                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                <button
+                  onClick={() => onVerDetalle(g.guiaId)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                >
                   <Eye size={13} /> Ver
                 </button>
               </td>
@@ -663,10 +711,14 @@ function TablaTransportista({
   guias,
   loading,
   showAvanzado,
+  onVerDetalle,
+  onEnvio,
 }: {
   guias: GuiaDto[];
   loading: boolean;
   showAvanzado: boolean;
+  onVerDetalle: (id: number) => void;
+  onEnvio: (guia: GuiaDto, tipo: "email" | "whatsapp") => void;
 }) {
   return (
     <table
@@ -683,17 +735,23 @@ function TablaTransportista({
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
             N° GUÍA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
             DESTINATARIO
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
             PUNTO PARTIDA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
             PUNTO LLEGADA
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
             PLACA
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">
+            CORREO
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+            WHATSAPP
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-28">
             SUNAT
@@ -769,13 +827,34 @@ function TablaTransportista({
                   {g.transportistaPlaca ?? "—"}
                 </span>
               </td>
+              <td className="px-5 py-4 text-center w-21">
+                <div className="flex justify-center">
+                  <BtnEnvio
+                    tipo="email"
+                    enviado={g.enviadoPorCorreo}
+                    onClick={() => onEnvio(g, "email")}
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-4 text-center w-24">
+                <div className="flex justify-center">
+                  <BtnEnvio
+                    tipo="whatsapp"
+                    enviado={g.enviadoPorWhatsapp}
+                    onClick={() => onEnvio(g, "whatsapp")}
+                  />
+                </div>
+              </td>
               <td className="px-5 py-4 text-center w-28">
                 <div className="flex justify-center">
                   <BadgeSunat estado={g.estadoSunat} />
                 </div>
               </td>
               <td className="px-5 py-4 text-center w-16">
-                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                <button
+                  onClick={() => onVerDetalle(g.guiaId)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                >
                   <Eye size={13} /> Ver
                 </button>
               </td>
