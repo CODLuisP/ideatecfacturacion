@@ -43,7 +43,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'operaciones', label: 'Emisión', icon: Grip },
-    { id: 'ver-comprobantes', label: 'Comprobantes', icon: FileBox },
+    { id: 'comprobantes', label: 'Comprobantes', icon: FileBox },
+    { id: 'comprobantes', label: 'Comprobantes', icon: FileBox },
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
