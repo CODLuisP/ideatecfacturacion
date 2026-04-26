@@ -5,7 +5,8 @@ import {
   LayoutDashboard, FileText, Users, Package,
   BarChart3, Zap, Settings, UserCircle, Download, Plus, FileBox,
   Building2,
-  Grip
+  Grip,
+  Truck
 } from 'lucide-react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Topbar } from '../components/layout/Topbar';
@@ -43,8 +44,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'operaciones', label: 'Emisión', icon: Grip },
-    { id: 'comprobantes', label: 'Comprobantes', icon: FileBox },
-    { id: 'comprobantes', label: 'Comprobantes', icon: FileBox },
+    { id: 'comprobantes', label: 'Comprobantes', icon: FileText },
+    { id: 'guiasremision', label: 'Guias de Remision', icon: Truck },
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
