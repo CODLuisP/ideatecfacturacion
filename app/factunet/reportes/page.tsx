@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart3, TrendingUp, Calendar, Download,
-  PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Loader2
+  PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Loader2,
+  ChevronLeft, ChevronRight, Users
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -11,219 +12,271 @@ import {
 import { Button } from '@/app/components/ui/Button';
 import { Card } from '@/app/components/ui/Card';
 import { cn } from '@/app/utils/cn';
+import { useAuth } from '@/context/AuthContext';
+import { useReportesEmpresa } from './gestionReportes/UseReportesEmpresa';
+import { useReportesSucursal } from './gestionReportes/UseReportesSucursal';
+import { Periodo, GraficoBarra } from './gestionReportes/Reportes';
 
-// ─── Datos base (reemplaza con tu API) ────────────────────────────────────────
-const ALL_DATA = {
-  'Hoy': {
-    ventas: [{ month: 'Hoy', ventas: 3200, igv: 576 }],
-    clientes: [
-      { name: 'Corporación Aceros SAC', docs: 1, sub: 'S/ 1,500.00', igv: 'S/ 270.00', total: 'S/ 1,770.00', subNum: 1500, igvNum: 270, totalNum: 1770 },
-      { name: 'Tech Solutions Peru', docs: 1, sub: 'S/ 1,700.00', igv: 'S/ 306.00', total: 'S/ 2,006.00', subNum: 1700, igvNum: 306, totalNum: 2006 },
-    ],
-    stats: { ventas: 3200, igv: 576, docs: 12 },
-    prevStats: { ventas: 2800, igv: 504, docs: 14 },
-  },
-  'Esta Semana': {
-    ventas: [
-      { month: 'Lun', ventas: 8000, igv: 1440 },
-      { month: 'Mar', ventas: 9500, igv: 1710 },
-      { month: 'Mie', ventas: 7200, igv: 1296 },
-      { month: 'Jue', ventas: 11000, igv: 1980 },
-      { month: 'Vie', ventas: 13500, igv: 2430 },
-    ],
-    clientes: [
-      { name: 'Corporación Aceros SAC', docs: 4, sub: 'S/ 18,000.00', igv: 'S/ 3,240.00', total: 'S/ 21,240.00', subNum: 18000, igvNum: 3240, totalNum: 21240 },
-      { name: 'Inversiones Globales EIRL', docs: 3, sub: 'S/ 12,000.00', igv: 'S/ 2,160.00', total: 'S/ 14,160.00', subNum: 12000, igvNum: 2160, totalNum: 14160 },
-      { name: 'Tech Solutions Peru', docs: 2, sub: 'S/ 9,200.00', igv: 'S/ 1,656.00', total: 'S/ 10,856.00', subNum: 9200, igvNum: 1656, totalNum: 10856 },
-    ],
-    stats: { ventas: 49200, igv: 8856, docs: 89 },
-    prevStats: { ventas: 44000, igv: 7920, docs: 95 },
-  },
-  'Este Mes': {
-    ventas: [
-      { month: 'Ene', ventas: 45000, igv: 8100 },
-      { month: 'Feb', ventas: 52000, igv: 9360 },
-      { month: 'Mar', ventas: 48000, igv: 8640 },
-      { month: 'Abr', ventas: 61000, igv: 10980 },
-      { month: 'May', ventas: 55000, igv: 9900 },
-      { month: 'Jun', ventas: 67000, igv: 12060 },
-    ],
-    clientes: [
-      { name: 'Corporación Aceros SAC', docs: 12, sub: 'S/ 12,500.00', igv: 'S/ 2,250.00', total: 'S/ 14,750.00', subNum: 12500, igvNum: 2250, totalNum: 14750 },
-      { name: 'Inversiones Globales EIRL', docs: 8, sub: 'S/ 8,400.00', igv: 'S/ 1,512.00', total: 'S/ 9,912.00', subNum: 8400, igvNum: 1512, totalNum: 9912 },
-      { name: 'Tech Solutions Peru', docs: 5, sub: 'S/ 4,200.00', igv: 'S/ 756.00', total: 'S/ 4,956.00', subNum: 4200, igvNum: 756, totalNum: 4956 },
-      { name: 'Juan Pérez García', docs: 15, sub: 'S/ 2,100.00', igv: 'S/ 378.00', total: 'S/ 2,478.00', subNum: 2100, igvNum: 378, totalNum: 2478 },
-    ],
-    stats: { ventas: 55240, igv: 9943, docs: 1345 },
-    prevStats: { ventas: 49100, igv: 8838, docs: 1378 },
-  },
-  'Este Año': {
-    ventas: [
-      { month: 'Ene', ventas: 145000, igv: 26100 },
-      { month: 'Feb', ventas: 162000, igv: 29160 },
-      { month: 'Mar', ventas: 148000, igv: 26640 },
-      { month: 'Abr', ventas: 171000, igv: 30780 },
-      { month: 'May', ventas: 155000, igv: 27900 },
-      { month: 'Jun', ventas: 187000, igv: 33660 },
-      { month: 'Jul', ventas: 193000, igv: 34740 },
-      { month: 'Ago', ventas: 178000, igv: 32040 },
-      { month: 'Sep', ventas: 201000, igv: 36180 },
-      { month: 'Oct', ventas: 215000, igv: 38700 },
-      { month: 'Nov', ventas: 224000, igv: 40320 },
-      { month: 'Dic', ventas: 242000, igv: 43560 },
-    ],
-    clientes: [
-      { name: 'Corporación Aceros SAC', docs: 142, sub: 'S/ 185,000.00', igv: 'S/ 33,300.00', total: 'S/ 218,300.00', subNum: 185000, igvNum: 33300, totalNum: 218300 },
-      { name: 'Inversiones Globales EIRL', docs: 98, sub: 'S/ 124,000.00', igv: 'S/ 22,320.00', total: 'S/ 146,320.00', subNum: 124000, igvNum: 22320, totalNum: 146320 },
-      { name: 'Tech Solutions Peru', docs: 74, sub: 'S/ 89,500.00', igv: 'S/ 16,110.00', total: 'S/ 105,610.00', subNum: 89500, igvNum: 16110, totalNum: 105610 },
-      { name: 'Juan Pérez García', docs: 201, sub: 'S/ 42,000.00', igv: 'S/ 7,560.00', total: 'S/ 49,560.00', subNum: 42000, igvNum: 7560, totalNum: 49560 },
-    ],
-    stats: { ventas: 2221000, igv: 399780, docs: 15840 },
-    prevStats: { ventas: 1980000, igv: 356400, docs: 14200 },
-  },
-};
-
-const DATA_DOC_TYPES = [
-  { name: 'Facturas', value: 450, color: '#0052CC' },
-  { name: 'Boletas', value: 850, color: '#FF6321' },
-  { name: 'Notas de Crédito', value: 45, color: '#6366f1' },
+// ─── Usuarios estáticos (reemplazar por dinámicos cuando esté el endpoint) ────
+const USUARIOS_ESTATICOS = [
+  { id: 1, nombre: 'Carlos Mendoza' },
+  { id: 2, nombre: 'Ana Torres' },
+  { id: 3, nombre: 'Luis García' },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function calcTrend(current: number, prev: number): { pct: string; isUp: boolean } {
-  if (prev === 0) return { pct: '—', isUp: true };
-  const diff = ((current - prev) / prev) * 100;
-  return { pct: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`, isUp: diff >= 0 };
-}
+// ─── Colores donut ────────────────────────────────────────────────────────────
+const DOC_COLORS = {
+  facturas:     '#0052CC',
+  boletas:      '#FF6321',
+  notasCredito: '#6366f1',
+  notasDebito:  '#f59e0b',
+};
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatNum(n: number): string {
   return `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`;
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
-type DateRange = 'Hoy' | 'Esta Semana' | 'Este Mes' | 'Este Año';
+function calcTrend(current: number, prev: number) {
+  if (prev === 0 && current === 0) return { pct: '—', isUp: true };
+  if (prev === 0 && current > 0)  return { pct: '+100%', isUp: true };
+  const diff = ((current - prev) / prev) * 100;
+  return { pct: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`, isUp: diff >= 0 };
+}
+
+function getTituloGrafico(periodo: Periodo): string {
+  const map: Record<Periodo, string> = {
+    hoy:           'Ventas de Hoy',
+    semana:        'Ventas de Esta Semana',
+    mes:           'Ventas de Este Mes',
+    año:           'Ventas de Este Año',
+    personalizado: 'Ventas del Período Seleccionado',
+  };
+  return map[periodo];
+}
+
+function getSubtituloGrafico(periodo: Periodo): string {
+  const map: Record<Periodo, string> = {
+    hoy:           'Comparativa de ventas e IGV del día',
+    semana:        'Comparativa de ventas e IGV por día',
+    mes:           'Comparativa de ventas e IGV por día',
+    año:           'Comparativa de ventas e IGV por mes',
+    personalizado: 'Comparativa de ventas e IGV generado',
+  };
+  return map[periodo];
+}
+
+const DIAS_POR_PAGINA = 10;
+
+// ─── Página principal ─────────────────────────────────────────────────────────
+type DateRange = 'hoy' | 'semana' | 'mes' | 'año' | 'personalizado';
 
 export default function ReportesPage() {
-  const [dateRange, setDateRange] = useState<DateRange>('Este Mes');
-  const [loadingPdf, setLoadingPdf] = useState(false);
-  const [loadingExcel, setLoadingExcel] = useState(false);
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
-  const [showCustom, setShowCustom] = useState(false);
+  const { user } = useAuth();
+  const isSuperAdmin = user?.rol === 'superadmin';
+  const isAdmin      = user?.rol === 'admin';
+  const puedeVerUsuarios = isSuperAdmin || isAdmin;
 
-  const current = ALL_DATA[dateRange];
+  const hookEmpresa  = useReportesEmpresa();
+  const hookSucursal = useReportesSucursal();
+  const { reportes, loading, loadingExport, fetchReportes, fetchExport } =
+    isSuperAdmin ? hookEmpresa : hookSucursal;
 
-  const stats = useMemo(() => {
-    const { ventas, igv, docs } = current.stats;
-    const prev = current.prevStats;
+  const [periodo, setPeriodo]           = useState<DateRange>('hoy');
+  const [showCustom, setShowCustom]     = useState(false);
+  const [customStart, setCustomStart]   = useState('');
+  const [customEnd, setCustomEnd]       = useState('');
+  const [usuarioId, setUsuarioId]       = useState<number | null>(null);
+  const [loadingPdf, setLoadingPdf]     = useState(false);
+  const [paginaGrafico, setPaginaGrafico] = useState(0);
+
+  // ── Fetch al cambiar período / usuario ──────────────────────────────────────
+  const doFetch = (p: DateRange, uId: number | null = usuarioId) => {
+    if (!user) return;
+    const params = {
+      periodo: p as Periodo,
+      limite: 10,
+      usuarioId: uId ?? undefined,
+    };
+    if (isSuperAdmin) {
+      (hookEmpresa.fetchReportes as Function)({ ...params, ruc: user.ruc });
+    } else {
+      (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
+    }
+    setPaginaGrafico(0);
+  };
+
+  useEffect(() => {
+    doFetch('hoy');
+  }, [user]);
+
+  const handlePeriodo = (p: DateRange) => {
+    setPeriodo(p);
+    setShowCustom(false);
+    doFetch(p);
+  };
+
+  const handleUsuario = (id: number | null) => {
+    setUsuarioId(id);
+    doFetch(periodo, id);
+  };
+
+  const handlePersonalizar = () => {
+    if (!customStart || !customEnd) return;
+    if (!user) return;
+    const params = {
+      periodo: 'personalizado' as Periodo,
+      desde: customStart,
+      hasta: customEnd,
+      limite: 10,
+      usuarioId: usuarioId ?? undefined,
+    };
+    if (isSuperAdmin) {
+      (hookEmpresa.fetchReportes as Function)({ ...params, ruc: user.ruc });
+    } else {
+      (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
+    }
+    setPaginaGrafico(0);
+  };
+
+  // ── Datos gráfico con paginación (solo mes y personalizado) ────────────────
+  const graficoCompleto: GraficoBarra[] = reportes?.grafico ?? [];
+  const necesitaPaginacion = (periodo === 'mes' || periodo === 'personalizado') && graficoCompleto.length > DIAS_POR_PAGINA;
+  const totalPaginas = Math.ceil(graficoCompleto.length / DIAS_POR_PAGINA);
+  const graficoPaginado = necesitaPaginacion
+    ? graficoCompleto.slice(paginaGrafico * DIAS_POR_PAGINA, (paginaGrafico + 1) * DIAS_POR_PAGINA)
+    : graficoCompleto;
+
+  // ── Distribución donut ──────────────────────────────────────────────────────
+  const donutData = useMemo(() => {
+    const d = reportes?.distribucion;
+    if (!d) return [];
     return [
-      {
-        label: 'Total Ventas (Inc. IGV)',
-        value: formatNum(ventas),
-        ...calcTrend(ventas, prev.ventas),
-        icon: TrendingUp,
-        color: 'text-emerald-600',
-        bg: 'bg-emerald-50',
-      },
-      {
-        label: 'IGV por Pagar',
-        value: formatNum(igv),
-        ...calcTrend(igv, prev.igv),
-        icon: BarChart3,
-        color: 'text-brand-blue',
-        bg: 'bg-blue-50',
-      },
-      {
-        label: 'Documentos Emitidos',
-        value: docs.toLocaleString('es-PE'),
-        ...calcTrend(docs, prev.docs),
-        icon: PieChartIcon,
-        color: 'text-brand-red',
-        bg: 'bg-red-50',
-      },
-    ];
-  }, [dateRange]);
+      { name: 'Facturas',       value: d.facturas,     color: DOC_COLORS.facturas },
+      { name: 'Boletas',        value: d.boletas,       color: DOC_COLORS.boletas },
+      { name: 'Notas de Crédito', value: d.notasCredito, color: DOC_COLORS.notasCredito },
+      { name: 'Notas de Débito',  value: d.notasDebito,  color: DOC_COLORS.notasDebito },
+    ].filter(i => i.value > 0);
+  }, [reportes?.distribucion]);
 
-  // Descarga PDF via API route (aquí simulamos con fetch al endpoint tuyo)
+  // ── KPI stats ───────────────────────────────────────────────────────────────
+  const kpi = reportes?.kpi;
+  const stats = useMemo(() => [
+    {
+      label: 'Total Ventas (Inc. IGV)',
+      value: kpi ? formatNum(kpi.totalVentas) : '—',
+      trend: kpi ? calcTrend(kpi.totalVentas, kpi.totalVentasAnterior) : { pct: '—', isUp: true },
+      icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50',
+    },
+    {
+      label: 'IGV por Pagar',
+      value: kpi ? formatNum(kpi.totalIGV) : '—',
+      trend: kpi ? calcTrend(kpi.totalIGV, kpi.totalIGVAnterior) : { pct: '—', isUp: true },
+      icon: BarChart3, color: 'text-brand-blue', bg: 'bg-blue-50',
+    },
+    {
+      label: 'Documentos Emitidos',
+      value: kpi ? kpi.totalDocumentos.toLocaleString('es-PE') : '—',
+      trend: kpi ? calcTrend(kpi.totalDocumentos, kpi.totalDocumentosAnterior) : { pct: '—', isUp: true },
+      icon: PieChartIcon, color: 'text-brand-red', bg: 'bg-red-50',
+    },
+  ], [kpi]);
+
+  // ── Export Excel ────────────────────────────────────────────────────────────
+  const handleExportExcel = async () => {
+    if (!user) return;
+    const params = {
+      periodo: (showCustom ? 'personalizado' : periodo) as Periodo,
+      desde: showCustom ? customStart : undefined,
+      hasta: showCustom ? customEnd : undefined,
+      usuarioId: usuarioId ?? undefined,
+    };
+    let data;
+    if (isSuperAdmin) {
+      data = await hookEmpresa.fetchExport({ ...params, ruc: user.ruc });
+    } else {
+      data = await hookSucursal.fetchExport({ ...params, sucursalId: Number(user.sucursalID) });
+    }
+    if (!data?.length) return;
+
+    // Generar CSV simple (reemplazar por librería Excel si se prefiere)
+    const headers = ['Cliente', 'Nº Doc', 'Nº Docs', 'Subtotal', 'IGV', 'Total'];
+    const rows = data.map(c => [
+      c.clienteRznSocial, c.clienteNumDoc, c.numDocs,
+      c.subtotal, c.igv, c.total
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `reporte_clientes_${periodo}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleDownloadPdf = async () => {
     setLoadingPdf(true);
-    try {
-      const payload = {
-        dateRange,
-        stats: stats.map(s => ({ label: s.label, value: s.value, trend: s.pct, isUp: s.isUp })),
-        clientes: current.clientes,
-        ventas: current.ventas,
-      };
-      const res = await fetch('/api/auth/reportes/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Error generando PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte_${dateRange.replace(' ', '_')}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert('Error al generar el PDF. Verifica que el endpoint /api/reportes/pdf esté configurado.');
-    } finally {
-      setLoadingPdf(false);
-    }
+    // TODO: implementar cuando esté el endpoint PDF
+    setTimeout(() => setLoadingPdf(false), 1500);
   };
 
-  // Descarga Excel via API route
-  const handleDownloadExcel = async () => {
-    setLoadingExcel(true);
-    try {
-      const payload = {
-        dateRange,
-        clientes: current.clientes,
-        ventas: current.ventas,
-      };
-const res = await fetch('/api/auth/reportes/excel', {
-          method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Error generando Excel');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte_clientes_${dateRange.replace(' ', '_')}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert('Error al generar el Excel. Verifica que el endpoint /api/reportes/excel esté configurado.');
-    } finally {
-      setLoadingExcel(false);
-    }
-  };
+  const getHoyString = () => {
+    const hoy = new Date()
+    const año = hoy.getFullYear()
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0')
+    const dia = String(hoy.getDate()).padStart(2, '0')
+    return `${año}-${mes}-${dia}`
+  }
+
+  const periodoActivo = showCustom ? null : periodo;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      {/* ── Header / Filtros ── */}
+      {/* ── Header / Filtros ─────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm w-fit">
-            {(['Hoy', 'Esta Semana', 'Este Mes', 'Este Año'] as DateRange[]).map((range) => (
-              <button
-                key={range}
-                onClick={() => { setDateRange(range); setShowCustom(false); }}
-                className={cn(
-                  "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
-                  dateRange === range && !showCustom
-                    ? "bg-brand-blue text-white shadow-sm"
-                    : "text-gray-500 hover:bg-gray-50"
-                )}
-              >
-                {range}
-              </button>
-            ))}
+
+          {/* Botones de período + select usuario */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+              {(['hoy', 'semana', 'mes', 'año'] as DateRange[]).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => handlePeriodo(range)}
+                  className={cn(
+                    "px-4 py-1.5 text-xs font-bold rounded-lg transition-all capitalize",
+                    periodoActivo === range
+                      ? "bg-brand-blue text-white shadow-sm"
+                      : "text-gray-500 hover:bg-gray-50"
+                  )}
+                >
+                  {range === 'hoy' ? 'Hoy'
+                    : range === 'semana' ? 'Esta Semana'
+                    : range === 'mes'    ? 'Este Mes'
+                    : 'Este Año'}
+                </button>
+              ))}
+            </div>
+
+            {/* Select de usuario — solo admin/superadmin */}
+            {puedeVerUsuarios && (
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <Users size={14} className="text-gray-400 shrink-0" />
+                <select
+                  value={usuarioId ?? ''}
+                  onChange={e => handleUsuario(e.target.value ? Number(e.target.value) : null)}
+                  className="text-xs text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
+                >
+                  <option value="">Todos los usuarios</option>
+                  {/* TODO: reemplazar USUARIOS_ESTATICOS por lista dinámica */}
+                  {USUARIOS_ESTATICOS.map(u => (
+                    <option key={u.id} value={u.id}>{u.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Personalizar fechas */}
@@ -232,35 +285,42 @@ const res = await fetch('/api/auth/reportes/excel', {
               <input
                 type="date"
                 value={customStart}
-                onChange={e => setCustomStart(e.target.value)}
+                max={getHoyString()}  
+                onChange={e => {
+                  setCustomStart(e.target.value)
+                  if (customEnd && e.target.value > customEnd) setCustomEnd('')
+                }}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-brand-blue"
               />
               <span className="text-gray-400 text-xs">→</span>
               <input
                 type="date"
                 value={customEnd}
+                min={customStart || undefined}                 
+                max={getHoyString()}  
                 onChange={e => setCustomEnd(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-brand-blue"
               />
               <button
-                onClick={() => setShowCustom(false)}
-                className="text-xs font-bold px-3 py-1.5 bg-brand-blue text-white rounded-lg hover:opacity-90"
+                onClick={handlePersonalizar}
+                disabled={loading || !customStart || !customEnd}  // ← deshabilitar si faltan fechas
+                className="text-xs font-bold px-3 py-1.5 bg-brand-blue text-white rounded-lg hover:opacity-90 disabled:opacity-50"
               >
-                Aplicar
+                {loading ? 'Cargando...' : 'Aplicar'}
               </button>
             </div>
           )}
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowCustom(v => !v)}>
+          <Button variant="outline" onClick={() => { setShowCustom(v => !v); }}>
             <Calendar className="w-4 h-4" /> Personalizar
           </Button>
           <Button
             variant="secondary"
             onClick={handleDownloadPdf}
             disabled={loadingPdf}
-            className="min-w-[160px]"
+            className="min-w-40"
           >
             {loadingPdf
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Generando...</>
@@ -270,8 +330,8 @@ const res = await fetch('/api/auth/reportes/excel', {
         </div>
       </div>
 
-      {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 ">
+      {/* ── KPI Cards ────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, i) => (
           <Card key={i} className="p-0">
             <div className="p-0">
@@ -279,72 +339,117 @@ const res = await fetch('/api/auth/reportes/excel', {
                 <div className={cn("p-3 rounded-xl", stat.bg)}>
                   <stat.icon className={cn("w-6 h-6", stat.color)} />
                 </div>
+                {/* Porcentaje: lógica futura — por ahora se mantiene visualmente */}
                 <div className={cn(
                   "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold",
-                  stat.isUp ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                  stat.trend.isUp ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                 )}>
-                  {stat.isUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  {stat.pct}
+                  {stat.trend.isUp
+                    ? <ArrowUpRight className="w-3 h-3" />
+                    : <ArrowDownRight className="w-3 h-3" />}
+                  {stat.trend.pct}
                 </div>
               </div>
               <div className="mt-4">
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stat.label}</p>
-                <p className="text-[14px] font-black text-gray-900 mt-1">{stat.value}</p>
+                <p className="text-[14px] font-black text-gray-900 mt-1">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin inline" /> : stat.value}
+                </p>
               </div>
             </div>
           </Card>
         ))}
       </div>
 
-      {/* ── Gráficas ── */}
+      {/* ── Gráficas ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2" title="Ventas Mensuales" subtitle="Comparativa de ventas e IGV generado">
-          <div className="h-[350px] w-full mt-6">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={current.ventas}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-             <Tooltip
-  cursor={{ fill: '#f8fafc' }}
-  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-  formatter={(value: number | undefined) =>
-    value !== undefined ? `S/ ${value.toLocaleString('es-PE')}` : '—'
-  }
-/>
-<Legend
-  iconType="circle"
-  wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
-/>                <Bar dataKey="ventas" name="Ventas Totales" fill="#0052CC" radius={[4, 4, 0, 0]} barSize={20}  />
-                <Bar dataKey="igv" name="IGV Generado" fill="#FF6321" radius={[4, 4, 0, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
+
+        {/* Gráfico de barras */}
+        <Card
+          className="lg:col-span-2"
+          title={getTituloGrafico((showCustom ? 'personalizado' : periodo) as Periodo)}
+          subtitle={getSubtituloGrafico((showCustom ? 'personalizado' : periodo) as Periodo)}
+        >
+          {/* Paginación — solo cuando hay más de 10 días */}
+          {necesitaPaginacion && (
+            <div className="flex items-center justify-end gap-2 mt-2">
+              <span className="text-xs text-gray-400">
+                Días {paginaGrafico * DIAS_POR_PAGINA + 1}–{Math.min((paginaGrafico + 1) * DIAS_POR_PAGINA, graficoCompleto.length)} de {graficoCompleto.length}
+              </span>
+              <button
+                onClick={() => setPaginaGrafico(p => Math.max(0, p - 1))}
+                disabled={paginaGrafico === 0}
+                className="p-1 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                onClick={() => setPaginaGrafico(p => Math.min(totalPaginas - 1, p + 1))}
+                disabled={paginaGrafico >= totalPaginas - 1}
+                className="p-1 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+
+          <div className="h-87.5 w-full mt-4">
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando datos...
+              </div>
+            ) : graficoPaginado.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                Sin datos en el período seleccionado
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={graficoPaginado}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="etiqueta" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                  <Tooltip
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number | undefined) => value !== undefined ? `S/ ${value.toLocaleString('es-PE')}` : '—'}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }} />
+                  <Bar dataKey="ventas" name="Ventas Totales" fill="#0052CC" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Bar dataKey="igv"    name="IGV Generado"   fill="#FF6321" radius={[4, 4, 0, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 
+        {/* Donut distribución */}
         <Card title="Distribución de Documentos" subtitle="Porcentaje por tipo de comprobante">
-          <div className="h-[300px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={DATA_DOC_TYPES}
-                  cx="50%" cy="50%"
-                  innerRadius={60} outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {DATA_DOC_TYPES.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="h-75 w-full mt-4">
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                <Loader2 className="w-5 h-5 animate-spin" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutData} cx="50%" cy="50%"
+                    innerRadius={60} outerRadius={80}
+                    paddingAngle={5} dataKey="value"
+                  >
+                    {donutData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
           <div className="space-y-3 mt-4">
-            {DATA_DOC_TYPES.map((item, i) => (
+            {loading ? null : donutData.map((item, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
@@ -357,17 +462,17 @@ const res = await fetch('/api/auth/reportes/excel', {
         </Card>
       </div>
 
-      {/* ── Tabla Clientes ── */}
+      {/* ── Tabla Clientes ───────────────────────────────────────────────────── */}
       <Card
         title="Resumen Detallado por Cliente"
         action={
           <Button
             variant="ghost"
             className="text-brand-blue"
-            onClick={handleDownloadExcel}
-            disabled={loadingExcel}
+            onClick={handleExportExcel}
+            disabled={loadingExport}
           >
-            {loadingExcel
+            {loadingExport
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Generando...</>
               : <><Download className="w-4 h-4" /> Exportar Excel</>
             }
@@ -386,31 +491,49 @@ const res = await fetch('/api/auth/reportes/excel', {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {current.clientes.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{row.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500 text-center">{row.docs}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 text-right">{row.sub}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 text-right">{row.igv}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-brand-blue text-right">{row.total}</td>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                    <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Cargando...
+                  </td>
                 </tr>
-              ))}
-              {/* Fila totales */}
-              <tr className="bg-gray-50 border-t-2 border-gray-200">
-                <td className="px-6 py-4 text-sm font-black text-gray-900">TOTAL</td>
-                <td className="px-6 py-4 text-sm font-bold text-gray-700 text-center">
-                  {current.clientes.reduce((s, c) => s + c.docs, 0)}
-                </td>
-                <td className="px-6 py-4 text-sm font-bold text-gray-700 text-right">
-                  {formatNum(current.clientes.reduce((s, c) => s + c.subNum, 0))}
-                </td>
-                <td className="px-6 py-4 text-sm font-bold text-orange-500 text-right">
-                  {formatNum(current.clientes.reduce((s, c) => s + c.igvNum, 0))}
-                </td>
-                <td className="px-6 py-4 text-sm font-black text-brand-blue text-right">
-                  {formatNum(current.clientes.reduce((s, c) => s + c.totalNum, 0))}
-                </td>
-              </tr>
+              ) : (reportes?.topClientes ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                    Sin datos en el período seleccionado
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {(reportes?.topClientes ?? []).map((row, i) => (
+                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{row.clienteRznSocial}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500 text-center">{row.numDocs}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 text-right">{formatNum(row.subtotal)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 text-right">{formatNum(row.igv)}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-brand-blue text-right">{formatNum(row.total)}</td>
+                    </tr>
+                  ))}
+                  {/* Fila totales */}
+                  {reportes?.totalesClientes && (
+                    <tr className="bg-gray-50 border-t-2 border-gray-200">
+                      <td className="px-6 py-4 text-sm font-black text-gray-900">TOTAL</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-700 text-center">
+                        {reportes.totalesClientes.totalDocs}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-700 text-right">
+                        {formatNum(reportes.totalesClientes.totalSubtotal)}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-orange-500 text-right">
+                        {formatNum(reportes.totalesClientes.totalIgv)}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-black text-brand-blue text-right">
+                        {formatNum(reportes.totalesClientes.totalGeneral)}
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
             </tbody>
           </table>
         </div>
