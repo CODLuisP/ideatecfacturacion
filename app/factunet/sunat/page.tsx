@@ -689,7 +689,7 @@ export default function SunatPage() {
           </CollapsibleSection>
 
           {/* ── Botón guardar ── */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 py-4">
             <Button type="submit" disabled={savingConfig || loadingCompany}>
               {savingConfig ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

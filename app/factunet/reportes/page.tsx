@@ -16,13 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useReportesEmpresa } from './gestionReportes/UseReportesEmpresa';
 import { useReportesSucursal } from './gestionReportes/UseReportesSucursal';
 import { Periodo, GraficoBarra } from './gestionReportes/Reportes';
-
-// ─── Usuarios estáticos (reemplazar por dinámicos cuando esté el endpoint) ────
-const USUARIOS_ESTATICOS = [
-  { id: 1, nombre: 'Carlos Mendoza' },
-  { id: 2, nombre: 'Ana Torres' },
-  { id: 3, nombre: 'Luis García' },
-];
+import { useUsuariosReporte } from './gestionReportes/UseUsuariosReporte';
 
 // ─── Colores donut ────────────────────────────────────────────────────────────
 const DOC_COLORS = {
@@ -89,6 +83,14 @@ export default function ReportesPage() {
   const [usuarioId, setUsuarioId]       = useState<number | null>(null);
   const [loadingPdf, setLoadingPdf]     = useState(false);
   const [paginaGrafico, setPaginaGrafico] = useState(0);
+
+  // Usuarios
+  const { usuarios, fetchUsuarios } = useUsuariosReporte();
+
+  useEffect(() => {
+    if (puedeVerUsuarios) fetchUsuarios()
+    doFetch('hoy')
+  }, [user])
 
   // ── Fetch al cambiar período / usuario ──────────────────────────────────────
   const doFetch = (p: DateRange, uId: number | null = usuarioId) => {
@@ -262,21 +264,22 @@ export default function ReportesPage() {
 
             {/* Select de usuario — solo admin/superadmin */}
             {puedeVerUsuarios && (
-              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
-                <Users size={14} className="text-gray-400 shrink-0" />
-                <select
-                  value={usuarioId ?? ''}
-                  onChange={e => handleUsuario(e.target.value ? Number(e.target.value) : null)}
-                  className="text-xs text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
-                >
-                  <option value="">Todos los usuarios</option>
-                  {/* TODO: reemplazar USUARIOS_ESTATICOS por lista dinámica */}
-                  {USUARIOS_ESTATICOS.map(u => (
-                    <option key={u.id} value={u.id}>{u.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
+              <Users size={14} className="text-gray-400 shrink-0" />
+              <select
+                value={usuarioId ?? ''}
+                onChange={e => handleUsuario(e.target.value ? Number(e.target.value) : null)}
+                className="text-xs text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
+              >
+                <option value="">Todos los usuarios</option>
+                {usuarios.map(u => (
+                  <option key={u.usuarioID} value={u.usuarioID}>
+                    {u.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           </div>
 
           {/* Personalizar fechas */}
