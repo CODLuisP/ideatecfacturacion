@@ -175,6 +175,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         // no cargar cliente inválido para factura
       } else {
         setClienteSeleccionado(data.cliente);
+        if (data.cliente.tipoDocumento) setTipoDoc(data.cliente.tipoDocumento);
         if (data.cliente.numeroDocumento) setBusqueda(data.cliente.numeroDocumento);
       }
     }
@@ -206,7 +207,13 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   }, [errorCli]);
 
   // Clientes varios — limpia contacto, no muestra dirección
+  const isFirstRenderClienteVarios = useRef(true);
   useEffect(() => {
+    if (isFirstRenderClienteVarios.current) {
+      isFirstRenderClienteVarios.current = false;
+      if (!clienteVarios) return;
+    }
+
     if (clienteVarios) {
       setTipoDoc('00');
       setClienteSeleccionado({
@@ -224,7 +231,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     } else {
       setClienteSeleccionado(null);
       setBusqueda('');
-      setTipoDoc('01');
+      setTipoDoc(tipo === 'factura' ? '06' : '01');
     }
   }, [clienteVarios]);
 

@@ -74,14 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
           <main className="flex-1 px-6  overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="mx-auto">
-              <div className="mb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
-                {activeView === 'dashboard' && (
-                  <div className="flex gap-2 py-2">
-                    <Button variant="outline" onClick={handleExport}><Download className="w-4 h-4" /> Exportar Reporte</Button>
-                    <Button onClick={() => router.push('/factunet/operaciones')}><Plus className="w-4 h-4" /> Nuevo Comprobante</Button>
-                  </div>
-                )}
-              </div>
+          
               {children}
             </div>
           </main>
