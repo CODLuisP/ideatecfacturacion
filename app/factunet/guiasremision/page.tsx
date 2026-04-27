@@ -25,6 +25,7 @@ import { BtnEnvio } from "@/app/components/ui/BtnEnvio";
 import { ModalDetalleGuia } from "./ModalDetalleGuia";
 import { ModalEnvioGuia, GuiaEnvioData } from "./ModalEnvioGuia";
 import axios from "axios";
+import { createPortal } from "react-dom";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 type TipoGuia = "remitente" | "transportista";
@@ -83,6 +84,7 @@ export default function GuiasRemisionPage() {
   // ── Datos y loading ──
   const [guias, setGuias] = useState<GuiaDto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingGuiaId, setLoadingGuiaId] = useState<number | null>(null);
 
   // ── Filtros locales ──
   const [search, setSearch] = useState("");
@@ -136,7 +138,27 @@ export default function GuiasRemisionPage() {
     if (!accessToken) return;
 
     if (modoAvanzado === "fechas") {
-      await cargarGuias(tipoGuia);
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          empresaRuc: rucEmpresa,
+          tipoDoc: TIPO_DOC[tipoGuia],
+          ...(!isSuperAdmin && sucursalId
+            ? { sucursalId: String(sucursalId) }
+            : {}),
+          ...(avFechaDesde ? { fechaDesde: avFechaDesde } : {}),
+          ...(avFechaHasta ? { fechaHasta: avFechaHasta } : {}),
+        });
+        const { data } = await axios.get<GuiaDto[]>(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/guias/por-fechas?${params}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        setGuias(data);
+      } catch {
+        showToast("Error al buscar las guías", "error");
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -164,6 +186,41 @@ export default function GuiasRemisionPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const enviarSunat = async (guiaId: number) => {
+    setLoadingGuiaId(guiaId);
+    try {
+      const { data } = await axios.post<GuiaDto>(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${guiaId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      setGuias((prev) =>
+        prev.map((g) =>
+          g.guiaId === guiaId
+            ? {
+                ...g,
+                estadoSunat: data.estadoSunat,
+                codigoRespuestaSunat: data.codigoRespuestaSunat,
+                mensajeRespuestaSunat: data.mensajeRespuestaSunat,
+              }
+            : g,
+        ),
+      );
+      if (data.estadoSunat === "ACEPTADO") {
+        showToast("Guía aceptada por SUNAT", "success");
+      } else {
+        showToast(
+          `SUNAT: ${data.mensajeRespuestaSunat ?? data.estadoSunat}`,
+          "error",
+        );
+      }
+    } catch {
+      showToast("Error al enviar a SUNAT", "error");
+    } finally {
+      setLoadingGuiaId(null);
     }
   };
 
@@ -480,30 +537,25 @@ export default function GuiasRemisionPage() {
       </div>
 
       {/* ── Tabla ── */}
-      <style>{`
-                .guia-table tbody {
-                    display: block;
-                    overflow-y: auto;
-                    max-height: calc(100vh - 330px);
-                    scrollbar-width: thin;
-                    scrollbar-color: #CBD5E1 transparent;
-                }
-                .guia-table-avanzado tbody {
-                    max-height: calc(100vh - 420px);
-                }
-                .guia-table thead tr,
-                .guia-table tbody tr {
-                    display: table;
-                    width: 100%;
-                    table-layout: fixed;
-                }
-                .guia-table thead {
-                    width: 100%;
-                }
-            `}</style>
+      <style>
+        {` .guia-table-wrapper {
+            overflow-y: auto;
+            max-height: calc(100vh - 330px);
+            scrollbar-width: thin;
+            scrollbar-color: #CBD5E1 transparent;
+          }
+          .guia-table-wrapper-avanzado {
+            max-height: calc(100vh - 420px);
+          }`}
+      </style>
 
       <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div
+          className={cn(
+            "guia-table-wrapper",
+            showAvanzado && "guia-table-wrapper-avanzado",
+          )}
+        >
           {tipoGuia === "remitente" ? (
             <TablaRemitente
               guias={filtered}
@@ -511,6 +563,13 @@ export default function GuiasRemisionPage() {
               showAvanzado={showAvanzado}
               onVerDetalle={setGuiaIdDetalle}
               onEnvio={(g, tipo) => setModalEnvio({ guia: g, tipo })}
+              onEnviarSunat={enviarSunat}
+              loadingGuiaId={loadingGuiaId}
+              onEditar={(guiaId) =>
+                router.push(
+                  `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
+                )
+              }
             />
           ) : (
             <TablaTransportista
@@ -519,6 +578,13 @@ export default function GuiasRemisionPage() {
               showAvanzado={showAvanzado}
               onVerDetalle={setGuiaIdDetalle}
               onEnvio={(g, tipo) => setModalEnvio({ guia: g, tipo })}
+              onEnviarSunat={enviarSunat}
+              loadingGuiaId={loadingGuiaId}
+              onEditar={(guiaId) =>
+                router.push(
+                  `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
+                )
+              }
             />
           )}
         </div>
@@ -546,53 +612,54 @@ function TablaRemitente({
   showAvanzado,
   onVerDetalle,
   onEnvio,
+  onEnviarSunat,
+  loadingGuiaId,
+  onEditar,
 }: {
   guias: GuiaDto[];
   loading: boolean;
   showAvanzado: boolean;
   onVerDetalle: (id: number) => void;
   onEnvio: (guia: GuiaDto, tipo: "email" | "whatsapp") => void;
+  onEnviarSunat: (guiaId: number) => void;
+  loadingGuiaId: number | null;
+  onEditar: (guiaId: number) => void;
 }) {
   return (
-    <table
-      className={cn(
-        "w-full text-left border-collapse guia-table",
-        showAvanzado && "guia-table-avanzado",
-      )}
-    >
+    <table className={cn("w-full text-left border-collapse", showAvanzado)}>
       <thead>
         <tr className="bg-gray-100">
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             FECHA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             N° GUÍA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             DESTINATARIO
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PUNTO PARTIDA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PUNTO LLEGADA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             TRANSPORTISTA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             CORREO
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             WHATSAPP
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-28">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             SUNAT
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             VER
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             OPCIONES
           </th>
         </tr>
@@ -622,13 +689,13 @@ function TablaRemitente({
               key={g.guiaId}
               className="hover:bg-gray-50/50 transition-colors"
             >
-              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap w-28">
+              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
                 {fmtFecha(g.fechaEmision)}
               </td>
-              <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap w-44">
+              <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
                 {g.numeroCompleto}
               </td>
-              <td className="px-5 py-4 w-48">
+              <td className="px-5 py-4">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">
                     {g.destinatarioNumDoc}
@@ -638,7 +705,7 @@ function TablaRemitente({
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-4 w-44">
+              <td className="px-5 py-4">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -646,7 +713,7 @@ function TablaRemitente({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 w-44">
+              <td className="px-5 py-4">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-blue-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -654,7 +721,7 @@ function TablaRemitente({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 w-40">
+              <td className="px-5 py-4">
                 <span className="text-xs text-gray-600 flex items-center gap-1">
                   <Truck size={12} className="text-gray-400 shrink-0" />
                   <span className="truncate max-w-36">
@@ -662,7 +729,7 @@ function TablaRemitente({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 text-center w-21">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
@@ -671,7 +738,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center w-24">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="whatsapp"
@@ -680,12 +747,19 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center w-28">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
-                  <BadgeSunat estado={g.estadoSunat} />
+                  {loadingGuiaId === g.guiaId ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
+                      <RefreshCw size={11} className="animate-spin" />{" "}
+                      Enviando...
+                    </span>
+                  ) : (
+                    <BadgeSunat estado={g.estadoSunat} />
+                  )}
                 </div>
               </td>
-              <td className="px-5 py-4 text-center w-16">
+              <td className="px-5 py-4 text-center">
                 <button
                   onClick={() => onVerDetalle(g.guiaId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -693,9 +767,13 @@ function TablaRemitente({
                   <Eye size={13} /> Ver
                 </button>
               </td>
-              <td className="px-5 py-4 text-center w-16">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
-                  <DropdownOpcionesGuia estado={g.estadoSunat} />
+                  <DropdownOpcionesGuia
+                    estado={g.estadoSunat}
+                    onEnviarSunat={() => onEnviarSunat(g.guiaId)}
+                    onEditar={() => onEditar(g.guiaId)}
+                  />
                 </div>
               </td>
             </tr>
@@ -713,53 +791,54 @@ function TablaTransportista({
   showAvanzado,
   onVerDetalle,
   onEnvio,
+  onEnviarSunat,
+  loadingGuiaId,
+  onEditar,
 }: {
   guias: GuiaDto[];
   loading: boolean;
   showAvanzado: boolean;
   onVerDetalle: (id: number) => void;
   onEnvio: (guia: GuiaDto, tipo: "email" | "whatsapp") => void;
+  onEnviarSunat: (guiaId: number) => void;
+  loadingGuiaId: number | null;
+  onEditar: (guiaId: number) => void;
 }) {
   return (
-    <table
-      className={cn(
-        "w-full text-left border-collapse guia-table",
-        showAvanzado && "guia-table-avanzado",
-      )}
-    >
+    <table className={cn("w-full text-left border-collapse", showAvanzado)}>
       <thead>
         <tr className="bg-gray-100">
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             FECHA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             N° GUÍA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             DESTINATARIO
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PUNTO PARTIDA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PUNTO LLEGADA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PLACA
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             CORREO
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             WHATSAPP
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-28">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             SUNAT
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             VER
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             OPCIONES
           </th>
         </tr>
@@ -789,13 +868,13 @@ function TablaTransportista({
               key={g.guiaId}
               className="hover:bg-gray-50/50 transition-colors"
             >
-              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap w-28">
+              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
                 {fmtFecha(g.fechaEmision)}
               </td>
-              <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap w-44">
+              <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
                 {g.numeroCompleto}
               </td>
-              <td className="px-5 py-4 w-48">
+              <td className="px-5 py-4">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">
                     {g.destinatarioNumDoc}
@@ -805,7 +884,7 @@ function TablaTransportista({
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-4 w-44">
+              <td className="px-5 py-4">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -813,7 +892,7 @@ function TablaTransportista({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 w-44">
+              <td className="px-5 py-4">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-blue-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -821,13 +900,13 @@ function TablaTransportista({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 w-28">
+              <td className="px-5 py-4">
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-mono font-semibold text-gray-700">
                   <Truck size={11} className="text-gray-500" />
                   {g.transportistaPlaca ?? "—"}
                 </span>
               </td>
-              <td className="px-5 py-4 text-center w-21">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
@@ -836,7 +915,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center w-24">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="whatsapp"
@@ -845,12 +924,19 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center w-28">
+              <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
-                  <BadgeSunat estado={g.estadoSunat} />
+                  {loadingGuiaId === g.guiaId ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
+                      <RefreshCw size={11} className="animate-spin" />{" "}
+                      Enviando...
+                    </span>
+                  ) : (
+                    <BadgeSunat estado={g.estadoSunat} />
+                  )}
                 </div>
               </td>
-              <td className="px-5 py-4 text-center w-16">
+              <td className="px-5 py-4 text-center">
                 <button
                   onClick={() => onVerDetalle(g.guiaId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -858,9 +944,13 @@ function TablaTransportista({
                   <Eye size={13} /> Ver
                 </button>
               </td>
-              <td className="px-5 py-4 text-center w-16">
+              <td className="px-5 py-4 text-center ">
                 <div className="flex justify-center">
-                  <DropdownOpcionesGuia estado={g.estadoSunat} />
+                  <DropdownOpcionesGuia
+                    estado={g.estadoSunat}
+                    onEnviarSunat={() => onEnviarSunat(g.guiaId)}
+                    onEditar={() => onEditar(g.guiaId)}
+                  />
                 </div>
               </td>
             </tr>
@@ -995,66 +1085,106 @@ const DropdownFiltro = ({
 };
 
 // ─── DropdownOpciones Guía ────────────────────────────────────────────────────
-const DropdownOpcionesGuia = ({ estado }: { estado: string }) => {
+const DropdownOpcionesGuia = ({
+  estado,
+  onEnviarSunat,
+  onEditar,
+}: {
+  estado: string;
+  onEnviarSunat: () => void;
+  onEditar: () => void;
+}) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
   const esAceptado = estado === "ACEPTADO";
   const esPendiente = estado === "PENDIENTE";
   const esRechazado = estado === "RECHAZADO";
 
   useEffect(() => {
+    if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
+      if (btnRef.current && btnRef.current.contains(e.target as Node)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [open]);
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + window.scrollY + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen((o) => !o);
+  };
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        ref={btnRef}
+        onClick={handleOpen}
         className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500"
       >
         <MoreHorizontal size={16} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-48">
-          {esPendiente && (
-            <button
-              onClick={() => setOpen(false)}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50"
-            >
-              <RefreshCw size={14} className="text-blue-500" />
-              Enviar a SUNAT
-            </button>
-          )}
-
-          {esRechazado && (
-            <button
-              onClick={() => setOpen(false)}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50"
-            >
-              <RefreshCw size={14} className="text-amber-500" />
-              Editar y reenviar
-            </button>
-          )}
-
-          {esAceptado && (
-            <>
-              <div className="border-t border-gray-100" />
+      {open &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: pos.top,
+              right: pos.right,
+              zIndex: 9999,
+            }}
+            className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-48"
+          >
+            {esPendiente && (
               <button
-                onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-red-600 hover:bg-red-50"
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  onEnviarSunat();
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50"
               >
-                <Ban size={14} className="text-red-500" />
-                Anular
+                <RefreshCw size={14} className="text-blue-500" /> Enviar a SUNAT
               </button>
-            </>
-          )}
-        </div>
-      )}
+            )}
+            {esRechazado && (
+              <button
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  onEditar();
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50"
+              >
+                <RefreshCw size={14} className="text-amber-500" /> Editar y
+                reenviar
+              </button>
+            )}
+            {esAceptado && (
+              <>
+                <div className="border-t border-gray-100" />
+                <button
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-red-600 hover:bg-red-50"
+                >
+                  <Ban size={14} className="text-red-500" /> Anular
+                </button>
+              </>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

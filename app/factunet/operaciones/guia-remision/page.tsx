@@ -31,6 +31,7 @@ import ModalDocumentoRelacionado, {
   DetalleComprobante,
 } from "@/app/components/guia/ModalDocumentoRelacionado";
 import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
+import { useSearchParams } from "next/navigation";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,9 @@ export default function GuiaRemisionPage() {
   const [envioExitoso, setEnvioExitoso] = useState(false);
   const [enviarWhatsapp, setEnviarWhatsapp] = useState(false);
   const [enviarCorreo, setEnviarCorreo] = useState(false);
+  const searchParams = useSearchParams();
+  const editarGuiaId = searchParams.get("editarGuiaId");
+  const [placaM1L, setPlacaM1L] = useState("");
 
   const isSuperAdmin = user?.rol === "superadmin";
 
@@ -232,7 +236,179 @@ export default function GuiaRemisionPage() {
     setLoadingSucursal(true);
     setSucursal(null);
     setRefreshSucursal((prev) => prev + 1);
+    setPlacaM1L("");
   };
+
+  useEffect(() => {
+    if (!editarGuiaId || !accessToken) return;
+    const cargarParaEditar = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/guias/detalle/${editarGuiaId}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (!res.ok) return;
+        const g = await res.json();
+
+        // Tipo de guía
+        setTipoGuia(g.tipoDoc === "09" ? "remitente" : "transportista");
+
+        // Motivo y modalidad
+        setMotivoCodigo(g.codTraslado ?? "01");
+        setModalidad(g.modTraslado === "02" ? "02" : "01");
+
+        // Puntos
+        if (g.partidaDireccion)
+          setPuntoPartida({
+            ubigeo: g.partidaUbigeo ?? "",
+            direccionLineal: g.partidaDireccion,
+            departamento: g.partidaDepartamento ?? "",
+            provincia: g.partidaProvincia ?? "",
+            distrito: g.partidaDistrito ?? "",
+            resumen: g.partidaDireccion,
+            tipo: "otra",
+            tipoDireccion: "OTRA DIRECCIÓN",
+          });
+
+        if (g.llegadaDireccion)
+          setPuntoLlegada({
+            ubigeo: g.llegadaUbigeo ?? "",
+            direccionLineal: g.llegadaDireccion,
+            departamento: g.llegadaDepartamento ?? "",
+            provincia: g.llegadaProvincia ?? "",
+            distrito: g.llegadaDistrito ?? "",
+            resumen: g.llegadaDireccion,
+            tipo: "otra",
+            tipoDireccion: "OTRA DIRECCIÓN",
+          });
+
+        // Destinatario
+        if (g.destinatarioNumDoc)
+          setDestinatarioSeleccionado({
+            clienteId: 0,
+            razonSocialNombre: g.destinatarioRznSocial ?? "",
+            numeroDocumento: g.destinatarioNumDoc,
+            tipoDocumento: {
+              tipoDocumentoId: g.destinatarioTipoDoc === "6" ? "06" : "01",
+              tipoDocumentoNombre:
+                g.destinatarioTipoDoc === "6" ? "RUC" : "DNI",
+            },
+            direccion: [],
+          });
+
+        // Observaciones
+        setObservaciones(g.observacion ?? "");
+
+        // Transportista público
+        if (g.modTraslado === "01" && g.transportistaNumDoc) {
+          setTransportistaPublico({
+            ruc: g.transportistaNumDoc,
+            razonSocial: g.transportistaRznSocial ?? "",
+            registroMTC: g.transportistaRegistroMTC ?? "",
+            entidadAutorizacion: g.autorizacionVehiculoEntidad ?? "",
+            numeroAutorizacion: g.autorizacionVehiculoNumero ?? "",
+          });
+        }
+
+        // Vehículos
+        const placas = [
+          g.transportistaPlaca,
+          g.placaSecundaria1,
+          g.placaSecundaria2,
+          g.placaSecundaria3,
+        ].filter(Boolean) as string[];
+        if (placas.length > 0) {
+          setVehiculos(
+            placas.map((p) => ({
+              placa: p,
+              entidadAutorizacion: "",
+              numeroAutorizacion: "",
+            })),
+          );
+        }
+
+        // Conductor principal
+        if (g.choferDoc) {
+          setConductores([
+            {
+              tipoDocumento: g.choferTipoDoc ?? "1",
+              numeroDocumento: g.choferDoc,
+              nombres: g.choferNombres ?? "",
+              apellidos: g.choferApellidos ?? "",
+              licencia: g.choferLicencia ?? "",
+            },
+            ...(g.choferSecundarioDoc
+              ? [
+                  {
+                    tipoDocumento: g.choferSecundarioTipoDoc ?? "1",
+                    numeroDocumento: g.choferSecundarioDoc,
+                    nombres: g.choferSecundarioNombres ?? "",
+                    apellidos: g.choferSecundarioApellidos ?? "",
+                    licencia: g.choferSecundarioLicencia ?? "",
+                  },
+                ]
+              : []),
+            ...(g.choferSecundario2Doc
+              ? [
+                  {
+                    tipoDocumento: g.choferSecundario2TipoDoc ?? "1",
+                    numeroDocumento: g.choferSecundario2Doc,
+                    nombres: g.choferSecundario2Nombres ?? "",
+                    apellidos: g.choferSecundario2Apellidos ?? "",
+                    licencia: g.choferSecundario2Licencia ?? "",
+                  },
+                ]
+              : []),
+          ]);
+        }
+
+        // M1/L
+        setVehiculoM1L(g.indVehiculoM1L ?? false);
+
+        setVehiculoM1L(g.indVehiculoM1L ?? false);
+        if (g.indVehiculoM1L && g.transportistaPlaca) {
+          setPlacaM1L(g.transportistaPlaca);
+        }
+
+        // Transbordo
+        setTransbordo(g.indTransbordo ?? false);
+
+        // Documentos relacionados
+        if (g.relDocNroDoc) {
+          setDocumentosRelacionados([
+            {
+              tipoDocumento: g.relDocTipoDoc ?? "01",
+              tipoDocumentoLabel:
+                g.relDocTipoDoc === "01"
+                  ? "Factura"
+                  : g.relDocTipoDoc === "03"
+                    ? "Boleta de Venta"
+                    : (g.relDocTipoDoc ?? ""),
+              numeroCompleto: g.relDocNroDoc,
+              numero: g.relDocNroDoc, // ← faltaba
+              detalles: [],
+            },
+          ]);
+        }
+        // Bienes
+        if (g.details?.length > 0) {
+          setBienes(
+            g.details.map((d: any) => ({
+              productoId: d.detalleId,
+              codigo: d.codigo ?? "",
+              descripcion: d.descripcion,
+              cantidad: d.cantidad,
+              unidadMedida: d.unidad,
+              pesoKg: 0,
+            })),
+          );
+        }
+      } catch (err) {
+        console.error("Error cargando guía para editar:", err);
+      }
+    };
+    cargarParaEditar();
+  }, [editarGuiaId, accessToken]);
 
   // ── API 1: Cargar sucursal(es) ─────────────────────────────────────────────
   useEffect(() => {
@@ -641,13 +817,7 @@ export default function GuiaRemisionPage() {
       }
 
       // ── Placa M1/L ─────────────────────────────────────────────────────
-      const placaM1L = vehiculoM1L
-        ? ((
-            document.querySelector(
-              'input[placeholder="Ej. ABC-123"]',
-            ) as HTMLInputElement
-          )?.value ?? "")
-        : null;
+      const placaM1LFinal = vehiculoM1L ? placaM1L : null;
 
       // ── Payload ────────────────────────────────────────────────────────
       const payload = {
@@ -740,7 +910,7 @@ export default function GuiaRemisionPage() {
                 numDoc: "",
                 rznSocial: "",
                 indVehiculoM1L: vehiculoM1L,
-                placa: placaM1L?.replace(/-/g, "") ?? null,
+                placa: placaM1LFinal?.replace(/-/g, "") ?? null,
                 placaSecundaria1: null,
                 placaSecundaria2: null,
                 placaSecundaria3: null,
@@ -1372,6 +1542,8 @@ export default function GuiaRemisionPage() {
                   <input
                     type="text"
                     placeholder="Ej. ABC-123"
+                    value={placaM1L}
+                    onChange={(e) => setPlacaM1L(e.target.value.toUpperCase())}
                     className={inputClass}
                   />
                   <p className="text-xs text-gray-400 pl-1">
