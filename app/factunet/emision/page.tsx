@@ -37,7 +37,6 @@ interface ItemRapido {
   _esIcbper?: boolean;
 }
 
-const IGV_DEFAULT = 18;
 const ICBPER_FACTOR = 0.50;
 const PRECIOS_BOLSA = { pequeña: 0.10, mediana: 0.20, grande: 0.30 };
 const MEDIOS_PAGO = ['Efectivo', 'Tarjeta', 'Yape', 'Plin', 'Transferencia'];
@@ -62,6 +61,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const isSuperAdmin = user?.rol === 'superadmin';
+  const IGV_DEFAULT = user?.igv ?? 18;
   const { empresa } = useEmpresaEmisor();
 
   //estado para envio por resumen

@@ -506,7 +506,10 @@ export default function VerComprobantesPage() {
                             ) : paginated.map((doc) => (
                                 <tr key={doc.comprobanteId} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap w-32">{formatFecha(doc.fechaCreacion)}</td>
-                                    <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap w-52">{tipoLabel(doc.tipoComprobante)}: {doc.numeroCompleto}</td>
+                                    <td className="px-5 py-4 whitespace-nowrap w-52">
+                                        <p className="text-sm font-medium text-gray-900">{doc.numeroCompleto}</p>
+                                        <p className="text-xs text-gray-400">{tipoLabel(doc.tipoComprobante)}</p>
+                                    </td>
                                     <td className="px-5 py-4 w-50">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium text-gray-900">{doc.cliente.numeroDocumento}</span>

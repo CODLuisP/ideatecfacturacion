@@ -6,7 +6,8 @@ import {
   BarChart3, Zap, Settings, UserCircle, Download, Plus, FileBox,
   Building2,
   Grip,
-  Truck
+  Truck,
+  DollarSign
 } from 'lucide-react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Topbar } from '../components/layout/Topbar';
@@ -46,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'operaciones', label: 'Emisión', icon: Grip },
     { id: 'comprobantes', label: 'Comprobantes', icon: FileText },
     { id: 'guiasremision', label: 'Guias de Remision', icon: Truck },
+    { id: 'cuentasporcobrar', label: 'Cuentas por Cobrar', icon: DollarSign },
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },

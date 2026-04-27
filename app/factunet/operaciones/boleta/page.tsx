@@ -65,7 +65,6 @@ interface PagoLocal {
 
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
-const IGV_DEFAULT = 18;
 
 export default function BoletaPage() {
   const { showToast } = useToast();
@@ -77,6 +76,7 @@ export default function BoletaPage() {
 
   // ── isSuperAdmin ─────────────────────────────────────────────
   const isSuperAdmin = user?.rol === "superadmin";
+  const IGV_DEFAULT = user?.igv ?? 18;
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } =
@@ -1855,10 +1855,12 @@ export default function BoletaPage() {
                             <label className="text-xs text-gray-500">Monto</label>
                             <div className="flex gap-2">
                               <input type="number" value={pago.monto} placeholder={montoRestante(i)}
-                                disabled={pago.medioPago === "Efectivo" && pagos.length === 1}
+                                disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && boleta.tipoPago !== 'CreditoInicial'}
                                 onChange={e => { actualizarPago(i, "monto", e.target.value); setPagosEditados(prev => { const n = [...prev]; n[i] = e.target.value !== ""; return n; }); }}
                                 onBlur={e => { if (!e.target.value || e.target.value === "0") { setPagosEditados(prev => { const n = [...prev]; n[i] = false; return n; }); actualizarPago(i, "monto", ""); } }}
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
+                                className={`w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
+                                    ${pago.medioPago === 'Efectivo' && pagos.length === 1 && boleta.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                                />
                               {pagos.length > 1 && (
                                 <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-2">
                                   <Trash2 className="w-4 h-4" />

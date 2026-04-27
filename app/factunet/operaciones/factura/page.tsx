@@ -116,7 +116,6 @@ const MEDIOS_PAGO_DETRACCION = [
 
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
-const IGV_DEFAULT = 18;
 
 export default function FacturaPage() {
   const { showToast } = useToast();
@@ -125,6 +124,7 @@ export default function FacturaPage() {
 
   // ── 1. isSuperAdmin ──────────────────────────────────────────
   const isSuperAdmin = user?.rol === "superadmin";
+  const IGV_DEFAULT = user?.igv ?? 18;
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } =
