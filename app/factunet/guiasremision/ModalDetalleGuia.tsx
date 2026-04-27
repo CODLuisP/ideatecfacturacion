@@ -43,6 +43,12 @@ interface GuiaDto {
   destinatarioTipoDoc?: string;
   destinatarioNumDoc?: string;
   destinatarioRznSocial?: string;
+  observacion?: string;
+  relDocTipoDoc?: string;
+  relDocNroDoc?: string;
+  terceroTipoDoc?: string;
+  terceroNumDoc?: string;
+  terceroRznSocial?: string;
   codTraslado?: string;
   desTraslado?: string;
   modTraslado?: string;
