@@ -700,13 +700,17 @@ const actualizarStockDevolucion = async () => {
   return (
     <div className="space-y-2 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6  py-2">
 
           {/* Header */}
-          <div className="flex items-center gap-4 mb-2">
-            <Button variant="ghost" onClick={() => router.push("/factunet/operaciones")} className="h-10 w-10 p-0 rounded-full">
-              <ChevronLeft className="w-6 h-6" />
-            </Button>
+          <div className="flex items-center gap-4 ">
+                     <Button
+            variant="ghost"
+            onClick={() => router.push("/factunet/operaciones")}
+            className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Nueva Nota de Crédito</h3>
               <p className="text-sm text-gray-500">Regresar a selección de comprobante</p>

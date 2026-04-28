@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
@@ -13,6 +13,8 @@ export default function BoletaFacturaElectronicaPage() {
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
   const [complejidad, setComplejidad] = useState<"simple" | "compleja">("simple");
+
+
 
   useEffect(() => {
     return () => {
@@ -50,7 +52,11 @@ export default function BoletaFacturaElectronicaPage() {
             <select
               id="complejidad-comprobante"
               value={complejidad}
-              onChange={(e) => setComplejidad(e.target.value as "simple" | "compleja")}
+              onChange={(e) => {
+                const data = sharedVentaStore.get();
+                sharedVentaStore.save(null, data.items, data.extra);
+                setComplejidad(e.target.value as "simple" | "compleja");
+              }}
               className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
             >
               <option value="simple">Emisión Simple</option>
@@ -65,7 +71,11 @@ export default function BoletaFacturaElectronicaPage() {
             <select
               id="tipo-comprobante"
               value={tipo}
-              onChange={(e) => setTipo(e.target.value as "boleta" | "factura")}
+              onChange={(e) => {
+                const data = sharedVentaStore.get();
+                sharedVentaStore.save(null, data.items, data.extra);
+                setTipo(e.target.value as "boleta" | "factura");
+              }}
               className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
             >
               <option value="boleta">Boleta de Venta</option>

@@ -117,7 +117,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
 
-  // Al cambiar tipo → resetear cliente condicionalmente
+  const isFirstRenderTipo = useRef(true);
   useEffect(() => {
     setTipoDoc(tipo === 'factura' ? '06' : '01');
     if (isSuperAdmin) {
@@ -126,15 +126,17 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
     setClienteVarios(false);
     
-    // Solo resetear si pasamos a factura y el cliente no es RUC/CE
-    if (tipo === 'factura' && clienteSeleccionado?.tipoDocumento !== '06' && clienteSeleccionado?.tipoDocumento !== '04') {
-      setBusqueda('');
-      setClienteSeleccionado(null);
-      setCorreoCliente('');
-      setTelefonoCliente('');
-      setEnviarCorreo(false);
-      setEnviarWhatsapp(false);
+    if (isFirstRenderTipo.current) {
+      isFirstRenderTipo.current = false;
+      return;
     }
+
+    setBusqueda('');
+    setClienteSeleccionado(null);
+    setCorreoCliente('');
+    setTelefonoCliente('');
+    setEnviarCorreo(false);
+    setEnviarWhatsapp(false);
   }, [tipo]);
 
   // Cargar estado inicial desde sharedVentaStore
@@ -175,6 +177,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         // no cargar cliente inválido para factura
       } else {
         setClienteSeleccionado(data.cliente);
+        if (data.cliente.tipoDocumento) setTipoDoc(data.cliente.tipoDocumento);
         if (data.cliente.numeroDocumento) setBusqueda(data.cliente.numeroDocumento);
       }
     }
@@ -206,7 +209,13 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   }, [errorCli]);
 
   // Clientes varios — limpia contacto, no muestra dirección
+  const isFirstRenderClienteVarios = useRef(true);
   useEffect(() => {
+    if (isFirstRenderClienteVarios.current) {
+      isFirstRenderClienteVarios.current = false;
+      if (!clienteVarios) return;
+    }
+
     if (clienteVarios) {
       setTipoDoc('00');
       setClienteSeleccionado({
@@ -224,7 +233,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     } else {
       setClienteSeleccionado(null);
       setBusqueda('');
-      setTipoDoc('01');
+      setTipoDoc(tipo === 'factura' ? '06' : '01');
     }
   }, [clienteVarios]);
 
