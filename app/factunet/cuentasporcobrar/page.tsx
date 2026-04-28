@@ -220,7 +220,7 @@ export default function CuentasPorCobrarPage() {
                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32 text-right">Importe</th>
                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32 text-right">Crédito</th>
                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-20 text-center">Moneda</th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28 text-center">Ver</th>
+                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40 text-center">Ver</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -253,10 +253,10 @@ export default function CuentasPorCobrarPage() {
                   <td className="px-5 py-4 text-center w-20">
                     <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">{c.tipoMoneda}</span>
                   </td>
-                  <td className="px-5 py-4 text-center w-28">
+                  <td className="px-5 py-4 text-center w-36">
                     <button
                       onClick={() => verCuotas(c)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
                     >
                       <Eye size={13} /> Ver cuotas
                     </button>

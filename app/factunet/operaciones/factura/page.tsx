@@ -1,5 +1,5 @@
 "use client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Printer,
@@ -43,6 +43,7 @@ import { useSucursalRuc } from "../boleta/gestionBoletas/useSucursalRuc";
 import { DatePickerLimitado } from "@/app/components/ui/DatePickerLimitado";
 import { ModalGuardarCliente } from "./gestionFacturas/ModalGuardarCliente";
 import { sharedVentaStore } from "../sharedVentaStore";
+import { useComprobanteUnicoId } from "../../comprobantes/gestionComprobantes/UseComprobanteUnicoId";
 
 // ── Tipos afectación gratuita ────────────────────────────────
 const TIPOS_GRATUITOS = ["11", "21", "31"];
@@ -125,6 +126,11 @@ export default function FacturaPage() {
   // ── 1. isSuperAdmin ──────────────────────────────────────────
   const isSuperAdmin = user?.rol === "superadmin";
   const IGV_DEFAULT = user?.igv ?? 18;
+
+  //Editar y reenviar
+  const searchParams = useSearchParams();
+  const { comprobante, fetchComprobante: fetchComprobanteById } = useComprobanteUnicoId();
+  const cargandoComprobante = !!searchParams.get('comprobanteId') && !comprobante;
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } =
@@ -257,9 +263,145 @@ export default function FacturaPage() {
   ]);
   const [pagosEditados, setPagosEditados] = useState<boolean[]>([false]);
   const pagosEditadosRef = useRef<boolean[]>([false]);
+
   useEffect(() => {
     pagosEditadosRef.current = pagosEditados;
   }, [pagosEditados]);
+
+  // Llemar api para obtener comprobante rechazado y editar
+  useEffect(() => {
+    const comprobanteId = searchParams.get('comprobanteId');
+    const serie = searchParams.get('serie');
+    const correlativo = searchParams.get('correlativo');
+    const ruc = searchParams.get('ruc');
+    const establecimiento = searchParams.get('establecimiento');
+    if (!comprobanteId) return;
+    fetchComprobanteById(Number(comprobanteId));
+      // Si es superadmin y viene establecimiento, buscar y setear la sucursal
+    if (isSuperAdmin && establecimiento && sucursales.length > 0) {
+      const sucursalEncontrada = sucursales.find(
+        (s: Sucursal) => s.codEstablecimiento === establecimiento
+      );
+      if (sucursalEncontrada) {
+        setSucursal(sucursalEncontrada);
+      }
+    }
+}, [sucursales]);
+
+  useEffect(() => {
+    if (!comprobante) return;
+    // Cliente
+    setFactura(prev => ({
+      ...prev,
+      tipoMoneda: comprobante.tipoMoneda ?? 'PEN',
+      tipoPago: comprobante.tipoPago ?? 'Contado',
+      tipoOperacion: comprobante.tipoOperacion ?? '0101',
+      fechaVencimiento: comprobante.fechaVencimiento?.slice(0, 10) ?? fecha,
+      cliente: comprobante.cliente ? {
+        clienteId: comprobante.cliente.clienteId ?? null,
+        tipoDocumento: comprobante.cliente.tipoDocumento,
+        numeroDocumento: comprobante.cliente.numeroDocumento,
+        razonSocial: comprobante.cliente.razonSocial,
+        ubigeo: comprobante.cliente.ubigeo ?? '',
+        direccionLineal: comprobante.cliente.direccionLineal ?? '',
+        departamento: comprobante.cliente.departamento ?? '',
+        provincia: comprobante.cliente.provincia ?? '',
+        distrito: comprobante.cliente.distrito ?? '',
+      } : undefined,
+    }));
+
+    // Búsqueda cliente
+    setBusqueda(comprobante.cliente?.numeroDocumento ?? '');
+    setTipoDoc(comprobante.cliente?.tipoDocumento === '6' ? '06' : (comprobante.cliente?.tipoDocumento ?? '06'));
+    setCorreoCliente(comprobante.cliente?.correo ?? '');
+    setTelefonoCliente(comprobante.cliente?.whatsApp ?? '');
+
+    // Detalles
+    if (comprobante.details && comprobante.details.length > 0) {
+      const nuevosDetalles: DetalleLocal[] = comprobante.details.map((d, idx) => ({
+        item: idx + 1,
+        productoId: d.productoId ?? null,
+        codigo: d.codigo ?? null,
+        descripcion: d.descripcion,
+        cantidad: d.cantidad,
+        unidadMedida: d.unidadMedida,
+        precioUnitario: d.precioUnitario,
+        tipoAfectacionIGV: d.tipoAfectacionIGV,
+        porcentajeIGV: d.porcentajeIGV,
+        montoIGV: d.montoIGV,
+        baseIgv: d.baseIgv,
+        codigoTipoDescuento: d.codigoTipoDescuento ?? '00',
+        descuentoUnitario: d.descuentoUnitario ?? 0,
+        descuentoTotal: d.descuentoTotal ?? 0,
+        valorVenta: d.valorVenta,
+        precioVenta: d.precioVenta,
+        totalVentaItem: d.totalVentaItem,
+        icbper: d.icbper ?? 0,
+        factorIcbper: d.factorIcbper ?? 0,
+        _precioBase: d.precioUnitario,
+        _precioBaseOriginal: d.precioUnitario,
+        _precioVentaConIGV: d.precioVenta,
+        _incluirIGV: false,
+      }));
+      setDetalles(nuevosDetalles);
+      setBusquedaProducto(nuevosDetalles.map(d => d.descripcion ?? ''));
+      setShowDropdownProducto(nuevosDetalles.map(() => false));
+      inputRefs.current = nuevosDetalles.map(() => null);
+    }
+
+    // Pagos
+    if (comprobante.pagos && comprobante.pagos.length > 0) {
+      setPagos(comprobante.pagos.map(p => ({
+        medioPago: p.medioPago,
+        monto: String(p.monto),
+        numeroOperacion: p.numeroOperacion ?? '',
+        entidadFinanciera: p.entidadFinanciera ?? '',
+        observaciones: p.observaciones ?? '',
+      })));
+    }
+
+    // Cuotas
+    if (comprobante.cuotas && comprobante.cuotas.length > 0) {
+      setNumeroCuotas(comprobante.cuotas.length);
+      setCuotas(comprobante.cuotas.map(c => ({
+        numeroCuota: c.numeroCuota,
+        monto: String(c.monto),
+        fechaVencimiento: c.fechaVencimiento?.slice(0, 10) ?? '',
+      })));
+    }
+
+    // Guías
+    if (comprobante.guias && comprobante.guias.length > 0) {
+      setGuias(comprobante.guias.map(g => {
+        const partes = g.guiaNumeroCompleto?.split('-') ?? [];
+        return {
+          serie: partes[0] ?? '',
+          numero: partes[1] ?? '',
+          tipoDoc: g.guiaTipoDoc ?? '09',
+        };
+      }));
+    }
+
+    // Detracción
+    if (comprobante.detracciones && comprobante.detracciones.length > 0) {
+      const det = comprobante.detracciones[0];
+      setAplicarDetraccion(true);
+      setShowDetraccion(true);
+      setDetraccion({
+        codigoBienDetraccion: det.codigoBienDetraccion,
+        codigoMedioPago: det.codigoMedioPago,
+        cuentaBancoDetraccion: det.cuentaBancoDetraccion,
+        porcentajeDetraccion: det.porcentajeDetraccion,
+        montoDetraccion: det.montoDetraccion,
+        observacion: det.observacion ?? '',
+      });
+    }
+
+    // Descuento global
+    setDescuentoGlobal(comprobante.descuentoGlobal ?? 0);
+    setCodigoTipoDescGlobal(comprobante.codigoTipoDescGlobal ?? '02');
+
+  }, [comprobante]);
 
   const mediosUsados = pagos.map((p) => p.medioPago);
   const todosMedios = ["Efectivo", "Tarjeta", "Yape", "Plin", "Transferencia"];
@@ -1892,7 +2034,14 @@ export default function FacturaPage() {
             title="Datos del Comprobante"
             subtitle="Completa la información requerida"
           >
-            <form className="space-y-6">
+            {cargandoComprobante && (
+              <div className="flex items-center pb-3 gap-2 text-xs text-brand-blue">
+                <div className="w-4 h-4 shrink-0 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+                <span>Cargando datos del comprobante...</span>
+              </div>
+            )}
+
+            <form className="space-y-3">
               {/* ── 2. Serie y correlativo ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {isSuperAdmin ? (

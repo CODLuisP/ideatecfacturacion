@@ -190,6 +190,25 @@ export default function VerComprobantesPage() {
             showToast('Error al enviar a SUNAT', 'error')
         }
     }
+    
+    const editarenviarSunat = (c: ComprobanteListado) => {
+    switch (c.tipoComprobante) {
+        case '01':
+        router.push(`/factunet/operaciones/factura?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        break;
+        case '03':
+        router.push(`/factunet/operaciones/boleta?comprobanteId=${c.comprobanteId}`);
+        break;
+        case '07':
+        router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        break;
+        case '08':
+        router.push(`/factunet/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        break;
+        default:
+        break;
+    }
+    };
 
     const generarNotaCredito = (c: ComprobanteListado) => {
         router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`)
@@ -266,26 +285,7 @@ export default function VerComprobantesPage() {
 
             <div className="sticky top-0 z-20">
                 <div className="space-y-3">
-
-                    {isSuperAdmin && (
-                        <div className="flex flex-wrap items-end gap-3">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1">
-                                    Sucursal {loadingSucursales && <RefreshCw size={10} className="animate-spin text-blue-400" />}
-                                </label>
-                                <select value={sucursalFiltro ?? ''}
-                                    onChange={e => setSucursalFiltro(e.target.value ? Number(e.target.value) : null)}
-                                    className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 shadow-sm min-w-40">
-                                    <option value="">Todas las sucursales</option>
-                                    {sucursales.map((s: any) => (
-                                        <option key={s.sucursalId} value={s.sucursalId}>{s.nombre ?? s.codEstablecimiento}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 pt-3">
 
                         {/* Div 1: Buscar + Filtros */}
                         <div className="flex-1 flex flex-wrap items-center gap-2">
@@ -308,6 +308,22 @@ export default function VerComprobantesPage() {
                                 <Filter size={14} /> Opciones avanzadas
                                 <ChevronDown size={13} className={cn("transition-transform", showAvanzado && "rotate-180")} />
                             </button>
+
+                            {/* Select sucursal superadmin — al costado de opciones avanzadas */}
+                            {isSuperAdmin && (
+                            <select
+                                value={sucursalFiltro ?? ''}
+                                onChange={e => setSucursalFiltro(e.target.value ? Number(e.target.value) : null)}
+                                className="py-2.5 px-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 shadow-sm"
+                            >
+                                <option value="">Todas las sucursales</option>
+                                {sucursales.map((s: any) => (
+                                <option key={s.sucursalId} value={s.sucursalId}>
+                                    {s.nombre ?? s.codEstablecimiento}
+                                </option>
+                                ))}
+                            </select>
+                            )}
                             {(filtroTipo !== 'Todos' || filtroEstado !== 'Todos') && (
                                 <button onClick={() => { setFiltroTipo('Todos'); setFiltroEstado('Todos'); }}
                                     className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors">
@@ -540,6 +556,7 @@ export default function VerComprobantesPage() {
                                             <DropdownOpciones
                                                 comprobante={doc}
                                                 onEnviarSunat={() => enviarSunat(doc)}
+                                                onEditarEnviarSunat={() => editarenviarSunat(doc)}
                                                 onResumen={() => agregarResumen(doc)}
                                                 onAnular={() => anularComprobante(doc)}
                                                 onGenerarNotaCredito={() => generarNotaCredito(doc)}
@@ -657,13 +674,14 @@ const StatusIcon = ({ type, status, onClick }: { type: 'pdf' | 'xml' | 'cdr'; st
 interface DropdownOpcionesProps {
     comprobante: ComprobanteListado;
     onEnviarSunat: () => void;
+    onEditarEnviarSunat: () => void;
     onResumen: () => void;
     onAnular: () => void;
     onGenerarNotaCredito: () => void;
     onGenerarNotaDebito: () => void;
 }
 
-const DropdownOpciones = ({ comprobante, onEnviarSunat, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
+const DropdownOpciones = ({ comprobante, onEnviarSunat, onEditarEnviarSunat, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const esAceptado = comprobante.estadoSunat === 'ACEPTADO';
@@ -709,7 +727,7 @@ const DropdownOpciones = ({ comprobante, onEnviarSunat, onResumen, onAnular, onG
                     {/* Editar y reenviar — solo RECHAZADO */}
                     {esRechazado && (
                         <button
-                            onClick={() => { setOpen(false); }}
+                            onClick={() => { onEditarEnviarSunat(); setOpen(false); }}
                             className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
                             <RotateCcw size={14} className="text-amber-500" />
                             Editar y reenviar
