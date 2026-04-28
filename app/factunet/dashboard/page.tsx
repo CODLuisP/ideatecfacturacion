@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Eye,
   Plus,
+  Building2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -36,6 +37,7 @@ import { useDashboardEmpresa } from "./gestionDashboard/UseDashboardEmpresa";
 import { useDashboardSucursal } from "./gestionDashboard/UseDashboardSucursal";
 
 import { Skeleton } from "@/app/components/ui/Skeleton";
+import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -139,10 +141,14 @@ const getUltimos7Dias = () => {
   };
 };
 
-const getHoy = () => {
-  const hoy = new Date().toISOString().split("T")[0];
-  return { desde: hoy, hasta: hoy };
-};
+  const getHoy = () => {
+    const hoy = new Date();
+    const año = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const fechaLocal = `${año}-${mes}-${dia}`;
+    return { desde: fechaLocal, hasta: fechaLocal };
+  };
 
 const estadoSunatLabel = (estado: string) => {
   const map: Record<string, "success" | "warning" | "error"> = {
@@ -464,14 +470,19 @@ const FiltroFechas: React.FC<FiltroFechasProps> = ({
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const isSuperAdmin = user?.rol === "superadmin";
+  const isSuperAdmin = user?.rol === "admin";
 
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();
 
-  const { dashboard, loading, fetchDashboard } = isSuperAdmin
-    ? hookEmpresa
-    : hookSucursal;
+  const { sucursales } = useSucursalRuc(isSuperAdmin)
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null)
+
+const { dashboard, loading } = isSuperAdmin && sucursalSeleccionada
+  ? hookSucursal
+  : isSuperAdmin
+  ? hookEmpresa
+  : hookSucursal;
 
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
 
@@ -486,7 +497,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return;
     const hoy = getHoy();
-    if (isSuperAdmin) {
+    if (isSuperAdmin && sucursalSeleccionada) {
+      hookSucursal.fetchDashboard({
+        sucursalId: sucursalSeleccionada,
+        desde: hoy.desde,
+        hasta: hoy.hasta,
+        limite: 5,
+      });
+    } else if (isSuperAdmin) {
       hookEmpresa.fetchDashboard({
         ruc: user.ruc,
         desde: hoy.desde,
@@ -501,7 +519,7 @@ export default function DashboardPage() {
         limite: 5,
       });
     }
-  }, [user]);
+  }, [user, sucursalSeleccionada]);
 
   // Datos para el gráfico de rendimiento
   const chartData = useMemo(() => {
@@ -527,6 +545,7 @@ export default function DashboardPage() {
   }, [dashboard?.rendimientoVentas]);
 
   const statusBadgeClass = (status: string) => estadoSunatLabel(status);
+  console.log("fetch", dashboard)
 
   return (
     <>
@@ -534,7 +553,24 @@ export default function DashboardPage() {
         <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />
       )}
 
-      <div className="mb-4 flex flex-col md:flex-row md:items-end md:justify-end gap-4">
+      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm w-fit">
+            <Building2 size={14} className="text-gray-400 shrink-0" />
+            <select
+              value={sucursalSeleccionada ?? ''}
+              onChange={e => setSucursalSeleccionada(e.target.value ? Number(e.target.value) : null)}
+              className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
+            >
+              <option value="">Todas las sucursales</option>
+              {sucursales.map(s => (
+                <option key={s.sucursalId} value={s.sucursalId}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex gap-2 ">
           <Button onClick={() => router.push("/factunet/operaciones")}>
             <Plus className="w-4 h-4" /> Nuevo Comprobante
