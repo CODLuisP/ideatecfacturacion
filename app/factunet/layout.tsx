@@ -72,7 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
             activeView={activeView}
           />
-          <main className="flex-1 px-6  overflow-y-auto overflow-x-hidden custom-scrollbar">
+          <main className="flex-1 px-6  overflow-y-auto overflow-x-hidden custom-scrollbar py-2">
             <div className="mx-auto">
           
               {children}
