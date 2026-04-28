@@ -190,6 +190,25 @@ export default function VerComprobantesPage() {
             showToast('Error al enviar a SUNAT', 'error')
         }
     }
+    
+    const editarenviarSunat = (c: ComprobanteListado) => {
+    switch (c.tipoComprobante) {
+        case '01':
+        router.push(`/factunet/operaciones/factura?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        break;
+        case '03':
+        router.push(`/factunet/operaciones/boleta?comprobanteId=${c.comprobanteId}`);
+        break;
+        case '07':
+        router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        break;
+        case '08':
+        router.push(`/factunet/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        break;
+        default:
+        break;
+    }
+    };
 
     const generarNotaCredito = (c: ComprobanteListado) => {
         router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`)
@@ -540,6 +559,7 @@ export default function VerComprobantesPage() {
                                             <DropdownOpciones
                                                 comprobante={doc}
                                                 onEnviarSunat={() => enviarSunat(doc)}
+                                                onEditarEnviarSunat={() => editarenviarSunat(doc)}
                                                 onResumen={() => agregarResumen(doc)}
                                                 onAnular={() => anularComprobante(doc)}
                                                 onGenerarNotaCredito={() => generarNotaCredito(doc)}
@@ -657,13 +677,14 @@ const StatusIcon = ({ type, status, onClick }: { type: 'pdf' | 'xml' | 'cdr'; st
 interface DropdownOpcionesProps {
     comprobante: ComprobanteListado;
     onEnviarSunat: () => void;
+    onEditarEnviarSunat: () => void;
     onResumen: () => void;
     onAnular: () => void;
     onGenerarNotaCredito: () => void;
     onGenerarNotaDebito: () => void;
 }
 
-const DropdownOpciones = ({ comprobante, onEnviarSunat, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
+const DropdownOpciones = ({ comprobante, onEnviarSunat, onEditarEnviarSunat, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const esAceptado = comprobante.estadoSunat === 'ACEPTADO';
@@ -709,7 +730,7 @@ const DropdownOpciones = ({ comprobante, onEnviarSunat, onResumen, onAnular, onG
                     {/* Editar y reenviar — solo RECHAZADO */}
                     {esRechazado && (
                         <button
-                            onClick={() => { setOpen(false); }}
+                            onClick={() => { onEditarEnviarSunat(); setOpen(false); }}
                             className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
                             <RotateCcw size={14} className="text-amber-500" />
                             Editar y reenviar
