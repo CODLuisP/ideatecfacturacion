@@ -285,26 +285,7 @@ export default function VerComprobantesPage() {
 
             <div className="sticky top-0 z-20">
                 <div className="space-y-3">
-
-                    {isSuperAdmin && (
-                        <div className="flex flex-wrap items-end gap-3">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1">
-                                    Sucursal {loadingSucursales && <RefreshCw size={10} className="animate-spin text-blue-400" />}
-                                </label>
-                                <select value={sucursalFiltro ?? ''}
-                                    onChange={e => setSucursalFiltro(e.target.value ? Number(e.target.value) : null)}
-                                    className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 shadow-sm min-w-40">
-                                    <option value="">Todas las sucursales</option>
-                                    {sucursales.map((s: any) => (
-                                        <option key={s.sucursalId} value={s.sucursalId}>{s.nombre ?? s.codEstablecimiento}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 pt-3">
 
                         {/* Div 1: Buscar + Filtros */}
                         <div className="flex-1 flex flex-wrap items-center gap-2">
@@ -327,6 +308,22 @@ export default function VerComprobantesPage() {
                                 <Filter size={14} /> Opciones avanzadas
                                 <ChevronDown size={13} className={cn("transition-transform", showAvanzado && "rotate-180")} />
                             </button>
+
+                            {/* Select sucursal superadmin — al costado de opciones avanzadas */}
+                            {isSuperAdmin && (
+                            <select
+                                value={sucursalFiltro ?? ''}
+                                onChange={e => setSucursalFiltro(e.target.value ? Number(e.target.value) : null)}
+                                className="py-2.5 px-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 shadow-sm"
+                            >
+                                <option value="">Todas las sucursales</option>
+                                {sucursales.map((s: any) => (
+                                <option key={s.sucursalId} value={s.sucursalId}>
+                                    {s.nombre ?? s.codEstablecimiento}
+                                </option>
+                                ))}
+                            </select>
+                            )}
                             {(filtroTipo !== 'Todos' || filtroEstado !== 'Todos') && (
                                 <button onClick={() => { setFiltroTipo('Todos'); setFiltroEstado('Todos'); }}
                                     className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors">
