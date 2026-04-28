@@ -1,5 +1,5 @@
 "use client";
-import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Receipt, FileCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
@@ -77,6 +77,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
 
   //guardar url del PDF
   const [pdfUrlEmitido, setPdfUrlEmitido] = useState<string | null>(null);
+ const [pdfTicketUrl, setPdfTicketUrl] = useState<string | null>(null);
 
   //emitir nueva factura 
   const [emitido, setEmitido] = useState(false);
@@ -598,6 +599,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
 
   const emitirComprobante = async () => {
+
     if (!clienteSeleccionado && !clienteVarios) { showToast('Debe ingresar un cliente', 'error'); return; }
     if (tipo === 'factura' && clienteSeleccionado?.tipoDocumento !== '06' && clienteSeleccionado?.tipoDocumento !== '04') {
       showToast('Para factura el cliente debe tener RUC o CE', 'error'); return;
@@ -706,6 +708,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       // ── 3. Setear id y PDF (siempre, independiente del modo) ─
       setComprobanteIdEmitido(comprobanteId);
 
+      const procesarSegundoPlano = async () => {
       // ── 4. PDF + correo + whatsapp (siempre si hay contacto) ─
       const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
       const serieNum = `${serie}-${corrNum}`;
@@ -721,6 +724,16 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
 
         // ← Para el botón Abrir
         setPdfUrlEmitido(URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' })));
+
+
+         const resTicket = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (resTicket.ok) {
+    const ticketBlob = await resTicket.blob();
+    setPdfTicketUrl(URL.createObjectURL(new Blob([ticketBlob], { type: 'application/pdf' })));
+  }
 
         // ← Solo si hay contacto marcado
         if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
@@ -841,6 +854,9 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
           );
         } catch {}
       }
+      };
+
+      procesarSegundoPlano();
 
       setEmitido(true);
     } catch (err: any) {
@@ -854,37 +870,40 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
   };
 
-  const resetForm = () => {
-    // ── Items ──────────────────────────────────────
-    setItems([]); setBusquedaProducto([]); setShowDropdownProducto([]); inputRefs.current = [];
-    setPorConsumo(false);
 
-    // ── Cliente ────────────────────────────────────
-    setClienteSeleccionado(null); setBusqueda(''); setClienteVarios(false);
-    setNoEncontrado(false); setClienteManual('');
+const resetForm = () => {
+  // ── Items ──────────────────────────────────────
+  setItems([]); setBusquedaProducto([]); setShowDropdownProducto([]); inputRefs.current = [];
+  setPorConsumo(false);
 
-    // ── Contacto ───────────────────────────────────
-    setCorreoCliente(''); setTelefonoCliente('');
-    setEnviarCorreo(false); setEnviarWhatsapp(false);
+  // ── Cliente ────────────────────────────────────
+  setClienteSeleccionado(null); setBusqueda(''); setClienteVarios(false);
+  setNoEncontrado(false); setClienteManual('');
 
-    // ── Bolsa ──────────────────────────────────────
-    setCantidadBolsa(0); setAplicarIcbper(false); setTamañoBolsa('mediana');
+  // ── Contacto ───────────────────────────────────
+  setCorreoCliente(''); setTelefonoCliente('');
+  setEnviarCorreo(false); setEnviarWhatsapp(false);
 
-    // ── Pago ───────────────────────────────────────
-    setMedioPago('Efectivo');
+  // ── Bolsa ──────────────────────────────────────
+  setCantidadBolsa(0); setAplicarIcbper(false); setTamañoBolsa('mediana');
 
-    // ── Emisión ────────────────────────────────────
-    setErrorEmision(null); setComprobanteIdEmitido(null); setEmitido(false);
+  // ── Pago ───────────────────────────────────────
+  setMedioPago('Efectivo');
 
-    // ── Sucursal (solo superadmin) ─────────────────
-    if (isSuperAdmin) {
-      setSucursalActual(null);
-      setCorrelativoActual(null);
-    }
+  // ── Emisión ────────────────────────────────────
+  setErrorEmision(null); setComprobanteIdEmitido(null); setEmitido(false);
+  setPdfUrlEmitido(null);    // ← agregar
+  setPdfTicketUrl(null);     // ← agregar
 
-    //Envio por resumen
-    setEnviarEnResumen(false);
-  };
+  // ── Sucursal (solo superadmin) ─────────────────
+  if (isSuperAdmin) {
+    setSucursalActual(null);
+    setCorrelativoActual(null);
+  }
+
+  //Envio por resumen
+  setEnviarEnResumen(false);
+};
 
   const descargarPdf = async () => {
     if (!comprobanteIdEmitido) return;
@@ -904,25 +923,17 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     } catch { showToast('Error al descargar el PDF', 'error'); }
   };
 
-  const imprimirPdf = async () => {
-    if (!comprobanteIdEmitido) return;
-    try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteIdEmitido}/pdf?tamano=Ticket58mm`,
-        { headers: { Authorization: `Bearer ${accessToken}` }, responseType: 'blob' }
-      );
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        iframe.contentWindow?.print();
-        setTimeout(() => document.body.removeChild(iframe), 1000);
-      };
-    } catch { showToast('Error al imprimir el PDF', 'error'); }
+const imprimirPdf = () => {
+  if (!pdfTicketUrl) return;
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = pdfTicketUrl;
+  document.body.appendChild(iframe);
+  iframe.onload = () => {
+    iframe.contentWindow?.print();
+    setTimeout(() => document.body.removeChild(iframe), 1000);
   };
-
+};
   //activar boton emitir
   const puedeEmitir = !emitiendo && !sinSucursal && !!serie && !!correlativoActual && (!!clienteSeleccionado || clienteVarios) && items.filter(i => !i._esIcbper).length > 0;
 
@@ -1358,18 +1369,18 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
             )}
 
           {/* Serie destacada */}
-          <div className="bg-linear-to-br from-brand-blue to-blue-700 rounded-lg p-2 text-white">
-            <p className="text-[14px] font-black tracking-tight text-center drop-shadow-sm">
-              {isSuperAdmin && !sucursalActual
-                ? <span className="text-sm font-medium opacity-60">Seleccionar sucursal para ver serie y correlativo</span>
-                : loadingSucursal
-                ? <span className="opacity-50 animate-pulse">Cargando...</span>
-                : !serie
-                ? <span className="text-sm font-medium opacity-60">No se pudo cargar la serie</span>
-                : `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`
-              }
-            </p>
-          </div>
+<div className="border border-gray-200 rounded-lg p-2 bg-green-700 shadow-sm flex items-center justify-center gap-2">
+  <p className="text-[14px] font-black tracking-tight text-center text-gray-800">
+    {isSuperAdmin && !sucursalActual
+      ? <span className="text-sm font-medium text-gray-400">Seleccionar sucursal para ver serie y correlativo</span>
+      : loadingSucursal
+      ? <span className="text-gray-400 animate-pulse">Cargando...</span>
+      : !serie
+      ? <span className="text-sm font-medium text-gray-400">No se pudo cargar la serie</span>
+      : <span className="text-gray-50">{serie}-{String(correlativoActual ?? 1).padStart(8, '0')}</span>
+    }
+  </p>
+</div>
 
           {/* ── Medio de Pago / Moneda ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
@@ -1476,28 +1487,42 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
               <p className="text-[10px] text-red-500 text-center leading-relaxed">{errorEmision}</p>
             )}
 
-            {comprobanteIdEmitido && (
-              <div className="relative flex items-center gap-2 p-3 bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl shadow-sm">
-                <button type="button"
-                  onClick={() => window.open(pdfUrlEmitido!, '_blank')}
-                  disabled={!pdfUrlEmitido}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200 disabled:opacity-50">
-                  <ExternalLink className="w-3.5 h-3.5" /> Abrir
-                </button>
-                <button type="button" onClick={descargarPdf}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-black bg-emerald-400 hover:bg-emerald-300 active:scale-95 border border-emerald-300 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
-                  <Download className="w-3.5 h-3.5" /> Descargar
-                </button>
-                <button type="button" onClick={imprimirPdf}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-black bg-amber-400 hover:bg-amber-300 active:scale-95 border border-amber-300 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
-                  <Printer className="w-3.5 h-3.5" /> Imprimir
-                </button>
-                <button type="button" onClick={() => setComprobanteIdEmitido(null)}
-                  className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-white hover:bg-red-500 hover:text-white text-gray-400 active:scale-95 border border-gray-200 hover:border-red-500 rounded-full transition-all duration-200 shadow-sm">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
+{comprobanteIdEmitido && (
+  <div className="relative flex items-center gap-2 p-3 bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl shadow-sm">
+    <button type="button"
+      onClick={() => window.open(pdfUrlEmitido!, '_blank')}
+      disabled={!pdfUrlEmitido}
+      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-violet-500 hover:bg-violet-400 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200 disabled:opacity-50">
+      {!pdfUrlEmitido ? (
+        <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
+      ) : (
+        <><ExternalLink className="w-3.5 h-3.5" /> Abrir</>
+      )}
+    </button>
+    <button type="button" onClick={descargarPdf}
+      disabled={!pdfUrlEmitido}
+      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50">
+      {!pdfUrlEmitido ? (
+        <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
+      ) : (
+        <><Download className="w-3.5 h-3.5" /> Descargar</>
+      )}
+    </button>
+    <button type="button" onClick={imprimirPdf}
+      disabled={!pdfTicketUrl}
+      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50">
+      {!pdfTicketUrl ? (
+        <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
+      ) : (
+        <><Printer className="w-3.5 h-3.5" /> Imprimir</>
+      )}
+    </button>
+    <button type="button" onClick={() => setComprobanteIdEmitido(null)}
+      className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-white hover:bg-red-500 hover:text-white text-gray-400 active:scale-95 border border-gray-200 hover:border-red-500 rounded-full transition-all duration-200 shadow-sm">
+      <X className="w-3 h-3" />
+    </button>
+  </div>
+)}
           </div>
 
           {/* Series configuradas 
