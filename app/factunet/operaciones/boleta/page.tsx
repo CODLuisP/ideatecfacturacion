@@ -422,12 +422,6 @@ export default function BoletaPage() {
     });
 
     setBusquedaProducto((prev) => {
-      // We need to know which items are bolsa to filter correctly.
-      // Since 'detalles' in closure might be stale, we rely on the fact that
-      // this effect is triggered by cantidadBolsa change, and we just updated 'detalles'
-      // above. However, setDetalles is async. 
-      // A better way is to use the item properties if available in prev, 
-      // but prev is just an array of strings.
       // For now, let's just assume we want to filter out anything that looks like a bolsa
       // if we are clearing or updating.
       const sinBolsa = prev.filter(s => !s.startsWith("BOLSA PLASTICA"));
@@ -550,7 +544,6 @@ export default function BoletaPage() {
     }
   }, []);
 
-  // Guard: skip save on first render so we don't overwrite the store
   // before the load effect reads it (both fire on mount in order)
   const isFirstSaveRef = useRef(true);
   useEffect(() => {
@@ -1996,7 +1989,7 @@ export default function BoletaPage() {
                       <span className="text-xs text-gray-500">Por Consumo</span>
                     </label>
                     {!porConsumo && (
-                      <Button type="button" variant="ghost" className="h-8 text-xs text-brand-blue" disabled={sinSucursal} onClick={agregarFila}>
+                      <Button type="button" variant="ghost" className={`h-8 text-xs text-brand-blue ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} `} disabled={sinSucursal} onClick={agregarFila}>
                         <Plus className="w-3 h-3 mr-1" /> Agregar ítem
                       </Button>
                     )}

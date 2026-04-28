@@ -4,27 +4,37 @@ import { Sucursal } from './Boleta'
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
 
-export function useSucursalRuc( enabled: boolean = true ) {
+const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
+
+export function useSucursalRuc(enabled: boolean = true) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
   const [loadingSucursales, setLoadingSucursales] = useState(false)
 
-  const fetchSucursales = async () => {
+  const fetchSucursales = async (intentos = 3) => {
     setLoadingSucursales(true)
-    try {
+    for (let i = 0; i < intentos; i++) {
+      try {
         const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal`,
-        {
-          params: { ruc: user?.ruc },
-          headers: { Authorization: `Bearer ${accessToken}` },
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal`,
+          {
+            params: { ruc: user?.ruc },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        )
+        setSucursales(res.data)
+        setLoadingSucursales(false)
+        return // ✅ éxito, salimos
+      } catch {
+        if (i < intentos - 1) {
+          await sleep(1000 * (i + 1)) // espera 1s, 2s antes de reintentar
+        } else {
+          // último intento fallido → muestra error
+          showToast("Error al obtener las sucursales", "error")
+          setLoadingSucursales(false)
         }
-      )
-      setSucursales(res.data)
-    } catch {
-      showToast("Error al obtener las sucursales", "error");
-    } finally {
-      setLoadingSucursales(false)
+      }
     }
   }
 

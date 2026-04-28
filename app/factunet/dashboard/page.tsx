@@ -1,32 +1,9 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  BarChart3,
-  FileText,
-  Zap,
-  ChevronRight,
-  X,
-  Send,
-  RotateCcw,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Bell,
-  Calendar,
-  ShieldCheck,
-  Eye,
-  Plus,
-  Building2,
+import { BarChart3, FileText, Zap, ChevronRight, X, Send, RotateCcw, CheckCircle2, AlertTriangle, XCircle,
+  Bell, Calendar, ShieldCheck, Eye, Plus, Building2,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, } from "recharts";
 import { useRouter } from "next/navigation";
 import { Card } from "@/app/components/ui/Card";
 import { Button } from "@/app/components/ui/Button";
@@ -472,54 +449,65 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
 
+  // ─── Hooks según rol
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();
-
   const { sucursales } = useSucursalRuc(isSuperAdmin)
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null)
 
-const { dashboard, loading } = isSuperAdmin && sucursalSeleccionada
-  ? hookSucursal
-  : isSuperAdmin
-  ? hookEmpresa
-  : hookSucursal;
+  // ─── Dashboard activo según contexto ──────────────────────────────
+  const { dashboard, loading, error } = useMemo(() => {
+    if (isSuperAdmin && sucursalSeleccionada) return hookSucursal; // superadmin + sucursal elegida
+    if (isSuperAdmin) return hookEmpresa;                          // superadmin sin selección
+    return hookSucursal;                                           // usuario normal
+  }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
 
-  // Filtro de fechas para KPIs y conteos (default: hoy)
-  const hoy = getHoy();
-
   // Filtro de fechas para rendimiento (default: últimos 7 días)
   const ultimos7 = getUltimos7Dias();
-  const [desdeChart, setDesdeChart] = useState(ultimos7.desde);
-  const [hastaChart, setHastaChart] = useState(ultimos7.hasta);
 
+  // ─── Carga inicial ─────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    const hoy = getHoy();
-    if (isSuperAdmin && sucursalSeleccionada) {
-      hookSucursal.fetchDashboard({
-        sucursalId: sucursalSeleccionada,
-        desde: hoy.desde,
-        hasta: hoy.hasta,
-        limite: 5,
-      });
-    } else if (isSuperAdmin) {
-      hookEmpresa.fetchDashboard({
-        ruc: user.ruc,
-        desde: hoy.desde,
-        hasta: hoy.hasta,
-        limite: 5,
-      });
+    const { desde, hasta } = getHoy();
+
+    if (isSuperAdmin) {
+      // superadmin siempre carga empresa al inicio
+      hookEmpresa.fetchDashboard({ ruc: user.ruc, desde, hasta, limite: 10 });
     } else {
+      // usuario normal carga su sucursal
       hookSucursal.fetchDashboard({
         sucursalId: Number(user.sucursalID),
-        desde: hoy.desde,
-        hasta: hoy.hasta,
-        limite: 5,
+        desde, hasta, limite: 10,
       });
     }
-  }, [user, sucursalSeleccionada]);
+  }, [user]);
+
+  // ─── Cuando superadmin selecciona una sucursal ────────────────────
+  useEffect(() => {
+    if (!isSuperAdmin || !sucursalSeleccionada) return;
+    const { desde, hasta } = getHoy();
+
+    hookSucursal.fetchDashboard({ 
+      sucursalId: sucursalSeleccionada, 
+      desde, 
+      hasta, 
+      limite: 10 
+    });
+  }, [sucursalSeleccionada]); // 👈 dispara solo cuando cambia la sucursal
+
+  // ─── Handler de selección ──────────────────────────────────────────
+  const handleSucursalChange = (id: number | null) => {
+    hookSucursal.reset();
+    setSucursalSeleccionada(id);
+
+    if (id === null) {
+      // volvió a "Todas las sucursales" → recarga empresa
+      const { desde, hasta } = getHoy();
+      hookEmpresa.fetchDashboard({ ruc: user!.ruc, desde, hasta, limite: 10 });
+    }
+  };
 
   // Datos para el gráfico de rendimiento
   const chartData = useMemo(() => {
@@ -553,30 +541,33 @@ const { dashboard, loading } = isSuperAdmin && sucursalSeleccionada
         <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />
       )}
 
-      <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {isSuperAdmin && (
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm w-fit">
-            <Building2 size={14} className="text-gray-400 shrink-0" />
-            <select
-              value={sucursalSeleccionada ?? ''}
-              onChange={e => setSucursalSeleccionada(e.target.value ? Number(e.target.value) : null)}
-              className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
-            >
-              <option value="">Todas las sucursales</option>
-              {sucursales.map(s => (
-                <option key={s.sucursalId} value={s.sucursalId}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="flex gap-2 ">
-          <Button onClick={() => router.push("/factunet/operaciones")}>
-            <Plus className="w-4 h-4" /> Nuevo Comprobante
-          </Button>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      {/* Izquierda: selector de sucursal (solo superadmin) */}
+      {isSuperAdmin ? (
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+          <Building2 size={14} className="text-gray-400 shrink-0" />
+          <select
+            value={sucursalSeleccionada ?? ''}
+            onChange={e => handleSucursalChange(e.target.value ? Number(e.target.value) : null)}
+            className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
+          >
+            <option value="">Todas las sucursales</option>
+            {sucursales.map(s => (
+              <option key={s.sucursalId} value={s.sucursalId}>
+                {s.nombre}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+      ) : (
+        <div /> // espacio vacío para mantener el botón a la derecha
+      )}
+
+      {/* Derecha: siempre fijo */}
+      <Button onClick={() => router.push("/factunet/operaciones")}>
+        <Plus className="w-4 h-4" /> Nuevo Comprobante
+      </Button>
+    </div>
 
       <div className="space-y-4 animate-in fade-in duration-500 ">
         {/* KPI Grid */}
@@ -675,8 +666,8 @@ const { dashboard, loading } = isSuperAdmin && sucursalSeleccionada
               title="Rendimiento de Ventas"
               subtitle="Resumen de los últimos 7 días"
             >
-              <div className="h-75 w-full mt-4">
-                {chartData.length === 0 ? (
+              <div className="h-75 w-full mt-4 min-h-0">
+                {!dashboard || chartData.every(d => d.sales === 0) ? (
                   <div className="h-full flex items-center justify-center text-gray-400 text-sm">
                     Sin datos en el período seleccionado
                   </div>

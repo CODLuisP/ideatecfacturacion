@@ -28,7 +28,7 @@ import { ModalEnvioCorreoWhatsapp } from '@/app/components/modalVerComprobantes/
 import { tipoLabel, formatFecha, formatFechaHora, COLORS } from './gestionComprobantes/helpers';
 import { useRouter } from 'next/navigation'
 import { Card } from '@/app/components/ui/Card';
-import { Button } from '@/app/components/ui/Button';
+import { createPortal } from 'react-dom';
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = ['Todos', 'Factura', 'Boleta', 'Nota de Crédito', 'Nota de Débito'];
@@ -101,9 +101,14 @@ export default function VerComprobantesPage() {
     }, [isSuperAdmin, sucursalFiltro, rucEmpresa, sucursalId])
 
     useEffect(() => {
-        if (!user || !accessToken) return 
-        cargarComprobantes()
-    }, [ user, accessToken])
+    if (!user || !accessToken) return
+    cargarComprobantes()
+    }, [user, accessToken, cargarComprobantes])
+
+    useEffect(() => {
+    if (!user || !accessToken || !isSuperAdmin) return
+    cargarComprobantes()
+    }, [sucursalFiltro])
 
     const abrirDetalle = useCallback(async (c: ComprobanteListado) => {
         setDetalle(c);
@@ -683,91 +688,98 @@ interface DropdownOpcionesProps {
 
 const DropdownOpciones = ({ comprobante, onEnviarSunat, onEditarEnviarSunat, onResumen, onAnular, onGenerarNotaCredito, onGenerarNotaDebito }: DropdownOpcionesProps) => {
     const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+    const btnRef = useRef<HTMLButtonElement>(null);
     const esAceptado = comprobante.estadoSunat === 'ACEPTADO';
     const esPendiente = comprobante.estadoSunat === 'PENDIENTE';
     const esRechazado = comprobante.estadoSunat === 'RECHAZADO';
     const esFacturaOBoleta = comprobante.tipoComprobante === '01' || comprobante.tipoComprobante === '03';
 
+const handleOpen = () => {
+    if (btnRef.current) {
+        const rect = btnRef.current.getBoundingClientRect()
+        setPos({
+            top: rect.bottom + window.scrollY, // 👈 desde abajo del botón
+            left: rect.left + window.scrollX - 180,
+        })
+    }
+    setOpen(o => !o)
+}
+
     useEffect(() => {
-        const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
+        if (!open) return
+        const handler = (e: MouseEvent) => {
+            if (btnRef.current && !btnRef.current.contains(e.target as Node)) 
+                setOpen(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [open])
 
     return (
-        <div className="relative" ref={ref}>
-            <button onClick={() => setOpen(o => !o)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500">
+        <>
+            <button
+                ref={btnRef}
+                onClick={handleOpen}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500"
+            >
                 <MoreHorizontal size={16} />
             </button>
-            {open && (
-                <div className="absolute right-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-50">
-                    
-                    {/* Enviar a SUNAT — solo si está PENDIENTE */}
+
+            {open && createPortal(
+                <div
+                    style={{ position: 'absolute', top: pos.top, left: pos.left, zIndex: 9999 }}
+                    className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-50"
+                >
                     {esPendiente && (
-                        <button
-                            onClick={() => { onEnviarSunat(); setOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                        <button onClick={() => { onEnviarSunat(); setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-50">
                             <RotateCcw size={14} className="text-blue-500" />
                             Enviar a SUNAT
                         </button>
                     )}
-
-                    {/* Agregar a resumen — solo boleta PENDIENTE */}
                     {comprobante.tipoComprobante === '03' && esPendiente && (
-                        <button
-                            onClick={() => { onResumen(); setOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                        <button onClick={() => { onResumen(); setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-50">
                             <Layers size={14} className="text-indigo-500" />
                             Agregar a envío por resumen
                         </button>
                     )}
-
-                    {/* Editar y reenviar — solo RECHAZADO */}
                     {esRechazado && (
-                        <button
-                            onClick={() => { onEditarEnviarSunat(); setOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                        <button onClick={() => { onEditarEnviarSunat(); setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-50">
                             <RotateCcw size={14} className="text-amber-500" />
                             Editar y reenviar
                         </button>
                     )}
-
-                    {/* Generar Nota Crédito / Débito — solo factura o boleta ACEPTADA */}
                     {esFacturaOBoleta && esAceptado && (
                         <>
                             <div className="border-t border-gray-100" />
-                            <button
-                                onClick={() => { onGenerarNotaCredito(); setOpen(false); }}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                            <button onClick={() => { onGenerarNotaCredito(); setOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-50">
                                 <FileText size={14} className="text-purple-500" />
                                 Generar Nota de Crédito
                             </button>
-                            <button
-                                onClick={() => { onGenerarNotaDebito(); setOpen(false); }}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-gray-700 hover:bg-gray-50">
+                            <button onClick={() => { onGenerarNotaDebito(); setOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-50">
                                 <FileText size={14} className="text-orange-500" />
                                 Generar Nota de Débito
                             </button>
                         </>
                     )}
-
-                    {/* Anular — solo factura o boleta ACEPTADA */}
                     {esFacturaOBoleta && esAceptado && (
                         <>
                             <div className="border-t border-gray-100" />
-                            <button
-                                onClick={() => { onAnular(); setOpen(false); }}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors text-red-600 hover:bg-red-50">
+                            <button onClick={() => { onAnular(); setOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left text-red-600 hover:bg-red-50">
                                 <Ban size={14} className="text-red-500" />
                                 Anular
                             </button>
                         </>
                     )}
-
-                </div>
+                </div>,
+                document.body
             )}
-        </div>
-    );
+        </>
+    )
 }

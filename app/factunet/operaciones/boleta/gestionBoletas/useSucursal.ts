@@ -11,10 +11,13 @@ export function useSucursal() {
   const [loadingSucursal, setLoadingSucursal] = useState(false)
 
   const fetchSucursal = async () => {
+    // ✅ No llamar si es superadmin o no tiene sucursalID
+    if (!user?.sucursalID || user?.rol === 'superadmin') return
+
     setLoadingSucursal(true)
     try {
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user?.sucursalID}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user.sucursalID}`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
