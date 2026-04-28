@@ -535,16 +535,16 @@ export default function DashboardPage() {
       )}
 
       <div className="mb-4 flex flex-col md:flex-row md:items-end md:justify-end gap-4">
-        <div className="flex gap-2 py-2">
+        <div className="flex gap-2 ">
           <Button onClick={() => router.push("/factunet/operaciones")}>
             <Plus className="w-4 h-4" /> Nuevo Comprobante
           </Button>
         </div>
       </div>
 
-      <div className="space-y-4 animate-in fade-in duration-500">
+      <div className="space-y-4 animate-in fade-in duration-500 ">
         {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 ">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="p-0">
