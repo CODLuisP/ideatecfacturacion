@@ -470,7 +470,7 @@ const FiltroFechas: React.FC<FiltroFechasProps> = ({
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const isSuperAdmin = user?.rol === "admin";
+  const isSuperAdmin = user?.rol === "superadmin";
 
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();

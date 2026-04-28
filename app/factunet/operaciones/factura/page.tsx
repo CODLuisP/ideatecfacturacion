@@ -1726,7 +1726,7 @@ export default function FacturaPage() {
       !totales.soloGratuitas
     ) {
       showToast(
-        "⚠️ El importe supera S/ 700. Verifica si aplica detracción.",
+        "El importe supera S/ 700. Verifica si aplica detracción.",
         "info",
       );
     }
