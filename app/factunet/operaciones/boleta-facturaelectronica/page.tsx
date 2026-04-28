@@ -13,14 +13,17 @@ export default function BoletaFacturaElectronicaPage() {
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
   const [complejidad, setComplejidad] = useState<"simple" | "compleja">("simple");
-
-
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    sharedVentaStore.clear();
+    setIsReady(true);
     return () => {
       sharedVentaStore.clear();
     };
   }, []);
+
+  if (!isReady) return null;
 
   return (
     <div className="flex flex-col h-full space-y-4">
