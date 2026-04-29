@@ -48,49 +48,117 @@ function StatStrip({
   totalSeries: number;
 }) {
   const activas = Object.values(estadoSucursales).filter(Boolean).length;
+  const inactivas = sucursales.length - activas;
+
   const items = [
     {
-      label: "Total",
+      label: "Total sucursales",
       value: sucursales.length,
-      icon: <Building2 className="w-3.5 h-3.5" />,
+      color: "neutral",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+      ),
     },
     {
       label: "Activas",
       value: activas,
-      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+      color: "green",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      ),
     },
     {
       label: "Inactivas",
-      value: sucursales.length - activas,
-      icon: <XCircle className="w-3.5 h-3.5" />,
+      value: inactivas,
+      color: "red",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      ),
     },
     {
-      label: "Series",
+      label: "Series registradas",
       value: totalSeries,
-      icon: <BookOpen className="w-3.5 h-3.5" />,
+      color: "blue",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+      ),
     },
-  ];
+  ] as const;
+
+  const palette = {
+    neutral: {
+      bg: "bg-gray-100",
+      icon: "text-gray-600",
+      value: "text-gray-900",
+      label: "text-gray-600",
+    },
+    green: {
+      bg: "bg-green-100",
+      icon: "text-green-700",
+      value: "text-green-900",
+      label: "text-green-700",
+    },
+    red: {
+      bg: "bg-red-100",
+      icon: "text-red-700",
+      value: "text-red-900",
+      label: "text-red-700",
+    },
+    blue: {
+      bg: "bg-blue-100",
+      icon: "text-blue-700",
+      value: "text-blue-900",
+      label: "text-blue-700",
+    },
+  };
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-200 rounded-2xl overflow-hidden border border-gray-200">
-      {items.map((item, i) => (
-        <div key={i} className="bg-white px-5 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 shrink-0">
-            {item.icon}
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {items.map((item, i) => {
+        const p = palette[item.color];
+        return (
+          <div
+            key={i}
+            className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3"
+          >
+            <div className={`w-7 h-7 rounded-md ${p.bg} flex items-center justify-center ${p.icon} shrink-0`}>
+              {item.icon}
+            </div>
+            <div>
+              <p className={`text-xl font-semibold leading-none ${p.value}`}>
+                {item.value}
+              </p>
+              <p className={`text-[11px] mt-1 font-medium ${p.label}`}>
+                {item.label}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xl font-bold text-gray-900 leading-none">
-              {item.value}
-            </p>
-            <p className="text-[10px] text-gray-400 font-medium tracking-widest uppercase mt-0.5">
-              {item.label}
-            </p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
+
+
+
 
 // ─── Series Badge ─────────────────────────────────────────────────────────────
 function SeriesBadge({ label, value }: { label: string; value?: string }) {
