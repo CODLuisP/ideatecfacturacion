@@ -1,6 +1,7 @@
 // ─── Categoría ───────────────────────────────────────────────
 export interface Categoria {
   categoriaId: number;
+  empresaRuc: string;
   categoriaNombre: string;
 }
 

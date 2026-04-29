@@ -10,30 +10,28 @@ export function useCategoriasLista() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loadingCategorias, setLoadingCategorias] = useState(false)
 
-  const fetchCategorias = async () => {
+  const fetchCategorias = async (ruc: string) => {
+    if (!ruc) return 
     setLoadingCategorias(true)
     try {
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Categorias`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Categorias/empresa/${ruc}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       )
       const data: Categoria[] = res.data.map((c: any) => ({
         categoriaId: c.categoriaId,
+        empresaRuc: c.empresaRuc,
         categoriaNombre: c.categoriaNombre,
       }))
       setCategorias(data)
-    } catch {
-      showToast("Error al cargar categorías", "error");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        showToast("Error al cargar categorías", "error");
+      }
     } finally {
       setLoadingCategorias(false)
     }
   }
 
-  useEffect(() => {
-    if (accessToken) fetchCategorias()
-  }, [accessToken])
-
-  return { categorias, loadingCategorias }
+  return { categorias, setCategorias, loadingCategorias, fetchCategorias }  // ← sin useEffect interno
 }

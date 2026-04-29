@@ -1,11 +1,10 @@
 import { ChevronDown } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 
-// SelectPersonalizado.tsx
 interface Opcion {
   value: number
-  label: string      // texto completo en dropdown
-  labelCorto: string // texto al seleccionar
+  label: string
+  labelCorto: string
 }
 
 interface Props {
@@ -50,7 +49,11 @@ export function SelectPersonalizado({ opciones, value, onChange, disabled, class
             <button
               key={o.value}
               type="button"
-              onMouseDown={() => { onChange(o.value); setAbierto(false) }}
+              onMouseDown={(e) => {
+                e.preventDefault()  // ← fix
+                onChange(o.value)
+                setAbierto(false)
+              }}
               className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0
                 ${o.value === value ? 'text-brand-blue font-medium' : 'text-gray-700'}`}
             >
