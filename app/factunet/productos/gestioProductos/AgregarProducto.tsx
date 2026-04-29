@@ -13,12 +13,16 @@ import { useProductosEmpresaLista } from "./useProductosEmpresaLista";
 import { useSucursalRuc } from "../../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { useProductosBaseDisponiblesLista } from "./useProductosBaseDisponiblesLista";
 import { useSearchProductosBaseDisponiblesLista } from "./useSearchProductosBaseDisponiblesLista";
+import ModalAgregarCategoria from "./ModalAgregarCategoria";
+import { SelectConAgregar } from "@/app/components/ui/SelectConAgregar";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onProductoAgregado: (producto: ProductoSucursal) => void;
   categorias: Categoria[];
+  onAgregarCategoria: (dto: { categoriaNombre: string; descripcion?: string }) => Promise<boolean>;  // ← nuevo
+  loadingCategoria: boolean;  // ← nuevo
 }
 
 const emptyForm: NuevoProducto = {
@@ -40,6 +44,8 @@ export default function AgregarProducto({
   onClose,
   onProductoAgregado,
   categorias,
+  onAgregarCategoria,  
+  loadingCategoria,    
 }: Props) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
@@ -51,6 +57,11 @@ export default function AgregarProducto({
   const [sugerencias, setSugerencias] = React.useState<ProductoBase[]>([]);
   const [showSugerencias, setShowSugerencias] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const [showNuevaCategoria, setShowNuevaCategoria] = useState(false);
+  const [nombreNuevaCategoria, setNombreNuevaCategoria] = useState("");
+
+  const [isModalCategoriaOpen, setIsModalCategoriaOpen] = useState(false);
 
   //seleccionar sucursal para agregar si es superadmin
   const { sucursales } = useSucursalRuc(isSuperAdmin);
@@ -81,16 +92,22 @@ export default function AgregarProducto({
       setSugerencias([]);
       setShowSugerencias(false);
       setErrors({});
-      setSucursalSeleccionada(0); 
+      setSucursalSeleccionada(0);
+      setShowNuevaCategoria(false);      
+      setNombreNuevaCategoria("");
+      setIsModalCategoriaOpen(false);       
     }
   }, [isOpen]);
 
   React.useEffect(() => {
-    if (palabraBusqueda.trim().length > 0) {
-      setSugerencias(productosBase);
-      setShowSugerencias(productosBase.length > 0);
+    if (palabraBusqueda.trim().length === 0) {
+      setSugerencias([]);
+      setShowSugerencias(false);
+      return;
     }
-  }, [productosBase]);
+    setSugerencias(productosBase);
+    setShowSugerencias(productosBase.length > 0);
+  }, [productosBase, palabraBusqueda]);
 
   const { productosEmpresa } = useProductosEmpresaLista()
 
@@ -173,7 +190,7 @@ export default function AgregarProducto({
     const newErrors: Record<string, boolean> = {};
     const soloSucursal = !!productoExistente;
 
-    if (isSuperAdmin && form.sucursalId === 0) newErrors.sucursalId = true; 
+    if (isSuperAdmin && sucursalSeleccionada === 0) newErrors.sucursalId = true;
     if (!form.nomProducto.trim()) newErrors.nomProducto = true;
     if (form.precioUnitario <= 0) newErrors.precioUnitario = true;
 
@@ -315,25 +332,60 @@ export default function AgregarProducto({
                 <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
                   Categoría <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  value={form.categoriaId}
-                  onChange={(e) => {
-                    handleFormChange("categoriaId")(e);
+                <SelectConAgregar
+                  placeholder="Seleccione categoría"
+                  showError={!!errors.categoriaId}
+                  value={form.categoriaId === 0 ? null : form.categoriaId}
+                  onChange={(val) => {
+                    setForm((prev) => ({ ...prev, categoriaId: val }));
                     if (errors.categoriaId) setErrors((prev) => ({ ...prev, categoriaId: false }));
                   }}
-                  className={`w-full px-4 py-2 bg-gray-50 border rounded-xl outline-none focus:border-brand-blue ${
-                    errors.categoriaId ? "border-rose-400" : "border-gray-200"
-                  }`}
-                >
-                  <option value={0}>Seleccione categoría</option>
-                  {categorias.map((cat) => (
-                    <option key={cat.categoriaId} value={cat.categoriaId}>
-                      {cat.categoriaNombre}
-                    </option>
-                  ))}
-                </select>
+                  onAgregar={() => setIsModalCategoriaOpen(true)}
+                  opciones={categorias.map((cat) => ({
+                    value: cat.categoriaId,
+                    label: cat.categoriaNombre,
+                  }))}
+                />
                 {errors.categoriaId && (
                   <p className="text-xs text-rose-500 font-medium">Campo obligatorio</p>
+                )}
+
+                {/* ── Mini formulario nueva categoría ── */}
+                {showNuevaCategoria && (
+                  <div className="flex gap-2 mt-1.5">
+                    <input
+                      type="text"
+                      value={nombreNuevaCategoria}
+                      onChange={(e) => setNombreNuevaCategoria(e.target.value)}
+                      placeholder="Nombre de la categoría"
+                      className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"
+                    />
+                    <Button
+                      type="button"
+                      disabled={loadingCategoria || !nombreNuevaCategoria.trim()}
+                      onClick={async () => {
+                        const ok = await onAgregarCategoria({
+                          categoriaNombre: nombreNuevaCategoria.trim(),
+                        });
+                        if (ok) {
+                          setNombreNuevaCategoria("");
+                          setShowNuevaCategoria(false);
+                        }
+                      }}
+                    >
+                      {loadingCategoria ? "Guardando..." : "Guardar"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowNuevaCategoria(false);
+                        setNombreNuevaCategoria("");
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -441,6 +493,12 @@ export default function AgregarProducto({
           </Button>
         </div>
       </form>
+      <ModalAgregarCategoria
+        isOpen={isModalCategoriaOpen}
+        onClose={() => setIsModalCategoriaOpen(false)}
+        onAgregarCategoria={onAgregarCategoria}
+        loadingCategoria={loadingCategoria}
+      />
     </Modal>
   );
 }

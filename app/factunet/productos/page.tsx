@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench } from "lucide-react";
 import axios from "axios";
 
@@ -19,6 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/app/components/ui/Toast";
 import { useProductosEmpresaLista } from "./gestioProductos/useProductosEmpresaLista";
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
+import { useRegistrarCategoria } from "./gestioProductos/useRegistrarCategoria";
 
 export default function ProductosPage() {
   const { showToast } = useToast();
@@ -39,8 +40,6 @@ export default function ProductosPage() {
   const { sucursales } = useSucursalRuc(isSuperAdmin); // solo fetcha si es superAdmin
   const [filtroSucursal, setFiltroSucursal] = useState<string>("");
 
-  const { categorias } = useCategoriasLista()
-
   // AFiltros avanzados
   const [showFiltrosAvanzados, setShowFiltrosAvanzados] = useState(false);
   const [filtroStock, setFiltroStock] = useState(false);
@@ -59,6 +58,17 @@ export default function ProductosPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProductoSucursal | null>(null);
 
   const [importFile, setImportFile] = useState<File | null>(null);
+
+  //Categorias
+  const { categorias, setCategorias, loadingCategorias, fetchCategorias } = useCategoriasLista()
+
+  const { registrarCategoria, loadingRegistrar } = useRegistrarCategoria(() => {
+    if (user?.ruc) fetchCategorias(user.ruc)  // ← refetch para obtener ids reales
+  });
+
+  useEffect(() => {
+    if (accessToken && user?.ruc) fetchCategorias(user.ruc)
+  }, [accessToken, user?.ruc])
 
   // REEMPLAZA el bloque filtered:
   const filtrosAvanzadosActivos =
@@ -480,12 +490,14 @@ export default function ProductosPage() {
       </div>
     </div>
 
-      <AgregarProducto
-        isOpen={isNewOpen}
-        onClose={() => setIsNewOpen(false)}
-        onProductoAgregado={(producto) => setProductos((prev) => [...prev, producto])}
-        categorias={categorias}
-      />
+    <AgregarProducto
+      isOpen={isNewOpen}
+      onClose={() => setIsNewOpen(false)}
+      onProductoAgregado={(producto) => setProductos((prev) => [...prev, producto])}
+      categorias={categorias}
+      onAgregarCategoria={registrarCategoria}
+      loadingCategoria={loadingRegistrar}
+    />
       <EditarProducto
         isOpen={isEditOpen}
         producto={editTarget}
