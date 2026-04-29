@@ -7,6 +7,8 @@ import {
   Lock,
   Mail,
   ShieldCheck,
+  Eye,
+  EyeOff,
   User,
   Zap,
 } from "lucide-react";
@@ -18,20 +20,22 @@ export default function Page() {
   const [ruc, setRuc] = useState("");
   const [usuario, setUsuario] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
   const [rucHint, setRucHint] = useState({
     text: "Número de 11 dígitos registrado en SUNAT",
     color: "",
   });
-  const [clave, setClave] = useState("");
-  const [claveError, setClaveError] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [success, setSuccess] = useState(false);
 
+  const [success, setSuccess] = useState(false);
   const [empresaData, setEmpresaData] = useState<any>(null);
   const [loadingRuc, setLoadingRuc] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const CLAVE_SECRETA = "vadmin123";
   const { showToast } = useToast();
 
   const handleRUC = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,32 +76,29 @@ export default function Page() {
     }
   };
 
-  const handleSubmit = () => {
-    if (!ruc || !usuario || !email) {
-      alert("Por favor completa todos los campos.");
+  const handleSubmit = async () => {
+    if (!ruc || !usuario || !email || !password || !confirmPassword) {
+      showToast("Por favor completa todos los campos.", "error");
       return;
     }
     if (ruc.length !== 11) {
-      alert("El RUC debe tener 11 dígitos.");
+      showToast("El RUC debe tener 11 dígitos.", "error");
       return;
     }
     if (!empresaData) {
       showToast("El RUC no es válido o no fue encontrado en SUNAT.", "error");
       return;
     }
-    setShowModal(true);
-    setClave("");
-    setClaveError("");
-  };
-
-  const handleConfirmarClave = async () => {
-    if (clave !== CLAVE_SECRETA) {
-      setClaveError("Clave incorrecta. Intenta nuevamente.");
-      setClave("");
+    if (password.length < 8) {
+      setPasswordError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden.");
       return;
     }
 
-    setShowModal(false);
+    setPasswordError("");
     setLoading(true);
 
     try {
@@ -132,13 +133,13 @@ export default function Page() {
       );
       const sucursalID = sucursalRes.data[0].sucursalId;
 
-      // 3. Registrar usuario con el sucursalID real
+      // 3. Registrar usuario con el sucursalID real y la contraseña ingresada
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/register`,
         {
           username: usuario,
           email: email,
-          password: "12345678",
+          password: password,
           ruc: ruc,
           rol: "admin",
           sucursalID: String(sucursalID),
@@ -147,13 +148,20 @@ export default function Page() {
       showToast("Usuario registrado correctamente", "success");
 
       // 4. Enviar correo de bienvenida
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Email/send`, {
-        toEmail: email,
-        toName: usuario,
-        subject: "¡Bienvenido a Factura Digital! 🎉",
-        body: `Hola ${usuario},\n\n¡Tu registro en Factura Digital ha sido exitoso!\n\nYa puedes comenzar a emitir tus comprobantes electrónicos certificados por SUNAT.\n\nEstos son tus datos de acceso:\n  • Usuario: ${usuario}\n  • RUC: ${ruc}\n  • Empresa: ${empresaData?.razonSocial ?? ""}\n  • Contraseña: 12345678 (por defecto)\n\nPor seguridad, te recomendamos cambiar tu contraseña lo antes posible desde la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión.\n\nSi tienes alguna consulta, no dudes en contactarnos.\n\n¡Bienvenido a bordo!\n\nEl equipo de Factura Digital`,
-        tipo: "0",
-      });
+      const formData = new FormData();
+      formData.append("toEmail", email);
+      formData.append("toName", usuario);
+      formData.append("subject", "¡Bienvenido a Factura Digital! 🎉");
+      formData.append(
+        "body",
+        `Hola ${usuario},\n\n¡Tu registro en Factura Digital ha sido exitoso!\n\nYa puedes comenzar a emitir tus comprobantes electrónicos certificados por SUNAT.\n\nEstos son tus datos de acceso:\n  • Usuario: ${usuario}\n  • RUC: ${ruc}\n  • Empresa: ${empresaData?.razonSocial ?? ""}\n\nSi tienes alguna consulta, no dudes en contactarnos.\n\n¡Bienvenido a bordo!\n\nEl equipo de Factura Digital`,
+      );
+      formData.append("tipo", "0");
+
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Email/send`,
+        formData,
+      );
       showToast("Correo de bienvenida enviado", "success");
 
       setSuccess(true);
@@ -225,7 +233,7 @@ export default function Page() {
             registrado correctamente.
           </div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-            Se envió un correo de verificación a {email}
+            Se envió un correo de bienvenida a {email}
           </div>
           <button
             onClick={() => {
@@ -233,6 +241,8 @@ export default function Page() {
               setRuc("");
               setUsuario("");
               setEmail("");
+              setPassword("");
+              setConfirmPassword("");
               setRucHint({
                 text: "Número de 11 dígitos registrado en SUNAT",
                 color: "",
@@ -276,7 +286,7 @@ export default function Page() {
         .field-input {
           width: 100%;
           height: 48px;
-          padding: 0 14px 0 44px;
+          padding: 0 44px 0 44px;
           border: 1.5px solid #e2e8f0;
           border-radius: 10px;
           background: #f8fafc;
@@ -292,22 +302,10 @@ export default function Page() {
           background: #fff;
           box-shadow: 0 0 0 3px rgba(24,95,165,0.12);
         }
-        .clave-input {
-          width: 100%;
-          height: 48px;
-          padding: 0 14px 0 44px;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 10px;
-          background: #f8fafc;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 15px;
-          color: #1e293b;
-          outline: none;
-          letter-spacing: 0.15em;
-          transition: border-color 0.2s, box-shadow 0.2s;
+        .field-input.error {
+          border-color: #DC2626;
+          box-shadow: 0 0 0 3px rgba(220,38,38,0.12);
         }
-        .clave-input:focus { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
-        .clave-input.error { border-color: #DC2626; box-shadow: 0 0 0 3px rgba(220,38,38,0.12); }
         .btn-submit {
           width: 100%;
           height: 52px;
@@ -328,33 +326,21 @@ export default function Page() {
         }
         .btn-submit:hover { background: #185FA5; }
         .btn-submit:active { transform: scale(0.99); }
-        .btn-confirm {
-          flex: 1;
-          height: 46px;
-          background: #0F2D6E;
-          color: #fff;
+        .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+        .toggle-password {
+          position: absolute;
+          right: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
           border: none;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14px;
-          font-weight: 500;
           cursor: pointer;
-          transition: background 0.2s;
+          color: #94a3b8;
+          display: flex;
+          padding: 0;
+          transition: color 0.2s;
         }
-        .btn-confirm:hover { background: #185FA5; }
-        .btn-cancel {
-          flex: 1;
-          height: 46px;
-          background: transparent;
-          color: #64748b;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14px;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-        .btn-cancel:hover { background: #f8fafc; }
+        .toggle-password:hover { color: #185FA5; }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -375,157 +361,41 @@ export default function Page() {
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: -80,
-            left: -80,
-            width: 280,
-            height: 280,
-            borderRadius: "50%",
-            background: "rgba(220,38,38,0.15)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: -60,
-            right: -60,
-            width: 200,
-            height: 200,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.06)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: "40%",
-            right: -30,
-            width: 120,
-            height: 120,
-            borderRadius: "50%",
-            background: "rgba(220,38,38,0.08)",
-          }}
-        />
+        <div style={{ position: "absolute", top: -80, left: -80, width: 280, height: 280, borderRadius: "50%", background: "rgba(220,38,38,0.15)" }} />
+        <div style={{ position: "absolute", bottom: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
+        <div style={{ position: "absolute", top: "40%", right: -30, width: 120, height: 120, borderRadius: "50%", background: "rgba(220,38,38,0.08)" }} />
 
-        {/* Logo */}
         <div style={{ position: "relative", zIndex: 1 }}>
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              background: "#DC2626",
-              borderRadius: 14,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
+          <div style={{ width: 52, height: 52, background: "#DC2626", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
             <FileText size={26} color="white" />
           </div>
-          <div
-            style={{
-              fontSize: 20,
-              fontWeight: 500,
-              color: "#fff",
-              lineHeight: 1.2,
-              marginBottom: 8,
-            }}
-          >
-            FACTURA DIGITAL
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.45)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-            }}
-          >
+          <div style={{ fontSize: 20, fontWeight: 500, color: "#fff", lineHeight: 1.2, marginBottom: 8 }}>FACTURA DIGITAL</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             Sistema de facturación electrónica
           </div>
-          <div
-            style={{
-              width: 32,
-              height: 2,
-              background: "#DC2626",
-              borderRadius: 2,
-              margin: "24px 0",
-            }}
-          />
-          <div
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.55)",
-              lineHeight: 1.7,
-            }}
-          >
-            Registra tu empresa en el sistema de facturación electrónica
-            certificado por SUNAT.
+          <div style={{ width: 32, height: 2, background: "#DC2626", borderRadius: 2, margin: "24px 0" }} />
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.7 }}>
+            Registra tu empresa en el sistema de facturación electrónica certificado por SUNAT.
           </div>
         </div>
 
-        {/* Features */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
-        >
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
           {[
-            {
-              icon: <Zap size={16} color="#fff" />,
-              text: "Emisión en tiempo real",
-            },
-            {
-              icon: <ShieldCheck size={16} color="#fff" />,
-              text: "Certificado digital incluido",
-            },
-            {
-              icon: <BarChart2 size={16} color="#fff" />,
-              text: "Panel de reportes",
-            },
+            { icon: <Zap size={16} color="#fff" />, text: "Emisión en tiempo real" },
+            { icon: <ShieldCheck size={16} color="#fff" />, text: "Certificado digital incluido" },
+            { icon: <BarChart2 size={16} color="#fff" />, text: "Panel de reportes" },
           ].map((f, i) => (
-            <div
-              key={i}
-              style={{ display: "flex", alignItems: "center", gap: 12 }}
-            >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  background: "rgba(255,255,255,0.08)",
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 32, height: 32, background: "rgba(255,255,255,0.08)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {f.icon}
               </div>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
-                {f.text}
-              </span>
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{f.text}</span>
             </div>
           ))}
         </div>
 
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            fontSize: 11,
-            color: "rgba(255,255,255,0.2)",
-            lineHeight: 1.6,
-          }}
-        >
-          Certificado por SUNAT · Perú
-          <br />© 2025 FacturaDigital
+        <div style={{ position: "relative", zIndex: 1, fontSize: 11, color: "rgba(255,255,255,0.2)", lineHeight: 1.6 }}>
+          Certificado por SUNAT · Perú<br />© 2025 FacturaDigital
         </div>
       </div>
 
@@ -539,18 +409,10 @@ export default function Page() {
           justifyContent: "center",
           padding: "2rem",
           position: "relative",
+          overflowY: "auto",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            background: "linear-gradient(90deg, #0F2D6E 50%, #DC2626 50%)",
-          }}
-        />
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: "linear-gradient(90deg, #0F2D6E 50%, #DC2626 50%)" }} />
 
         <div
           style={{
@@ -561,241 +423,126 @@ export default function Page() {
             border: "0.5px solid #e2e8f0",
             padding: "2.5rem 2.5rem",
             boxShadow: "0 4px 40px rgba(15,45,110,0.08)",
+            margin: "2rem 0",
           }}
         >
           {/* Header */}
           <div style={{ marginBottom: "2rem" }}>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 11,
-                fontWeight: 500,
-                color: "#185FA5",
-                background: "#E6F1FB",
-                padding: "4px 12px",
-                borderRadius: 20,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                marginBottom: 16,
-              }}
-            >
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#DC2626",
-                }}
-              />
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 500, color: "#185FA5", background: "#E6F1FB", padding: "4px 12px", borderRadius: 20, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 16 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#DC2626" }} />
               Nuevo registro
             </div>
-            <div
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#1e293b",
-                lineHeight: 1.15,
-                marginBottom: 8,
-              }}
-            >
-              CREAR CUENTA
-            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", lineHeight: 1.15, marginBottom: 8 }}>CREAR CUENTA</div>
             <div style={{ fontSize: 14, color: "#64748b", lineHeight: 1.6 }}>
-              Ingresa los datos de tu empresa para comenzar con la facturación
-              electrónica.
+              Ingresa los datos de tu empresa para comenzar con la facturación electrónica.
             </div>
             <div style={{ display: "flex", gap: 4, marginTop: 14 }}>
-              <div
-                style={{
-                  height: 3,
-                  width: 32,
-                  background: "#0F2D6E",
-                  borderRadius: 2,
-                }}
-              />
-              <div
-                style={{
-                  height: 3,
-                  width: 16,
-                  background: "#DC2626",
-                  borderRadius: 2,
-                }}
-              />
-              <div
-                style={{
-                  height: 3,
-                  width: 8,
-                  background: "#e2e8f0",
-                  borderRadius: 2,
-                }}
-              />
+              <div style={{ height: 3, width: 32, background: "#0F2D6E", borderRadius: 2 }} />
+              <div style={{ height: 3, width: 16, background: "#DC2626", borderRadius: 2 }} />
+              <div style={{ height: 3, width: 8, background: "#e2e8f0", borderRadius: 2 }} />
             </div>
           </div>
 
           {/* Fields */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
             {/* RUC */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#475569",
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
+              <label style={{ fontSize: 12, fontWeight: 500, color: "#475569", letterSpacing: "0.07em", textTransform: "uppercase" }}>
                 RUC <span style={{ color: "#DC2626" }}>*</span>
               </label>
               <div style={{ position: "relative" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 14,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#185FA5",
-                    opacity: 0.55,
-                    pointerEvents: "none",
-                    display: "flex",
-                  }}
-                >
+                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#185FA5", opacity: 0.55, pointerEvents: "none", display: "flex" }}>
                   <FileText size={16} />
                 </span>
-                <input
-                  className="field-input"
-                  type="text"
-                  placeholder="20XXXXXXXXXXX"
-                  maxLength={11}
-                  value={ruc}
-                  onChange={handleRUC}
-                />
+                <input className="field-input" type="text" placeholder="20XXXXXXXXXXX" maxLength={11} value={ruc} onChange={handleRUC} style={{ paddingRight: 14 }} />
               </div>
-              <span style={{ fontSize: 11, color: rucHint.color || "#94a3b8" }}>
-                {rucHint.text}
-              </span>
+              <span style={{ fontSize: 11, color: rucHint.color || "#94a3b8" }}>{rucHint.text}</span>
             </div>
 
             {/* Usuario */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#475569",
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
+              <label style={{ fontSize: 12, fontWeight: 500, color: "#475569", letterSpacing: "0.07em", textTransform: "uppercase" }}>
                 Nombre de usuario <span style={{ color: "#DC2626" }}>*</span>
               </label>
               <div style={{ position: "relative" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 14,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#185FA5",
-                    opacity: 0.55,
-                    pointerEvents: "none",
-                    display: "flex",
-                  }}
-                >
+                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#185FA5", opacity: 0.55, pointerEvents: "none", display: "flex" }}>
                   <User size={16} />
                 </span>
-                <input
-                  className="field-input"
-                  type="text"
-                  placeholder="usuario_empresa"
-                  value={usuario}
-                  onChange={(e) => setUsuario(e.target.value)}
-                />
+                <input className="field-input" type="text" placeholder="usuario_empresa" value={usuario} onChange={(e) => setUsuario(e.target.value)} style={{ paddingRight: 14 }} />
               </div>
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                Mínimo 4 caracteres, sin espacios
-              </span>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>Mínimo 4 caracteres, sin espacios</span>
             </div>
 
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#475569",
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
+              <label style={{ fontSize: 12, fontWeight: 500, color: "#475569", letterSpacing: "0.07em", textTransform: "uppercase" }}>
                 Correo electrónico <span style={{ color: "#DC2626" }}>*</span>
               </label>
               <div style={{ position: "relative" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 14,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#185FA5",
-                    opacity: 0.55,
-                    pointerEvents: "none",
-                    display: "flex",
-                  }}
-                >
+                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#185FA5", opacity: 0.55, pointerEvents: "none", display: "flex" }}>
                   <Mail size={16} />
                 </span>
-                <input
-                  className="field-input"
-                  type="email"
-                  placeholder="empresa@correo.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+                <input className="field-input" type="email" placeholder="empresa@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ paddingRight: 14 }} />
               </div>
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                Se enviará un código de verificación
-              </span>
+            </div>
+
+            {/* Contraseña */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "#475569", letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                Contraseña <span style={{ color: "#DC2626" }}>*</span>
+              </label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#185FA5", opacity: 0.55, pointerEvents: "none", display: "flex" }}>
+                  <Lock size={16} />
+                </span>
+                <input
+                  className={`field-input${passwordError ? " error" : ""}`}
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mínimo 8 caracteres"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setPasswordError(""); }}
+                />
+                <button className="toggle-password" type="button" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirmar Contraseña */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "#475569", letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                Confirmar contraseña <span style={{ color: "#DC2626" }}>*</span>
+              </label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#185FA5", opacity: 0.55, pointerEvents: "none", display: "flex" }}>
+                  <Lock size={16} />
+                </span>
+                <input
+                  className={`field-input${passwordError ? " error" : ""}`}
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Repite tu contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(""); }}
+                />
+                <button className="toggle-password" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {passwordError && (
+                <span style={{ fontSize: 11, color: "#DC2626", display: "flex", alignItems: "center", gap: 4 }}>
+                  <ShieldCheck size={11} color="#DC2626" /> {passwordError}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Submit */}
-          <div
-            style={{
-              marginTop: "2rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
-            <button
-              className="btn-submit"
-              onClick={handleSubmit}
-              disabled={loading}
-            >
+          <div style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: 14 }}>
+            <button className="btn-submit" onClick={handleSubmit} disabled={loading}>
               {loading ? (
                 <>
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    style={{ animation: "spin 0.9s linear infinite" }}
-                  >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 0.9s linear infinite" }}>
                     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                   </svg>
                   Registrando...
@@ -803,189 +550,19 @@ export default function Page() {
               ) : (
                 <>
                   Registrar usuario
-                  <span
-                    style={{
-                      width: 22,
-                      height: 22,
-                      background: "rgba(255,255,255,0.15)",
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                  <span style={{ width: 22, height: 22, background: "rgba(255,255,255,0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <KeyRound size={12} color="white" />
                   </span>
                 </>
               )}
             </button>
-            <div
-              style={{
-                textAlign: "center",
-                fontSize: 12,
-                color: "#94a3b8",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
-            >
+            <div style={{ textAlign: "center", fontSize: 12, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               <Lock size={12} color="#185FA5" opacity={0.5} />
               Datos protegidos con cifrado SSL · SUNAT
             </div>
           </div>
         </div>
       </div>
-
-      {/* MODAL CLAVE */}
-      {showModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,45,110,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            backdropFilter: "blur(4px)",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false);
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: "2rem",
-              width: "100%",
-              maxWidth: 380,
-              boxShadow: "0 20px 60px rgba(15,45,110,0.25)",
-              border: "0.5px solid #e2e8f0",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                marginBottom: 20,
-              }}
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  background: "#0F2D6E",
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <KeyRound size={20} color="white" />
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: "#1e293b",
-                  }}
-                >
-                  Clave de autorización
-                </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
-                  Ingresa la clave para confirmar el registro
-                </div>
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: "#f8fafc",
-                borderRadius: 10,
-                padding: "12px 14px",
-                marginBottom: 18,
-                fontSize: 13,
-                color: "#475569",
-                lineHeight: 1.5,
-                border: "0.5px solid #e2e8f0",
-              }}
-            >
-              <strong style={{ color: "#1e293b" }}>Resumen:</strong>
-              <br />
-              RUC: {ruc} · Usuario: {usuario}
-            </div>
-
-            <div style={{ position: "relative", marginBottom: 8 }}>
-              <span
-                style={{
-                  position: "absolute",
-                  left: 14,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "#185FA5",
-                  opacity: 0.5,
-                  pointerEvents: "none",
-                  display: "flex",
-                }}
-              >
-                <Lock size={16} />
-              </span>
-              <input
-                className={`clave-input${claveError ? " error" : ""}`}
-                type="password"
-                placeholder="••••••••"
-                value={clave}
-                onChange={(e) => {
-                  setClave(e.target.value);
-                  setClaveError("");
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleConfirmarClave()}
-                autoFocus
-              />
-            </div>
-
-            {claveError && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#DC2626",
-                  marginBottom: 14,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
-                <ShieldCheck size={12} color="#DC2626" />
-                {claveError}
-              </div>
-            )}
-
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                marginTop: claveError ? 0 : 14,
-              }}
-            >
-              <button
-                className="btn-cancel"
-                onClick={() => setShowModal(false)}
-              >
-                Cancelar
-              </button>
-              <button className="btn-confirm" onClick={handleConfirmarClave}>
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

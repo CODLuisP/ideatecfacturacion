@@ -549,13 +549,8 @@ export default function GuiasRemisionPage() {
           }`}
       </style>
 
-      <Card className="p-0 overflow-hidden">
-        <div
-          className={cn(
-            "guia-table-wrapper",
-            showAvanzado && "guia-table-wrapper-avanzado",
-          )}
-        >
+      <Card className="p-0 rounded-2xl border border-gray-200 overflow-hidden">
+  <div className={cn("guia-table-wrapper", showAvanzado && "guia-table-wrapper-avanzado")}>
           {tipoGuia === "remitente" ? (
             <TablaRemitente
               guias={filtered}
@@ -627,9 +622,9 @@ function TablaRemitente({
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
-      <thead>
+      <thead className="sticky top-0 z-10">
         <tr className="bg-gray-100">
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-2xl">
             FECHA
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -659,7 +654,7 @@ function TablaRemitente({
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             VER
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center rounded-tr-2xl">
             OPCIONES
           </th>
         </tr>
@@ -806,9 +801,9 @@ function TablaTransportista({
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
-      <thead>
+      <thead className="sticky top-0 z-10">
         <tr className="bg-gray-100">
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-2xl">
             FECHA
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -838,7 +833,7 @@ function TablaTransportista({
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             VER
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center rounded-tl-2xl">
             OPCIONES
           </th>
         </tr>
