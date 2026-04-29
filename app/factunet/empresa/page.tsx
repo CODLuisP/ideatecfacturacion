@@ -416,7 +416,7 @@ export default function ConfiguracionPage() {
   const { accessToken, user, refreshLogo } = useAuth();
 
   // ── Permisos por rol ───────────────────────────────────────────────────────
-  const isSuperAdmin = user?.username === 'superAdminOpen';
+  const isSuperAdmin = user?.rol === 'superadmin';
   const canEdit      = user?.rol === 'admin' || isSuperAdmin;
   const isFacturador = user?.rol === 'facturador';
 
