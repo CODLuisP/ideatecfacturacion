@@ -42,20 +42,23 @@ const PRECIOS_BOLSA = { pequeña: 0.10, mediana: 0.20, grande: 0.30 };
 const MEDIOS_PAGO = ['Efectivo', 'Tarjeta', 'Yape', 'Plin', 'Transferencia'];
 
 // ── Cálculo de item ────────────────────────────────────────────
-function calcItem(item: ItemRapido) {
-  if (item._esIcbper) {
+  function calcItem(item: ItemRapido) {
+    if (item._esIcbper) {
+      const baseIgv = parseFloat((item.precioUnitario * item.cantidad).toFixed(2));
+      return { baseIgv, montoIGV: 0, totalVentaItem: baseIgv, valorVenta: baseIgv };
+    }
+
+    if (item.tipoAfectacionIGV === '10') {
+      const totalVentaItem = parseFloat((item.precioVentaConIGV * item.cantidad).toFixed(2));
+      const montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + item.porcentajeIGV / 100)).toFixed(2));
+      const baseIgv  = parseFloat((totalVentaItem - montoIGV).toFixed(2));
+      return { baseIgv, montoIGV, totalVentaItem, valorVenta: baseIgv };
+    }
+
+    // exonerado (20) / inafecto (30)
     const baseIgv = parseFloat((item.precioUnitario * item.cantidad).toFixed(2));
     return { baseIgv, montoIGV: 0, totalVentaItem: baseIgv, valorVenta: baseIgv };
   }
-  const baseIgv = parseFloat((item.precioUnitario * item.cantidad).toFixed(2));
-  if (item.tipoAfectacionIGV === '10') {
-    const montoIGV = parseFloat((baseIgv * item.porcentajeIGV / 100).toFixed(2));
-    const totalVentaItem = parseFloat((item.precioVentaConIGV * item.cantidad).toFixed(2));
-    return { baseIgv, montoIGV, totalVentaItem, valorVenta: baseIgv };
-  }
-  // exonerado (20) / inafecto (30)
-  return { baseIgv, montoIGV: 0, totalVentaItem: baseIgv, valorVenta: baseIgv };
-}
 
 export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoComprobante }) {
   const { showToast } = useToast();
@@ -609,6 +612,10 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     const sinDesc = itemsReales.findIndex(d => !d.descripcion?.trim());
     if (sinDesc !== -1) { showToast(`El ítem ${sinDesc + 1} no tiene descripción`, 'error'); return; }
     if (enviarCorreo && !correoCliente.trim()) { showToast('Ingrese el correo del cliente', 'error'); return; }
+    const consumoItem = itemsReales.find(i => i.id === 'por-consumo');
+    if (consumoItem && consumoItem.precioVentaConIGV <= 0) {
+        showToast('El ítem "Por Consumo" debe tener un precio mayor a cero', 'error'); return;
+    }
 
     setEmitiendo(true);
     setErrorEmision(null);

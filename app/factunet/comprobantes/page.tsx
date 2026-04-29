@@ -29,6 +29,7 @@ import { tipoLabel, formatFecha, formatFechaHora, COLORS } from './gestionCompro
 import { useRouter } from 'next/navigation'
 import { Card } from '@/app/components/ui/Card';
 import { createPortal } from 'react-dom';
+import { Button } from '@/app/components/ui/Button';
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = ['Todos', 'Factura', 'Boleta', 'Nota de Crédito', 'Nota de Débito'];
@@ -131,7 +132,13 @@ export default function VerComprobantesPage() {
         } else if (modoAvanzado === 'unico') {
             if (!avSerie || !avNumero) { showToast('Ingrese serie y número', 'error'); return }
             setSucursalFiltro(null)
-            await hookUnico.fetchComprobante({ ruc: rucEmpresa, serie: avSerie, numero: Number(avNumero) })
+            const resultado = await hookUnico.fetchComprobante({ ruc: rucEmpresa, serie: avSerie, numero: Number(avNumero) })
+            if (resultado) {
+                setComprobantes([resultado])
+            } else {
+                setComprobantes([])
+                showToast('No se encontró el comprobante', 'error')
+            }
         } else if (modoAvanzado === 'cliente') {
             if (!avClienteDoc) { showToast('Ingrese el número de documento del cliente', 'error'); return }
             if (isSuperAdmin) {
@@ -339,11 +346,9 @@ export default function VerComprobantesPage() {
 
                         {/* Div 2: Nuevo Comprobante */}
                         <div className="shrink-0">
-                            <button
-                                onClick={() => router.push('/factunet/operaciones')}
-                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-colors">
-                                <Plus size={14} /> Nuevo Comprobante
-                            </button>
+                            <Button onClick={() => router.push("/factunet/operaciones")}>
+                                <Plus className="w-4 h-4" /> Nuevo Comprobante
+                            </Button>
                         </div>
 
                     </div>

@@ -1152,96 +1152,56 @@ export default function FacturaPage() {
     ) => {
       const esGratuito = TIPOS_GRATUITOS.includes(tipoAfectacion);
       const precioUnitario = parseFloat(precioBase.toFixed(6));
-      let baseIgv = 0,
-        montoIGV = 0,
-        totalVentaItem = 0,
-        valorVenta = 0;
+      let baseIgv = 0, montoIGV = 0, totalVentaItem = 0, valorVenta = 0;
       let precioVenta = parseFloat(precioVentaConIGV.toFixed(2));
       let descuentoTotal = 0;
 
       if (esGratuito) {
         baseIgv = parseFloat((precioBase * cantidad).toFixed(2));
-        montoIGV =
-          tipoAfectacion === "11"
-            ? parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2))
-            : 0;
+        montoIGV = tipoAfectacion === "11"
+          ? parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2))
+          : 0;
         precioVenta = 0;
         totalVentaItem = 0;
         valorVenta = baseIgv;
-        return {
-          precioUnitario,
-          precioVenta,
-          baseIgv,
-          montoIGV,
-          totalVentaItem,
-          valorVenta,
-          descuentoTotal,
-        };
+        return { precioUnitario, precioVenta, baseIgv, montoIGV, totalVentaItem, valorVenta, descuentoTotal };
       }
 
       if (tipoAfectacion === "10") {
-        const pvConIGV = parseFloat(
-          (precioBase * (1 + porcentajeIGV / 100)).toFixed(2),
-        );
         if (codigoDescuento === "00") {
-          baseIgv = parseFloat(
-            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
-          );
-          montoIGV = parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2));
           precioVenta = parseFloat(
-            (
-              (precioBase - descuentoUnitario) *
-              (1 + porcentajeIGV / 100)
-            ).toFixed(2),
+            ((precioBase - descuentoUnitario) * (1 + porcentajeIGV / 100)).toFixed(2),
           );
           totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
+          montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + porcentajeIGV / 100)).toFixed(2));
+          baseIgv = parseFloat((totalVentaItem - montoIGV).toFixed(2));
           valorVenta = baseIgv;
-          descuentoTotal = parseFloat(
-            (descuentoUnitario * cantidad).toFixed(2),
-          );
+          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
         } else {
-          baseIgv = parseFloat((precioBase * cantidad).toFixed(2));
-          montoIGV = parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2));
-          precioVenta = parseFloat((pvConIGV - descuentoUnitario).toFixed(2));
-          totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
+          totalVentaItem = parseFloat((precioVentaConIGV * cantidad).toFixed(2));
+          montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + porcentajeIGV / 100)).toFixed(2));
+          baseIgv = parseFloat((totalVentaItem - montoIGV).toFixed(2));
+          precioVenta = parseFloat((precioVentaConIGV - descuentoUnitario).toFixed(2));
           valorVenta = baseIgv;
-          descuentoTotal = parseFloat(
-            (descuentoUnitario * cantidad).toFixed(2),
-          );
+          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
         }
       } else {
         if (codigoDescuento === "00") {
-          baseIgv = parseFloat(
-            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
-          );
+          baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2));
           precioVenta = parseFloat((precioBase - descuentoUnitario).toFixed(2));
           totalVentaItem = parseFloat(baseIgv.toFixed(2));
-          descuentoTotal = parseFloat(
-            (descuentoUnitario * cantidad).toFixed(2),
-          );
+          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
         } else {
           baseIgv = parseFloat((precioBase * cantidad).toFixed(2));
           precioVenta = parseFloat(precioBase.toFixed(2));
-          totalVentaItem = parseFloat(
-            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
-          );
-          descuentoTotal = parseFloat(
-            (descuentoUnitario * cantidad).toFixed(2),
-          );
+          totalVentaItem = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2));
+          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
         }
         montoIGV = 0;
         valorVenta = baseIgv;
       }
 
-      return {
-        precioUnitario,
-        precioVenta,
-        baseIgv,
-        montoIGV,
-        totalVentaItem,
-        valorVenta,
-        descuentoTotal,
-      };
+      return { precioUnitario, precioVenta, baseIgv, montoIGV, totalVentaItem, valorVenta, descuentoTotal };
     },
     [],
   );
@@ -1701,6 +1661,10 @@ export default function FacturaPage() {
         "error",
       );
       return;
+    }
+    const consumoItem = detalles.find(d => d._id === "por-consumo");
+    if (consumoItem && (consumoItem.precioVenta ?? 0) <= 0) {
+        showToast('El ítem "Por Consumo" debe tener un precio mayor a cero', "error"); return;
     }
     if (aplicarDetraccion) {
       if (totales.importeTotal < 700) {
