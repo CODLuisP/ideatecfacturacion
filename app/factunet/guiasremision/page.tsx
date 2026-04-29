@@ -55,6 +55,9 @@ interface GuiaDto {
   llegadaDireccion?: string;
   transportistaRznSocial?: string;
   transportistaPlaca?: string;
+  choferNombres?: string;
+  choferApellidos?: string;
+  choferLicencia?: string;
   clienteCorreo?: string;
   enviadoPorCorreo: boolean;
   clienteWhatsapp?: string;
@@ -550,7 +553,12 @@ export default function GuiasRemisionPage() {
       </style>
 
       <Card className="p-0 rounded-2xl border border-gray-200 overflow-hidden">
-  <div className={cn("guia-table-wrapper", showAvanzado && "guia-table-wrapper-avanzado")}>
+        <div
+          className={cn(
+            "guia-table-wrapper",
+            showAvanzado && "guia-table-wrapper-avanzado",
+          )}
+        >
           {tipoGuia === "remitente" ? (
             <TablaRemitente
               guias={filtered}
@@ -634,10 +642,7 @@ function TablaRemitente({
             DESTINATARIO
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            PUNTO PARTIDA
-          </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            PUNTO LLEGADA
+            PLACA
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             TRANSPORTISTA
@@ -701,20 +706,14 @@ function TablaRemitente({
                 </div>
               </td>
               <td className="px-5 py-4">
-                <span className="text-xs text-gray-600 flex items-start gap-1">
-                  <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
-                  <span className="line-clamp-2">
-                    {g.partidaDireccion ?? "—"}
+                {g.transportistaPlaca ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-mono font-semibold text-gray-700">
+                    <Truck size={11} className="text-gray-500" />
+                    {g.transportistaPlaca}
                   </span>
-                </span>
-              </td>
-              <td className="px-5 py-4">
-                <span className="text-xs text-gray-600 flex items-start gap-1">
-                  <MapPin size={12} className="text-blue-400 mt-0.5 shrink-0" />
-                  <span className="line-clamp-2">
-                    {g.llegadaDireccion ?? "—"}
-                  </span>
-                </span>
+                ) : (
+                  <span className="text-xs text-gray-400">—</span>
+                )}
               </td>
               <td className="px-5 py-4">
                 <span className="text-xs text-gray-600 flex items-center gap-1">
@@ -833,7 +832,7 @@ function TablaTransportista({
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             VER
           </th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center rounded-tl-2xl">
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center rounded-tr-2xl">
             OPCIONES
           </th>
         </tr>

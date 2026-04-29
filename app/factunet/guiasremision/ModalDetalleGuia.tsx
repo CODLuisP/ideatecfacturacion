@@ -184,7 +184,8 @@ export const ModalDetalleGuia = ({
 }: ModalDetalleGuiaProps) => {
   const [guia, setGuia] = useState<GuiaDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [loadingVer, setLoadingVer] = useState(false);
+  const [loadingDescargar, setLoadingDescargar] = useState(false);
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const sizeRef = useRef<HTMLDivElement>(null);
 
@@ -223,7 +224,8 @@ export const ModalDetalleGuia = ({
   const obtenerPdf = useCallback(
     async (abrir: boolean) => {
       if (!guia) return;
-      setLoadingPdf(true);
+      if (abrir) setLoadingVer(true);
+      else setLoadingDescargar(true);
       try {
         const ventana = abrir ? window.open("", "_blank") : null;
         if (ventana) {
@@ -257,7 +259,8 @@ export const ModalDetalleGuia = ({
         }
       } catch {
       } finally {
-        setLoadingPdf(false);
+        if (abrir) setLoadingVer(false);
+        else setLoadingDescargar(false);
         setShowSizeMenu(false);
       }
     },
@@ -293,7 +296,7 @@ export const ModalDetalleGuia = ({
   const tieneChoferSecundario2 = guia?.choferSecundario2Doc;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 min-h-screen h-full">
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col animate-in zoom-in-95 duration-200"
         style={{ maxHeight: "90vh" }}
@@ -362,6 +365,19 @@ export const ModalDetalleGuia = ({
                   </span>
                 )}
               </div>
+              {/* Mensaje SUNAT */}
+              {guia.mensajeRespuestaSunat && (
+                <p
+                  className={cn(
+                    "text-xs rounded-xl px-3 py-2",
+                    guia.estadoSunat === "ACEPTADO"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-red-50 text-red-600",
+                  )}
+                >
+                  {guia.mensajeRespuestaSunat}
+                </p>
+              )}
 
               {/* Info general */}
               <div className="grid grid-cols-2 gap-3">
@@ -687,20 +703,6 @@ export const ModalDetalleGuia = ({
                   </div>
                 </div>
               )}
-
-              {/* Mensaje SUNAT */}
-              {guia.mensajeRespuestaSunat && (
-                <p
-                  className={cn(
-                    "text-xs rounded-xl px-3 py-2",
-                    guia.estadoSunat === "ACEPTADO"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-red-50 text-red-600",
-                  )}
-                >
-                  {guia.mensajeRespuestaSunat}
-                </p>
-              )}
             </>
           )}
         </div>
@@ -709,22 +711,27 @@ export const ModalDetalleGuia = ({
         <div className="px-6 pb-6 pt-3 flex gap-2 border-t border-gray-100 shrink-0">
           <button
             onClick={() => obtenerPdf(true)}
-            disabled={loadingPdf || loading || !guia}
+            disabled={loadingVer || loading || !guia}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {loadingPdf ? (
+            {loadingVer ? (
               <RefreshCw size={15} className="animate-spin" />
             ) : (
               <Eye size={15} />
-            )}{" "}
+            )}
             Ver PDF
           </button>
           <button
             onClick={() => obtenerPdf(false)}
-            disabled={loadingPdf || loading || !guia}
+            disabled={loadingDescargar || loading || !guia}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50 transition-colors"
           >
-            <Download size={15} /> Descargar PDF
+            {loadingDescargar ? (
+              <RefreshCw size={15} className="animate-spin" />
+            ) : (
+              <Download size={15} />
+            )}
+            Descargar PDF
           </button>
           <button
             onClick={onClose}

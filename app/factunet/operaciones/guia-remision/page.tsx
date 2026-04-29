@@ -1164,6 +1164,24 @@ export default function GuiaRemisionPage() {
       const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
       const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
 
+      // ── Verificar estado de conexión WhatsApp ──────────────────────
+      const resEstado = await fetch(`${whatsappBase}/api/status`, {
+        headers: {
+          "x-api-key": whatsappApiKey,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!resEstado.ok)
+        throw new Error("No se pudo verificar el estado de WhatsApp");
+
+      const estadoData = await resEstado.json();
+      if (!estadoData.exito || estadoData.datos?.estado !== "conectado") {
+        throw new Error(
+          estadoData.datos?.mensaje ?? "WhatsApp no está conectado",
+        );
+      }
+
+      // ── Subir PDF ──────────────────────────────────────────────────
       const uploadForm = new FormData();
       uploadForm.append("file", pdfFile);
       const resUpload = await fetch(`${whatsappBase}/api/upload`, {
@@ -1175,6 +1193,7 @@ export default function GuiaRemisionPage() {
       const uploadData = await resUpload.json();
       const fileUrl = uploadData.datos.url;
 
+      // ── Enviar mensaje ─────────────────────────────────────────────
       const numeroFormateado = telefonoEnvio.startsWith("51")
         ? telefonoEnvio
         : `51${telefonoEnvio}`;
@@ -1999,7 +2018,6 @@ export default function GuiaRemisionPage() {
                                   (_, j) => j !== i,
                                 ),
                               );
-                              // 👈 limpiar bienes precargados al quitar el documento
                               setBienesPreCargados([]);
                               setBienes([]);
                             }}
