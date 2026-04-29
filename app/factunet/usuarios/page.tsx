@@ -409,12 +409,18 @@ export default function UsuariosPage() {
   };
 
   // ── Filtrado ───────────────────────────────────────────────────────────────
-  const filtered = usuarios.filter((u) => {
+const filtered = usuarios
+  .filter((u) => {
     const matchSearch =
       u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchRol = rolFilter === "todos" || u.rol === rolFilter;
     return matchSearch && matchRol;
+  })
+  .sort((a, b) => {
+    if (a.rol === "superadmin" && b.rol !== "superadmin") return -1;
+    if (a.rol !== "superadmin" && b.rol === "superadmin") return 1;
+    return 0;
   });
 
   const counts = {
