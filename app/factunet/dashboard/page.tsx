@@ -1,9 +1,32 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { BarChart3, FileText, Zap, ChevronRight, X, Send, RotateCcw, CheckCircle2, AlertTriangle, XCircle,
-  Bell, Calendar, ShieldCheck, Eye, Plus, Building2,
+import {
+  BarChart3,
+  FileText,
+  Zap,
+  ChevronRight,
+  X,
+  Send,
+  RotateCcw,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Bell,
+  Calendar,
+  ShieldCheck,
+  Eye,
+  Plus,
+  Building2,
 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, } from "recharts";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 import { useRouter } from "next/navigation";
 import { Card } from "@/app/components/ui/Card";
 import { Button } from "@/app/components/ui/Button";
@@ -15,6 +38,7 @@ import { useDashboardSucursal } from "./gestionDashboard/UseDashboardSucursal";
 
 import { Skeleton } from "@/app/components/ui/Skeleton";
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
+import { DropdownSucursal } from "@/app/components/ui/DropdownSucursal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -118,14 +142,14 @@ const getUltimos7Dias = () => {
   };
 };
 
-  const getHoy = () => {
-    const hoy = new Date();
-    const año = hoy.getFullYear();
-    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-    const dia = String(hoy.getDate()).padStart(2, '0');
-    const fechaLocal = `${año}-${mes}-${dia}`;
-    return { desde: fechaLocal, hasta: fechaLocal };
-  };
+const getHoy = () => {
+  const hoy = new Date();
+  const año = hoy.getFullYear();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  const fechaLocal = `${año}-${mes}-${dia}`;
+  return { desde: fechaLocal, hasta: fechaLocal };
+};
 
 const estadoSunatLabel = (estado: string) => {
   const map: Record<string, "success" | "warning" | "error"> = {
@@ -452,14 +476,16 @@ export default function DashboardPage() {
   // ─── Hooks según rol
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();
-  const { sucursales } = useSucursalRuc(isSuperAdmin)
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null)
+  const { sucursales } = useSucursalRuc(isSuperAdmin);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<
+    number | null
+  >(null);
 
   // ─── Dashboard activo según contexto ──────────────────────────────
   const { dashboard, loading, error } = useMemo(() => {
     if (isSuperAdmin && sucursalSeleccionada) return hookSucursal; // superadmin + sucursal elegida
-    if (isSuperAdmin) return hookEmpresa;                          // superadmin sin selección
-    return hookSucursal;                                           // usuario normal
+    if (isSuperAdmin) return hookEmpresa; // superadmin sin selección
+    return hookSucursal; // usuario normal
   }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
@@ -479,7 +505,9 @@ export default function DashboardPage() {
       // usuario normal carga su sucursal
       hookSucursal.fetchDashboard({
         sucursalId: Number(user.sucursalID),
-        desde, hasta, limite: 10,
+        desde,
+        hasta,
+        limite: 10,
       });
     }
   }, [user]);
@@ -489,11 +517,11 @@ export default function DashboardPage() {
     if (!isSuperAdmin || !sucursalSeleccionada) return;
     const { desde, hasta } = getHoy();
 
-    hookSucursal.fetchDashboard({ 
-      sucursalId: sucursalSeleccionada, 
-      desde, 
-      hasta, 
-      limite: 10 
+    hookSucursal.fetchDashboard({
+      sucursalId: sucursalSeleccionada,
+      desde,
+      hasta,
+      limite: 10,
     });
   }, [sucursalSeleccionada]); // 👈 dispara solo cuando cambia la sucursal
 
@@ -533,7 +561,7 @@ export default function DashboardPage() {
   }, [dashboard?.rendimientoVentas]);
 
   const statusBadgeClass = (status: string) => estadoSunatLabel(status);
-  console.log("fetch", dashboard)
+  console.log("fetch", dashboard);
 
   return (
     <>
@@ -541,33 +569,26 @@ export default function DashboardPage() {
         <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />
       )}
 
-    <div className="mb-4 flex items-center justify-between gap-4">
-      {/* Izquierda: selector de sucursal (solo superadmin) */}
-      {isSuperAdmin ? (
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
-          <Building2 size={14} className="text-gray-400 shrink-0" />
-          <select
-            value={sucursalSeleccionada ?? ''}
-            onChange={e => handleSucursalChange(e.target.value ? Number(e.target.value) : null)}
-            className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
-          >
-            <option value="">Todas las sucursales</option>
-            {sucursales.map(s => (
-              <option key={s.sucursalId} value={s.sucursalId}>
-                {s.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : (
-        <div /> // espacio vacío para mantener el botón a la derecha
-      )}
+      <div className="mb-4 flex items-center justify-between gap-4">
+        {/* Izquierda: selector de sucursal (solo superadmin) */}
+        {isSuperAdmin ? (
+          <div className="flex">
+            <DropdownSucursal
+              sucursales={sucursales}
+              seleccionada={sucursalSeleccionada}
+              onSelect={handleSucursalChange}
+            />
+          </div>
+        ) : (
+          <div />
+        )}
 
-      {/* Derecha: siempre fijo */}
-      <Button onClick={() => router.push("/factunet/operaciones")}>
-        <Plus className="w-4 h-4" /> Nuevo Comprobante
-      </Button>
-    </div>
+        {/* Derecha: siempre fijo */}
+
+        <Button onClick={() => router.push("/factunet/operaciones")}>
+          <Plus className="w-4 h-4" /> Nuevo Comprobante
+        </Button>
+      </div>
 
       <div className="space-y-4 animate-in fade-in duration-500 ">
         {/* KPI Grid */}
@@ -667,7 +688,7 @@ export default function DashboardPage() {
               subtitle="Resumen de los últimos 7 días"
             >
               <div className="h-75 w-full mt-4 min-h-0">
-                {!dashboard || chartData.every(d => d.sales === 0) ? (
+                {!dashboard || chartData.every((d) => d.sales === 0) ? (
                   <div className="h-full flex items-center justify-center text-gray-400 text-sm">
                     Sin datos en el período seleccionado
                   </div>
