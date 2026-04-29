@@ -1,31 +1,27 @@
 import { useState } from 'react'
-import axios from 'axios'
 import { BoletaCliente } from './Boleta'
+import { consultaDni } from '@/app/components/apiConsultasJsonPe/consultaDni'
+import { consultaRuc } from '@/app/components/apiConsultasJsonPe/consultaRuc'
 
 export function useClienteBoleta() {
   const [cliente, setCliente] = useState<Partial<BoletaCliente> | null>(null)
   const [loadingCliente, setLoadingCliente] = useState(false)
   const [errorCliente, setErrorCliente] = useState<string | null>(null)
 
-  const buscarCliente = async ( tipoDoc: string, numeroDoc: string) => {
+  const buscarCliente = async (tipoDoc: string, numeroDoc: string) => {
     if (!numeroDoc) return
     setLoadingCliente(true)
     setErrorCliente(null)
 
     try {
-      // 2. Si no está en BD, buscar en API SUNAT según tipo doc
       if (tipoDoc === '01') {
-        // DNI
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/dni/${numeroDoc}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
-        )
-        const data = await res.json()
-        if (data.success) {
+        const result = await consultaDni(numeroDoc)
+        if (result) {
           setCliente({
             clienteId: null,
             tipoDocumento: tipoDoc,
             numeroDocumento: numeroDoc,
-            razonSocial: `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`,
+            razonSocial: result.nombreCompleto,
             ubigeo: '',
             direccionLineal: '',
             departamento: '',
@@ -36,23 +32,21 @@ export function useClienteBoleta() {
           setErrorCliente('No se encontró el DNI.')
         }
       } else if (tipoDoc === '06') {
-        // RUC
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/ruc/${numeroDoc}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
-        )
-        const data = await res.json()
-        if (data.ruc) {
+        const result = await consultaRuc(numeroDoc)
+        if (result) {
           setCliente({
             clienteId: null,
             tipoDocumento: tipoDoc,
             numeroDocumento: numeroDoc,
-            razonSocial: data.razonSocial ?? '',
-            ubigeo: data.ubigeo ?? '',
-            direccionLineal: data.direccion ?? '',
-            departamento: data.departamento ?? '',
-            provincia: data.provincia ?? '',
-            distrito: data.distrito ?? '',
+            razonSocial: result.razonSocial,
+            ubigeo: result.ubigeo,
+            direccionLineal: result.direccionLineal,
+            departamento: result.departamento,
+            provincia: result.provincia,
+            distrito: result.distrito,
           })
+        } else {
+          setErrorCliente('RUC no encontrado')
         }
       }
     } catch {

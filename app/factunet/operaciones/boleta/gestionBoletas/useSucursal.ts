@@ -10,23 +10,30 @@ export function useSucursal() {
   const [sucursal, setSucursal] = useState<Sucursal | null>(null)
   const [loadingSucursal, setLoadingSucursal] = useState(false)
 
+  const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
+
   const fetchSucursal = async () => {
-    // ✅ No llamar si es superadmin o no tiene sucursalID
     if (!user?.sucursalID || user?.rol === 'superadmin') return
 
     setLoadingSucursal(true)
-    try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user.sucursalID}`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
+
+    for (let i = 0; i < 3; i++) {
+      try {
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${user.sucursalID}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+        setSucursal(res.data)
+        setLoadingSucursal(false)
+        return
+      } catch {
+        if (i < 2) {
+          await sleep(1000 * (i + 1))
+        } else {
+          showToast("Error al obtener la sucursal", "error")
+          setLoadingSucursal(false)
         }
-      )
-      setSucursal(res.data)
-    } catch {
-      showToast("Error al obtener la sucursal", "error");
-    } finally {
-      setLoadingSucursal(false)
+      }
     }
   }
 

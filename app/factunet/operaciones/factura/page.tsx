@@ -11,7 +11,6 @@ import {
   ExternalLink,
   UserRound,
   ClipboardList,
-  ChevronLeft,
   Info,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
@@ -2317,7 +2316,7 @@ export default function FacturaPage() {
                   </div>
 
                   {/* Dirección */}
-                  {factura.cliente?.razonSocial && (
+                  {factura.cliente?.direccionLineal && (
                     <div className="md:col-span-2">
                       <input
                         type="text"

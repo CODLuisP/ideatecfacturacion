@@ -1718,7 +1718,7 @@ export default function BoletaPage() {
                     </div>
                   </div>
 
-                  {boleta.cliente?.razonSocial && !clienteVarios && (
+                  {boleta.cliente?.direccionLineal && !clienteVarios && (
                     <div className="md:col-span-2">
                       <input type="text" disabled value={boleta.cliente?.direccionLineal ?? ""} placeholder="Dirección del cliente"
                         className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500" />

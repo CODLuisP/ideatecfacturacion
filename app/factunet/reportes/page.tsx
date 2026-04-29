@@ -105,7 +105,6 @@ export default function ReportesPage() {
     } else {
       (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
     }
-    setPaginaGrafico(0);
   };
 
   useEffect(() => {
@@ -138,7 +137,6 @@ export default function ReportesPage() {
     } else {
       (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
     }
-    setPaginaGrafico(0);
   };
 
   // ── Datos gráfico con paginación (solo mes y personalizado) ────────────────
@@ -148,6 +146,14 @@ export default function ReportesPage() {
   const graficoPaginado = necesitaPaginacion
     ? graficoCompleto.slice(paginaGrafico * DIAS_POR_PAGINA, (paginaGrafico + 1) * DIAS_POR_PAGINA)
     : graficoCompleto;
+
+    useEffect(() => {
+      if (graficoCompleto.length > DIAS_POR_PAGINA) {
+        setPaginaGrafico(Math.ceil(graficoCompleto.length / DIAS_POR_PAGINA) - 1)
+      } else {
+        setPaginaGrafico(0)
+      }
+    }, [graficoCompleto.length])
 
   // ── Distribución donut ──────────────────────────────────────────────────────
   const donutData = useMemo(() => {

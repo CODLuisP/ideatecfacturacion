@@ -6,6 +6,8 @@ import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
 import { useToast } from "@/app/components/ui/Toast";
 import { Sucursal } from "../../operaciones/boleta/gestionBoletas/Boleta";
+import { consultaDni } from "@/app/components/apiConsultasJsonPe/consultaDni";
+import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
 
 interface AgregarClienteProps {
   isOpen: boolean;
@@ -69,71 +71,46 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
     setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));
 
     try {
-      const res = await fetch("https://api.json.pe/api/dni", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_JSONPE_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ dni: nuevoCliente.numeroDocumento }),
-      });
-
-      const data = await res.json();
-      console.log("datos de dni: ", data)
-
-      if (data.success && data.data) {
-        const { nombres, apellido_paterno, apellido_materno } = data.data;
-        const nombreCompleto = `${nombres} ${apellido_paterno} ${apellido_materno}`;
-        setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: nombreCompleto }));
+      const result = await consultaDni(nuevoCliente.numeroDocumento);
+      if (result) {
+        setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: result.nombreCompleto }));
       } else {
         showToast("No se encontró el DNI, verifica el número o llénalo manualmente.", "info");
       }
-    } catch (error) {
+    } catch {
       showToast("Error al conectar con la API, llena los datos manualmente.", "error");
     }
   };
 
-const buscarRuc = async () => {
-  if (nuevoCliente.numeroDocumento.length !== 11) {
-    setLengthErrors(prev => ({ ...prev, numeroDocumento: "El RUC debe tener 11 dígitos" }));
-    return;
-  }
-  setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));
-
-  try {
-    const res = await fetch("https://api.json.pe/api/ruc", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_JSONPE_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ruc: nuevoCliente.numeroDocumento }),
-    });
-
-    const data = await res.json();
-    console.log("datos de ruc: ", data)
-
-    if (data.success && data.data) {
-      const d = data.data;
-      setNuevoCliente((prev: any) => ({
-        ...prev,
-        razonSocialNombre: d.nombre_o_razon_social || "",
-        direccion: {
-          ...prev.direccion,
-          direccionLineal: d.direccion || "",
-          departamento: d.departamento || "",
-          provincia: d.provincia || "",
-          distrito: d.distrito || "",
-          ubigeo: d.ubigeo_sunat || "",
-        },
-      }));
-    } else {
-      showToast("No se encontró el RUC, verifica el número o llénalo manualmente.", "info");
+  const buscarRuc = async () => {
+    if (nuevoCliente.numeroDocumento.length !== 11) {
+      setLengthErrors(prev => ({ ...prev, numeroDocumento: "El RUC debe tener 11 dígitos" }));
+      return;
     }
-  } catch (error) {
-    showToast("Error al conectar con la API, llena los datos manualmente.", "error");
-  }
-};
+    setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));
+
+    try {
+      const result = await consultaRuc(nuevoCliente.numeroDocumento);
+      if (result) {
+        setNuevoCliente((prev: any) => ({
+          ...prev,
+          razonSocialNombre: result.razonSocial,
+          direccion: {
+            ...prev.direccion,
+            direccionLineal: result.direccionLineal,
+            departamento: result.departamento,
+            provincia: result.provincia,
+            distrito: result.distrito,
+            ubigeo: result.ubigeo,
+          },
+        }));
+      } else {
+        showToast("No se encontró el RUC, verifica el número o llénalo manualmente.", "info");
+      }
+    } catch {
+      showToast("Error al conectar con la API, llena los datos manualmente.", "error");
+    }
+  };
 
   //Elegimos que funcion usar
   const buscarDocumento = () => {
