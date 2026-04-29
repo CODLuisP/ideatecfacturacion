@@ -47,7 +47,18 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
   const [mostrarDireccion, setMostrarDireccion] = React.useState(false); 
 
   useEffect(() => {
-  setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: "" }));
+    setNuevoCliente((prev: any) => ({ 
+      ...prev, 
+      razonSocialNombre: "",
+      direccion: {
+        ...prev.direccion,
+        direccionLineal: "",
+        departamento: "",
+        provincia: "",
+        distrito: "",
+        ubigeo: "",
+      }
+    }));
   }, [nuevoCliente.numeroDocumento]);
 
   const buscarDni = async () => {
@@ -55,57 +66,74 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
       setLengthErrors(prev => ({ ...prev, numeroDocumento: "El DNI debe tener 8 dígitos" }));
       return;
     }
-    setLengthErrors(prev => ({ ...prev, numeroDocumento: "" })); // limpiar error si pasa la validación
-  try {
-    const res = await fetch(
-      `https://dniruc.apisperu.com/api/v1/dni/${nuevoCliente.numeroDocumento}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
-    );
-    const data = await res.json();
-    if (data.success) {
-      const nombreCompleto = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`;
-      setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: nombreCompleto }));
-    }else {
-      showToast("No se encontró el DNI, verifica el número o llénalo manualmente.", "info");
+    setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));
+
+    try {
+      const res = await fetch("https://api.json.pe/api/dni", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_JSONPE_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ dni: nuevoCliente.numeroDocumento }),
+      });
+
+      const data = await res.json();
+      console.log("datos de dni: ", data)
+
+      if (data.success && data.data) {
+        const { nombres, apellido_paterno, apellido_materno } = data.data;
+        const nombreCompleto = `${nombres} ${apellido_paterno} ${apellido_materno}`;
+        setNuevoCliente((prev: any) => ({ ...prev, razonSocialNombre: nombreCompleto }));
+      } else {
+        showToast("No se encontró el DNI, verifica el número o llénalo manualmente.", "info");
+      }
+    } catch (error) {
+      showToast("Error al conectar con la API, llena los datos manualmente.", "error");
     }
-  } catch (error) {
-    showToast("Error al conectar con la API, llena los datos manualmente.", "error");
-  }
   };
 
-  const buscarRuc = async () => {
+const buscarRuc = async () => {
   if (nuevoCliente.numeroDocumento.length !== 11) {
     setLengthErrors(prev => ({ ...prev, numeroDocumento: "El RUC debe tener 11 dígitos" }));
     return;
   }
+  setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));
 
-  setLengthErrors(prev => ({ ...prev, numeroDocumento: "" }));// limpiar error si pasa la validación
   try {
-    const res = await fetch(
-      `https://dniruc.apisperu.com/api/v1/ruc/${nuevoCliente.numeroDocumento}?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVzbHVpc2NhYnJlcmEyMEBnbWFpbC5jb20ifQ.6itYzECdbiU5iZ8loM3Os1kdGrX-dXXOmdrMnYVo2no`
-    );
+    const res = await fetch("https://api.json.pe/api/ruc", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_JSONPE_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ruc: nuevoCliente.numeroDocumento }),
+    });
+
     const data = await res.json();
-    if (data.ruc) {
+    console.log("datos de ruc: ", data)
+
+    if (data.success && data.data) {
+      const d = data.data;
       setNuevoCliente((prev: any) => ({
         ...prev,
-        razonSocialNombre: data.razonSocial || "",
-        nombreComercial: data.nombreComercial || "",
-        telefono: data.telefonos?.[0] || "",
+        razonSocialNombre: d.nombre_o_razon_social || "",
         direccion: {
           ...prev.direccion,
-          direccionLineal: data.direccion || "",
-          departamento: data.departamento || "",
-          provincia: data.provincia || "",
-          distrito: data.distrito || "",
-          ubigeo: data.ubigeo || ""
-        }
+          direccionLineal: d.direccion || "",
+          departamento: d.departamento || "",
+          provincia: d.provincia || "",
+          distrito: d.distrito || "",
+          ubigeo: d.ubigeo_sunat || "",
+        },
       }));
     } else {
       showToast("No se encontró el RUC, verifica el número o llénalo manualmente.", "info");
     }
   } catch (error) {
-      showToast("Error al conectar con la API, llena los datos manualmente.", "error");
+    showToast("Error al conectar con la API, llena los datos manualmente.", "error");
   }
-  };
+};
 
   //Elegimos que funcion usar
   const buscarDocumento = () => {
@@ -163,7 +191,12 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
           <select
             value={nuevoCliente.tipoDocumentoId}
             onChange={(e) => {
-              setNuevoCliente((f: any) => ({ ...f, tipoDocumentoId: e.target.value }));
+              setNuevoCliente((f: any) => ({ 
+                ...f, 
+                tipoDocumentoId: e.target.value,
+                numeroDocumento: "",
+                razonSocialNombre: "",
+              }));
               setMostrarDireccion(false);
             }}
             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue"

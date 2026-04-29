@@ -15,6 +15,8 @@ import { usePagarCuota } from './gestionCuentasPorCobrar/UsePagarCuota';
 import { CuentaPorCobrar, Cuota, PagarCuotaPayload } from './gestionCuentasPorCobrar/CuentasPorCobrar';
 import { formatFecha, formatMoneda, tipoComprobanteLabel, getEstadoCuota, ESTADO_CUOTA_COLORS, getCuotaVencida, getDiasVencida } from './gestionCuentasPorCobrar/helpers';
 import { ModalPagarCuota } from '@/app/components/modalCuentasPorCobrar/ModalPagarCuota';
+import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursalRuc';
+import { useSucursal } from '../operaciones/boleta/gestionBoletas/useSucursal';
 
 const TIPO_OPTS = ['Todos', 'Factura', 'Boleta'];
 
@@ -22,6 +24,22 @@ export default function CuentasPorCobrarPage() {
   const { user, accessToken } = useAuth();
   const { showToast } = useToast();
   const rucEmpresa = user?.ruc ?? '';
+
+
+  const isSuperAdmin = user?.rol === 'superadmin'
+
+  // Solo carga sucursales si es superadmin
+  const { sucursales, loadingSucursales } = useSucursalRuc(isSuperAdmin)
+
+  // Solo carga su sucursal si NO es superadmin
+  const { sucursal } = useSucursal()
+
+  const [sucursalFiltro, setSucursalFiltro] = useState<string | null>(null)
+
+  const getCodEstablecimiento = () => {
+    if (isSuperAdmin) return sucursalFiltro
+    return sucursal?.codEstablecimiento ?? null
+  }
 
   const hookCuentas = useCuentasPorCobrar();
   const hookCuotas  = useCuotasComprobante();
@@ -40,14 +58,19 @@ export default function CuentasPorCobrarPage() {
   const hoy = new Date().toISOString().split('T')[0];
 
   const cargar = async () => {
-    const data = await hookCuentas.fetchCuentas({ empresaRuc: rucEmpresa });
+    const data = await hookCuentas.fetchCuentas({
+      empresaRuc: rucEmpresa,
+      establecimientoAnexo: isSuperAdmin ? sucursalFiltro : (getCodEstablecimiento() ?? null)
+    });
     setCuentas(data);
   };
 
   useEffect(() => {
-    if (!user || !accessToken) return;
-    cargar();
-  }, [user, accessToken]);
+    if (!user || !accessToken) return
+    // Superadmin no necesita esperar sucursal
+    if (!isSuperAdmin && !sucursal) return
+    cargar()
+  }, [user, accessToken, sucursalFiltro, sucursal])
 
   const verCuotas = async (c: CuentaPorCobrar) => {
     setComprobanteSeleccionado(c);
@@ -108,7 +131,7 @@ export default function CuentasPorCobrarPage() {
   const loading = hookCuentas.loading;
 
   return (
-    <div className="space-y-3 animate-in fade-in duration-500">
+    <div className="space-y-3 py-1 animate-in fade-in duration-500">
 
       {/* Modal Pagar */}
       {cuotaPagar && comprobanteSeleccionado && (
@@ -141,6 +164,29 @@ export default function CuentasPorCobrarPage() {
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+              {/* Select sucursal — solo superadmin */}
+              {isSuperAdmin && (
+                <div className="relative">
+                  <select
+                    value={sucursalFiltro ?? ''}
+                    onChange={e => setSucursalFiltro(e.target.value || null)}
+                    className={cn(
+                      "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all shadow-sm",
+                      sucursalFiltro
+                        ? "bg-blue-50 border-blue-300 text-blue-700"
+                        : "bg-white border-gray-200 text-gray-600"
+                    )}
+                  >
+                    <option value="">Todas las sucursales</option>
+                    {sucursales.map(s => (
+                      <option key={s.sucursalId} value={s.codEstablecimiento}>
+                        {s.nombre ?? s.codEstablecimiento}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              )}
             <DropdownFiltro label="Tipo" value={filtroTipo} options={TIPO_OPTS} onChange={setFiltroTipo} />
             <button
               onClick={() => setShowAvanzado(o => !o)}

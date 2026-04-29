@@ -461,7 +461,7 @@ export default function VerComprobantesPage() {
             {/* ── Contador ── */}
             <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">
-                    Total <span className="font-semibold text-gray-900">{comprobantes.length}</span> comprobantes
+                    Total <span className="font-semibold text-gray-900">{paginated.length}</span> comprobantes
                 </p>
                 {(!!search || filtroTipo !== 'Todos' || filtroEstado !== 'Todos') && filtered.length === 0 && (
                     <p className="text-sm text-amber-600 font-medium">Sin resultados para esta búsqueda</p>
@@ -690,27 +690,33 @@ const DropdownOpciones = ({ comprobante, onEnviarSunat, onEditarEnviarSunat, onR
     const [open, setOpen] = useState(false);
     const [pos, setPos] = useState({ top: 0, left: 0 });
     const btnRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null); // ← AGREGAR ESTA REF
     const esAceptado = comprobante.estadoSunat === 'ACEPTADO';
     const esPendiente = comprobante.estadoSunat === 'PENDIENTE';
     const esRechazado = comprobante.estadoSunat === 'RECHAZADO';
     const esFacturaOBoleta = comprobante.tipoComprobante === '01' || comprobante.tipoComprobante === '03';
 
-const handleOpen = () => {
-    if (btnRef.current) {
-        const rect = btnRef.current.getBoundingClientRect()
-        setPos({
-            top: rect.bottom + window.scrollY, // 👈 desde abajo del botón
-            left: rect.left + window.scrollX - 180,
-        })
+    const handleOpen = () => {
+        if (btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect()
+            setPos({
+                top: rect.bottom + window.scrollY, 
+                left: rect.left + window.scrollX - 180,
+            })
+        }
+        setOpen(o => !o)
     }
-    setOpen(o => !o)
-}
 
     useEffect(() => {
         if (!open) return
         const handler = (e: MouseEvent) => {
-            if (btnRef.current && !btnRef.current.contains(e.target as Node)) 
+            // ← AHORA VERIFICA AMBAS REFS
+            if (
+                btnRef.current && !btnRef.current.contains(e.target as Node) &&
+                menuRef.current && !menuRef.current.contains(e.target as Node)
+            ) {
                 setOpen(false)
+            }
         }
         document.addEventListener('mousedown', handler)
         return () => document.removeEventListener('mousedown', handler)
@@ -728,6 +734,7 @@ const handleOpen = () => {
 
             {open && createPortal(
                 <div
+                    ref={menuRef} // ← ASIGNAR REF AQUÍ
                     style={{ position: 'absolute', top: pos.top, left: pos.left, zIndex: 9999 }}
                     className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-50"
                 >
