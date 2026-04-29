@@ -81,7 +81,8 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
     const detallesFiltrados = comprobante.details ?? [];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 min-h-screen h-full">
+
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col animate-in zoom-in-95 duration-200" style={{ maxHeight: '90vh' }}>
 
                 {/* Header */}
