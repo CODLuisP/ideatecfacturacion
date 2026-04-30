@@ -612,9 +612,9 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     const sinDesc = itemsReales.findIndex(d => !d.descripcion?.trim());
     if (sinDesc !== -1) { showToast(`El ítem ${sinDesc + 1} no tiene descripción`, 'error'); return; }
     if (enviarCorreo && !correoCliente.trim()) { showToast('Ingrese el correo del cliente', 'error'); return; }
-    const consumoItem = itemsReales.find(i => i.id === 'por-consumo');
-    if (consumoItem && consumoItem.precioVentaConIGV <= 0) {
-        showToast('El ítem "Por Consumo" debe tener un precio mayor a cero', 'error'); return;
+    const sinPrecio = itemsReales.findIndex(i => i.precioVentaConIGV <= 0);
+    if (sinPrecio !== -1) {
+      showToast(`El ítem ${sinPrecio + 1} debe tener un precio mayor a cero`, 'error'); return;
     }
 
     setEmitiendo(true);
