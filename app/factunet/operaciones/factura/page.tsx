@@ -746,6 +746,7 @@ export default function FacturaPage() {
       isFirstSaveRef.current = false;
       return;
     }
+    if (emitido) return;
     sharedVentaStore.save(factura.cliente ?? null, detalles, {
       porConsumo,
       cantidadBolsa,
@@ -776,6 +777,12 @@ export default function FacturaPage() {
     setCorreoCliente("");
     setTelefonoCliente("");
   }, [cliente]);
+
+  useEffect(() => {
+    if (emitido) {
+      sharedVentaStore.clear();
+    }
+  }, [emitido]);
 
   useEffect(() => {
     if (!sucursalDelHook) return;
@@ -1767,6 +1774,7 @@ export default function FacturaPage() {
 
   //limpiamos para nueva factura
   const nuevaFactura = () => {
+    sharedVentaStore.clear();
     setEmitido(false);
     setPdfA4Url(null);
     setPdfTicketUrl(null);

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   BarChart3,
   FileText,
@@ -493,53 +493,52 @@ export default function DashboardPage() {
   // Filtro de fechas para rendimiento (default: últimos 7 días)
   const ultimos7 = getUltimos7Dias();
 
-  // ─── Carga inicial ─────────────────────────────────────────────────
-  useEffect(() => {
+  // ─── Carga de Datos (Consolidada) ──────────────────────────────
+  const fetchData = useCallback(async () => {
     if (!user) return;
     const { desde, hasta } = getHoy();
 
     if (isSuperAdmin) {
-      // superadmin siempre carga empresa al inicio
-      hookEmpresa.fetchDashboard({ ruc: user.ruc, desde, hasta, limite: 10 });
+      if (sucursalSeleccionada) {
+        await hookSucursal.fetchDashboard({
+          sucursalId: sucursalSeleccionada,
+          desde,
+          hasta,
+          limite: 10,
+        });
+      } else {
+        await hookEmpresa.fetchDashboard({
+          ruc: user.ruc,
+          desde,
+          hasta,
+          limite: 10,
+        });
+      }
     } else {
-      // usuario normal carga su sucursal
-      hookSucursal.fetchDashboard({
+      await hookSucursal.fetchDashboard({
         sucursalId: Number(user.sucursalID),
         desde,
         hasta,
         limite: 10,
       });
     }
-  }, [user]);
+  }, [user, isSuperAdmin, sucursalSeleccionada, hookEmpresa.fetchDashboard, hookSucursal.fetchDashboard]);
 
-  // ─── Cuando superadmin selecciona una sucursal ────────────────────
   useEffect(() => {
-    if (!isSuperAdmin || !sucursalSeleccionada) return;
-    const { desde, hasta } = getHoy();
-
-    hookSucursal.fetchDashboard({
-      sucursalId: sucursalSeleccionada,
-      desde,
-      hasta,
-      limite: 10,
-    });
-  }, [sucursalSeleccionada]); // 👈 dispara solo cuando cambia la sucursal
+    fetchData();
+  }, [fetchData]);
 
   // ─── Handler de selección ──────────────────────────────────────────
   const handleSucursalChange = (id: number | null) => {
-    hookSucursal.reset();
+    // Al resetear, el useEffect se encargará de disparar el fetch correcto
+    if (id === null) hookEmpresa.reset();
+    else hookSucursal.reset();
     setSucursalSeleccionada(id);
-
-    if (id === null) {
-      // volvió a "Todas las sucursales" → recarga empresa
-      const { desde, hasta } = getHoy();
-      hookEmpresa.fetchDashboard({ ruc: user!.ruc, desde, hasta, limite: 10 });
-    }
   };
 
   // Datos para el gráfico de rendimiento
   const chartData = useMemo(() => {
-    const dias: { name: string; sales: number }[] = [];
+    const dias: { name: string; sales: number; fechaRaw: string }[] = [];
     for (let i = 6; i >= 0; i--) {
       const fecha = new Date();
       fecha.setDate(fecha.getDate() - i);
@@ -555,10 +554,23 @@ export default function DashboardPage() {
           day: "2-digit",
         }),
         sales: encontrado ? Number(encontrado.totalVentas.toFixed(2)) : 0,
+        fechaRaw: fechaStr,
       });
     }
     return dias;
   }, [dashboard?.rendimientoVentas]);
+
+  const handleChartClick = (data: any) => {
+    if (data && data.activePayload && data.activePayload.length > 0) {
+      const { fechaRaw } = data.activePayload[0].payload;
+      router.push(`/factunet/comprobantes?desde=${fechaRaw}&hasta=${fechaRaw}`);
+    }
+  };
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const statusBadgeClass = (status: string) => estadoSunatLabel(status);
   console.log("fetch", dashboard);
@@ -589,6 +601,28 @@ export default function DashboardPage() {
           <Plus className="w-4 h-4" /> Nuevo Comprobante
         </Button>
       </div>
+
+      {/* Alerta de Error */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-red-900">Error al cargar datos</p>
+              <p className="text-xs text-red-600 mt-0.5">{error}</p>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => fetchData()}
+            className="bg-white border-red-200 text-red-700 hover:bg-red-50 text-xs px-3 py-1.5"
+          >
+            <RotateCcw size={14} className="mr-2" /> Reintentar
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-4 animate-in fade-in duration-500 ">
         {/* KPI Grid */}
@@ -677,7 +711,7 @@ export default function DashboardPage() {
                   <Skeleton className="h-3 w-32" />
                 </div>
               </div>
-              <div className="h-75 w-full">
+              <div className="h-80 w-full">
                 <Skeleton className="w-full h-full rounded-xl" />
               </div>
             </Card>
@@ -687,14 +721,18 @@ export default function DashboardPage() {
               title="Rendimiento de Ventas"
               subtitle="Resumen de los últimos 7 días"
             >
-              <div className="h-75 w-full mt-4 min-h-0">
-                {!dashboard || chartData.every((d) => d.sales === 0) ? (
+              <div className="h-80 w-full mt-4 min-h-0">
+                {!isMounted || !dashboard || chartData.every((d) => d.sales === 0) ? (
                   <div className="h-full flex items-center justify-center text-gray-400 text-sm">
                     Sin datos en el período seleccionado
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
+                    <AreaChart 
+                      data={chartData} 
+                      onClick={handleChartClick}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <defs>
                         <linearGradient
                           id="colorSales"
@@ -750,6 +788,7 @@ export default function DashboardPage() {
                         strokeWidth={2}
                         fillOpacity={1}
                         fill="url(#colorSales)"
+                        activeDot={{ r: 6, strokeWidth: 0 }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>

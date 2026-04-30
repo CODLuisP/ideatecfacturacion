@@ -56,8 +56,6 @@ export default function BoletaFacturaElectronicaPage() {
               id="complejidad-comprobante"
               value={complejidad}
               onChange={(e) => {
-                const data = sharedVentaStore.get();
-                sharedVentaStore.save(null, data.items, data.extra);
                 setComplejidad(e.target.value as "simple" | "compleja");
               }}
               className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
@@ -75,8 +73,6 @@ export default function BoletaFacturaElectronicaPage() {
               id="tipo-comprobante"
               value={tipo}
               onChange={(e) => {
-                const data = sharedVentaStore.get();
-                sharedVentaStore.save(null, data.items, data.extra);
                 setTipo(e.target.value as "boleta" | "factura");
               }}
               className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"

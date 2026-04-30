@@ -214,6 +214,12 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   }, [cliente]);
 
   useEffect(() => {
+    if (emitido) {
+      sharedVentaStore.clear();
+    }
+  }, [emitido]);
+
+  useEffect(() => {
     if (errorCli) setNoEncontrado(true); setErrorVisible(true);
   }, [errorCli]);
 
@@ -518,6 +524,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       isFirstSaveRef.current = false;
       return;
     }
+    if (emitido) return;
     sharedVentaStore.save(clienteSeleccionado, items, {
       porConsumo,
       cantidadBolsa,
@@ -884,6 +891,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
 
 
 const resetForm = () => {
+  sharedVentaStore.clear(); // Limpiar persistencia al reiniciar
   // ── Items ──────────────────────────────────────
   setItems([]); setBusquedaProducto([]); setShowDropdownProducto([]); inputRefs.current = [];
   setPorConsumo(false);
