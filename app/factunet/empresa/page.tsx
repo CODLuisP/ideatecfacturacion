@@ -7,6 +7,7 @@ import { Card } from '@/app/components/ui/Card';
 import { Button } from '@/app/components/ui/Button';
 import { cn } from '@/app/utils/cn';
 import { useAuth } from "@/context/AuthContext";
+import { LogoCropper } from '@/app/components/ui/LogoCropper';
 
 const BASE_URL = 'http://localhost:5004';
 
@@ -178,12 +179,25 @@ interface LogoUploaderProps {
 function LogoUploader({ logoDataUrl, uploading, canEdit, onFileSelected, onLogoRemove,onError  }: LogoUploaderProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<number>(1);
+
+  useEffect(() => {
+    if (!logoDataUrl) {
+      setAspectRatio(1);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      setAspectRatio(img.width / img.height);
+    };
+    img.src = logoDataUrl;
+  }, [logoDataUrl]);
 
   const handle = (file: File | undefined) => {
     if (!file || !canEdit) return;
     if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type)) return;
     if (file.size > 2 * 1024 * 1024) {
-      onError('La imagen pesa más de 2MB. Carga una imagen de máximo 2MB.'); // 👈 agrega esto
+      onError('La imagen pesa más de 2MB. Carga una imagen de máximo 2MB.');
       return;
     }    
     const reader = new FileReader();
@@ -195,10 +209,15 @@ function LogoUploader({ logoDataUrl, uploading, canEdit, onFileSelected, onLogoR
     <div className="md:col-span-2 flex items-center gap-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
       <div
         className={cn(
-          'w-24 h-24 bg-white rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors',
+          'h-24 bg-white rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300',
           canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-70',
           dragging && canEdit ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'
         )}
+        style={{ 
+          aspectRatio: logoDataUrl ? aspectRatio : 1,
+          width: logoDataUrl ? 'auto' : '6rem',
+          minWidth: '6rem'
+        }}
         onDragOver={(e) => { if (!canEdit) return; e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
@@ -207,7 +226,7 @@ function LogoUploader({ logoDataUrl, uploading, canEdit, onFileSelected, onLogoR
         {uploading ? (
           <Loader2 className="w-6 h-6 text-brand-blue animate-spin" />
         ) : logoDataUrl ? (
-          <img src={logoDataUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+          <img src={logoDataUrl} alt="Logo" className="w-full h-full object-contain p-1 rounded-lg" />
         ) : (
           <Upload className="w-6 h-6 text-gray-300" />
         )}
@@ -413,6 +432,9 @@ export default function ConfiguracionPage() {
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [logoBase64Pure, setLogoBase64Pure] = useState<string | null>(null);
 
+  // Cropper state
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+
   const { accessToken, user, refreshLogo } = useAuth();
 
   // ── Permisos por rol ───────────────────────────────────────────────────────
@@ -488,18 +510,23 @@ export default function ConfiguracionPage() {
   }, [user?.ruc, user?.sucursalID, isSuperAdmin]);
 
   // ── Subir logo ────────────────────────────────────────────────────────────
-  const handleFileSelected = async (file: File, previewDataUrl: string) => {
+  const handleFileSelected = (file: File, previewDataUrl: string) => {
     if (!canEdit) return;
-    setLogoDataUrl(previewDataUrl);
-    setLogoBase64Pure(stripDataUrlPrefix(previewDataUrl));
+    setImageToCrop(previewDataUrl);
+  };
+
+  const handleCropComplete = async (croppedDataUrl: string, croppedFile: File) => {
+    setImageToCrop(null);
+    setLogoDataUrl(croppedDataUrl);
+    setLogoBase64Pure(stripDataUrlPrefix(croppedDataUrl));
     setUploadingLogo(true);
     try {
       const formData = new FormData();
-      formData.append('File', file);
+      formData.append('File', croppedFile);
       await axios.post(`${BASE_URL}/api/companies/file/base64`, formData, {
         headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${accessToken}` },
       });
-      showToast('Logo subido correctamente', 'success');
+      showToast('Logo subido y procesado correctamente', 'success');
     } catch {
       setLogoDataUrl('');
       setLogoBase64Pure(null);
@@ -620,6 +647,7 @@ export default function ConfiguracionPage() {
   };
 
   return (
+    <>
     <form onSubmit={handleSave} className="mx-auto space-y-6 animate-in fade-in duration-500">
 
       {/* ── Datos de la Empresa ── */}
@@ -746,6 +774,15 @@ export default function ConfiguracionPage() {
         )}
       </Card>
 
+
     </form>
+    {imageToCrop && (
+      <LogoCropper
+        image={imageToCrop}
+        onCropComplete={handleCropComplete}
+        onCancel={() => setImageToCrop(null)}
+      />
+    )}
+  </>
   );
 }
