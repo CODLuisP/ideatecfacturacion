@@ -8,6 +8,8 @@ interface UseComprobantesEmpresaClienteListadoParams {
   clienteNumDoc: string
   fechaDesde?: string | null
   fechaHasta?: string | null
+  limit?: number
+  page?: number
 }
 
 interface UseComprobantesEmpresaClienteListadoReturn {
@@ -26,7 +28,7 @@ export const useComprobantesEmpresaClienteListado = (): UseComprobantesEmpresaCl
   const [error, setError] = useState<string | null>(null)
 
   const fetchComprobantes = useCallback(async ({
-    rucEmpresa, clienteNumDoc, fechaDesde, fechaHasta,
+    rucEmpresa, clienteNumDoc, fechaDesde, fechaHasta, limit = 100, page = 1
   }: UseComprobantesEmpresaClienteListadoParams): Promise<ComprobanteListado[]> => {
     setLoading(true)
     setError(null)
@@ -36,6 +38,8 @@ export const useComprobantesEmpresaClienteListado = (): UseComprobantesEmpresaCl
       )
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
+      url.searchParams.append("limit", limit.toString()) 
+      url.searchParams.append("page", page.toString()) 
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` }

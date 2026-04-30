@@ -36,27 +36,36 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
 
     const obtenerPdf = useCallback(async (tamano: string, abrir: boolean) => {
         setLoadingPdf(true);
+        let ventana: Window | null = null;
         try {
-            const ventana = abrir ? window.open('', '_blank') : null;
-            if (ventana) {
-                ventana.document.write(`
-                    <html><head><title>Cargando PDF...</title></head>
-                    <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                        </svg>
-                        <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
-                        <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF, por favor espere...</p>
-                    </body></html>
-                `);
+            if (abrir) {
+                ventana = window.open('', '_blank');
+                if (ventana) {
+                    ventana.document.write(`
+                        <html><head><title>Cargando PDF...</title></head>
+                        <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                            </svg>
+                            <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+                            <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF, por favor espere...</p>
+                        </body></html>
+                    `);
+                }
             }
+
             const res = await fetch(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobante.comprobanteId}/pdf?tamano=${tamano}`,
                 { headers: { Authorization: `Bearer ${accessToken}` } }
             );
-            if (!res.ok) throw new Error();
+
+            if (!res.ok) {
+                throw new Error('Error al generar PDF');
+            }
+
             const blob = await res.blob();
             const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+
             if (abrir && ventana) {
                 ventana.location.href = url;
             } else {
@@ -65,7 +74,12 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
                 a.download = `${ruc}-${comprobante.serie}-${padCorrelativo(comprobante.correlativo)}.pdf`;
                 a.click();
             }
-        } catch { } finally { setLoadingPdf(false); }
+        } catch (error) {
+            if (ventana) ventana.close();
+            console.error('Error obteniendo PDF:', error);
+        } finally {
+            setLoadingPdf(false);
+        }
     }, [comprobante, ruc, accessToken]);
 
     const colorEstado = COLORS.sunat[comprobante.estadoSunat as keyof typeof COLORS.sunat]?.badge ?? COLORS.sunat.PENDIENTE.badge;

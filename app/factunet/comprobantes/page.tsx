@@ -63,7 +63,9 @@ export default function VerComprobantesPage() {
     const [search, setSearch] = useState('');
     const [filtroTipo, setFiltroTipo] = useState('Todos');
     const [filtroEstado, setFiltroEstado] = useState('Todos');
+    const [currentPage, setCurrentPage] = useState(1);
     const [modalEnvio, setModalEnvio] = useState<{ comprobante: ComprobanteListado; tipo: 'email' | 'whatsapp' } | null>(null);
+    const [loadingPdfMap, setLoadingPdfMap] = useState<Record<string, boolean>>({});
 
     // ── Filtros cabecera ──
     const [showAvanzado, setShowAvanzado] = useState(false);
@@ -89,27 +91,58 @@ export default function VerComprobantesPage() {
         || hookUsuario.loading
 
     // ── Carga inicial ──
-    const cargarComprobantes = useCallback(async () => {
+    const cargarComprobantes = useCallback(async (page: number = 1) => {
         let data: ComprobanteListado[] = []
+        const params = { fechaDesde: null, fechaHasta: null, page, limit: 100 }
         if (isSuperAdmin && sucursalFiltro) {
-            data = await hookSucursal.fetchComprobantes({ sucursalId: sucursalFiltro, fechaDesde: null, fechaHasta: null })
+            data = await hookSucursal.fetchComprobantes({ ...params, sucursalId: sucursalFiltro })
         } else if (isSuperAdmin) {
-            data = await hookEmpresa.fetchComprobantes({ ruc: rucEmpresa, fechaDesde: null, fechaHasta: null })
+            data = await hookEmpresa.fetchComprobantes({ ...params, ruc: rucEmpresa })
         } else {
-            data = await hookSucursal.fetchComprobantes({ sucursalId, fechaDesde: null, fechaHasta: null })
+            data = await hookSucursal.fetchComprobantes({ ...params, sucursalId })
         }
         setComprobantes(data)
     }, [isSuperAdmin, sucursalFiltro, rucEmpresa, sucursalId])
 
     useEffect(() => {
-    if (!user || !accessToken) return
-    cargarComprobantes()
+        if (!user || !accessToken) return
+        setCurrentPage(1)
+        cargarComprobantes(1)
     }, [user, accessToken, cargarComprobantes])
 
-    useEffect(() => {
-    if (!user || !accessToken || !isSuperAdmin) return
-    cargarComprobantes()
-    }, [sucursalFiltro])
+
+    const obtenerPdf = useCallback(async (c: ComprobanteListado) => {
+        setLoadingPdfMap(prev => ({ ...prev, [c.comprobanteId]: true }));
+        let ventana: Window | null = null;
+        try {
+            ventana = window.open('', '_blank');
+            if (ventana) {
+                ventana.document.write(`
+                    <html><head><title>Cargando PDF...</title></head>
+                    <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                        </svg>
+                        <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+                        <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF, por favor espere...</p>
+                    </body></html>
+                `);
+            }
+            const res = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${c.comprobanteId}/pdf?tamano=A4`,
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            if (!res.ok) throw new Error('Error al generar PDF');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+            if (ventana) ventana.location.href = url;
+        } catch (err) {
+            if (ventana) ventana.close();
+            showToast('Error al obtener el PDF', 'error');
+        } finally {
+            setLoadingPdfMap(prev => ({ ...prev, [c.comprobanteId]: false }));
+        }
+    }, [accessToken, showToast]);
 
     const abrirDetalle = useCallback(async (c: ComprobanteListado) => {
         setDetalle(c);
@@ -118,23 +151,25 @@ export default function VerComprobantesPage() {
         if (data) setDetalleCompleto(data);
     }, [hookDetalles]);
 
-    const buscarAvanzado = async () => {
+    const buscarAvanzado = async (page: number = 1) => {
         let data: ComprobanteListado[] = []
+        const commonParams = { fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null, page, limit: 100 }
+        
         if (modoAvanzado === 'fechas') {
             if (isSuperAdmin && sucursalFiltro) {
-                data = await hookSucursal.fetchComprobantes({ sucursalId: sucursalFiltro, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+                data = await hookSucursal.fetchComprobantes({ ...commonParams, sucursalId: sucursalFiltro })
             } else if (isSuperAdmin) {
-                data = await hookEmpresa.fetchComprobantes({ ruc: rucEmpresa, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+                data = await hookEmpresa.fetchComprobantes({ ...commonParams, ruc: rucEmpresa })
             } else {
-                data = await hookSucursal.fetchComprobantes({ sucursalId, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+                data = await hookSucursal.fetchComprobantes({ ...commonParams, sucursalId })
             }
             setComprobantes(data)
         } else if (modoAvanzado === 'unico') {
             if (!avSerie || !avNumero) { showToast('Ingrese serie y número', 'error'); return }
-            setSucursalFiltro(null)
+            // Para búsqueda única no limpiamos sucursalFiltro para evitar el trigger del useEffect
             const resultado = await hookUnico.fetchComprobante({ ruc: rucEmpresa, serie: avSerie, numero: Number(avNumero) })
             if (resultado) {
-                setComprobantes([resultado])
+                setComprobantes([resultado as unknown as ComprobanteListado])
             } else {
                 setComprobantes([])
                 showToast('No se encontró el comprobante', 'error')
@@ -142,16 +177,14 @@ export default function VerComprobantesPage() {
         } else if (modoAvanzado === 'cliente') {
             if (!avClienteDoc) { showToast('Ingrese el número de documento del cliente', 'error'); return }
             if (isSuperAdmin) {
-                setSucursalFiltro(null)
-                data = await hookCliente.fetchComprobantes({ rucEmpresa, clienteNumDoc: avClienteDoc, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+                data = await hookCliente.fetchComprobantes({ ...commonParams, rucEmpresa, clienteNumDoc: avClienteDoc })
             } else {
-                data = await hookClienteSucursal.fetchComprobantes({ sucursalId, clienteNumDoc: avClienteDoc, fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+                data = await hookClienteSucursal.fetchComprobantes({ ...commonParams, sucursalId, clienteNumDoc: avClienteDoc })
             }
             setComprobantes(data)
         } else if (modoAvanzado === 'usuario') {
             if (!avUsuarioId) { showToast('Ingrese el ID de usuario', 'error'); return }
-            setSucursalFiltro(null)
-            data = await hookUsuario.fetchComprobantes({ rucEmpresa, usuarioId: Number(avUsuarioId), fechaDesde: avFechaDesde || null, fechaHasta: avFechaHasta || null })
+            data = await hookUsuario.fetchComprobantes({ ...commonParams, rucEmpresa, usuarioId: Number(avUsuarioId) })
             setComprobantes(data)
         }
     }
@@ -337,7 +370,7 @@ export default function VerComprobantesPage() {
                             </select>
                             )}
                             {(filtroTipo !== 'Todos' || filtroEstado !== 'Todos') && (
-                                <button onClick={() => { setFiltroTipo('Todos'); setFiltroEstado('Todos'); }}
+                                <button onClick={() => { setFiltroTipo('Todos'); setFiltroEstado('Todos'); setCurrentPage(1); cargarComprobantes(1); }}
                                     className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors">
                                     Limpiar
                                 </button>
@@ -447,13 +480,14 @@ export default function VerComprobantesPage() {
                                         </div>
                                     </>
                                 )}
-                                <button onClick={buscarAvanzado} disabled={loading}
+                                <button onClick={() => buscarAvanzado(1)} disabled={loading}
                                     className={cn("flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors self-end", COLORS.btnPrimary, loading && COLORS.btnDisabled)}>
                                     <Search size={14} /> Buscar
                                 </button>
                                 <button onClick={() => {
                                     setAvSerie(''); setAvNumero(''); setAvClienteDoc(''); setAvUsuarioId('');
-                                    setAvFechaDesde(''); setAvFechaHasta(''); setSucursalFiltro(null); cargarComprobantes();
+                                    setAvFechaDesde(''); setAvFechaHasta(''); setSucursalFiltro(null); 
+                                    setCurrentPage(1); cargarComprobantes(1);
                                 }} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors self-end pb-2">
                                     <X size={12} /> Limpiar
                                 </button>
@@ -502,15 +536,15 @@ export default function VerComprobantesPage() {
                             <tr className="bg-gray-100" style={{borderTopLeftRadius: '12px', borderTopRightRadius: '12px', overflow: 'hidden'}}>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">FECHA</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-52">COMPROBANTE</th>
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-50">CLIENTE</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-60">CLIENTE</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">PDF</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">XML</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">CDR</th>
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-27.5">SUNAT</th>
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">CORREO</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-32">SUNAT</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">CORREO</th>
                                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">WHATSAPP</th>
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-19">VER</th>
-                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-21">OPCIONES</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-20">VER</th>
+                                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">OPCIONES</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -536,17 +570,26 @@ export default function VerComprobantesPage() {
                                         <p className="text-sm font-medium text-gray-900">{doc.numeroCompleto}</p>
                                         <p className="text-xs text-gray-400">{tipoLabel(doc.tipoComprobante)}</p>
                                     </td>
-                                    <td className="px-5 py-4 w-50">
+                                    <td className="px-5 py-4 w-60">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium text-gray-900">{doc.cliente.numeroDocumento}</span>
                                             <span className="text-sm text-gray-600">{doc.cliente.razonSocial}</span>
                                         </div>
                                     </td>
-                                    <td className="px-5 py-4 text-center w-16"><div className="flex justify-center"><StatusIcon type="pdf" status="available" onClick={() => abrirDetalle(doc)} /></div></td>
+                                    <td className="px-5 py-4 text-center w-16">
+                                        <div className="flex justify-center">
+                                            <StatusIcon 
+                                                type="pdf" 
+                                                status="available" 
+                                                loading={loadingPdfMap[doc.comprobanteId]}
+                                                onClick={() => obtenerPdf(doc)} 
+                                            />
+                                        </div>
+                                    </td>
                                     <td className="px-5 py-4 text-center w-16"><div className="flex justify-center"><StatusIcon type="xml" status="available" /></div></td>
                                     <td className="px-5 py-4 text-center w-16"><div className="flex justify-center"><StatusIcon type="cdr" status="available" /></div></td>
-                                    <td className="px-5 py-4 text-center w-27.5"><div className="flex justify-center"><BadgeSunat estado={doc.estadoSunat} /></div></td>
-                                    <td className="px-5 py-4 text-center w-21">
+                                    <td className="px-5 py-4 text-center w-32"><div className="flex justify-center"><BadgeSunat estado={doc.estadoSunat} /></div></td>
+                                    <td className="px-5 py-4 text-center w-24">
                                         <div className="flex justify-center">
                                             <BtnEnvio tipo="email" enviado={doc.cliente.enviadoPorCorreo} fecha={formatFechaHora(doc.fechaCreacion)} onClick={() => setModalEnvio({ comprobante: doc, tipo: 'email' })} />
                                         </div>
@@ -556,12 +599,12 @@ export default function VerComprobantesPage() {
                                             <BtnEnvio tipo="whatsapp" enviado={doc.cliente.enviadoPorWhatsApp} fecha={formatFechaHora(doc.fechaCreacion)} onClick={() => setModalEnvio({ comprobante: doc, tipo: 'whatsapp' })} />
                                         </div>
                                     </td>
-                                    <td className="px-5 py-4 text-center w-19">
+                                    <td className="px-5 py-4 text-center w-20">
                                         <button onClick={() => abrirDetalle(doc)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                                             <Eye size={13} /> Ver
                                         </button>
                                     </td>
-                                    <td className="px-5 py-4 text-center w-21">
+                                    <td className="px-5 py-4 text-center w-24">
                                         <div className="flex justify-center">
                                             <DropdownOpciones
                                                 comprobante={doc}
@@ -578,6 +621,36 @@ export default function VerComprobantesPage() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+                {/* ── Footer Paginación ── */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => {
+                                const p = Math.max(1, currentPage - 1);
+                                setCurrentPage(p);
+                                showAvanzado ? buscarAvanzado(p) : cargarComprobantes(p);
+                            }}
+                            disabled={currentPage === 1 || loading}
+                            className={cn("px-4 py-2 text-sm font-medium border rounded-lg transition-colors", 
+                                currentPage === 1 || loading ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")}
+                        >
+                            Anterior
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const p = currentPage + 1;
+                                setCurrentPage(p);
+                                showAvanzado ? buscarAvanzado(p) : cargarComprobantes(p);
+                            }}
+                            disabled={paginated.length < 100 || loading}
+                            className={cn("px-4 py-2 text-sm font-medium border rounded-lg transition-colors", 
+                                paginated.length < 100 || loading ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")}
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                    <span className="text-sm text-gray-500">Página <span className="font-semibold text-gray-900">{currentPage}</span></span>
                 </div>
             </Card>
         </div>
@@ -665,11 +738,11 @@ const BtnEnvio = ({ tipo, enviado, fecha, onClick }: { tipo: 'email' | 'whatsapp
 };
 
 // ─── StatusIcon ───────────────────────────────────────────────────────────────
-const StatusIcon = ({ type, status, onClick }: { type: 'pdf' | 'xml' | 'cdr'; status: 'available' | 'pending'; onClick?: () => void; }) => {
+const StatusIcon = ({ type, status, loading, onClick }: { type: 'pdf' | 'xml' | 'cdr'; status: 'available' | 'pending'; loading?: boolean; onClick?: () => void; }) => {
     if (type === 'pdf') {
         return (
-            <button onClick={onClick} className={COLORS.pdf.btn} title="Ver PDF">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg" className="w-5 h-5 opacity-90" alt="PDF" />
+            <button onClick={onClick} className={cn(COLORS.pdf.btn, loading && "animate-pulse opacity-50")} title="Ver PDF" disabled={loading}>
+                {loading ? <RefreshCw size={18} className="animate-spin text-blue-500" /> : <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg" className="w-5 h-5 opacity-90" alt="PDF" />}
             </button>
         );
     }
@@ -706,7 +779,7 @@ const DropdownOpciones = ({ comprobante, onEnviarSunat, onEditarEnviarSunat, onR
             const rect = btnRef.current.getBoundingClientRect()
             setPos({
                 top: rect.bottom + window.scrollY, 
-                left: rect.left + window.scrollX - 180,
+                left: rect.right + window.scrollX - 200, // Aligned to right with menu width offset
             })
         }
         setOpen(o => !o)
