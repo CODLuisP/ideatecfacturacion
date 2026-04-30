@@ -5,8 +5,7 @@ import { DashboardData } from './Dashboard'
 
 interface UseDashboardEmpresaParams {
   ruc: string
-  desde?: string | null
-  hasta?: string | null
+  fecha?: string | null
   limite?: number
 }
 
@@ -26,14 +25,13 @@ export const useDashboardEmpresa = (): UseDashboardEmpresaReturn => {
   const [error, setError] = useState<string | null>(null)
 
   const fetchDashboard = useCallback(async ({
-    ruc, desde, hasta, limite = 10
+    ruc, fecha, limite = 10
   }: UseDashboardEmpresaParams): Promise<DashboardData | null> => {
     setLoading(true)
     setError(null)
     try {
       const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/Dashboard/empresa/${ruc}`)
-      if (desde) url.searchParams.append('desde', desde)
-      if (hasta) url.searchParams.append('hasta', hasta)
+      if (fecha) url.searchParams.append('fecha', fecha)
       url.searchParams.append('limite', String(limite))
 
       const response = await fetch(url.toString(), {

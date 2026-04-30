@@ -132,24 +132,13 @@ const formatFecha = (fechaStr: string) => {
 const formatMoneda = (valor: number) =>
   `S/ ${valor.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const getUltimos7Dias = () => {
-  const hasta = new Date();
-  const desde = new Date();
-  desde.setDate(desde.getDate() - 6);
-  return {
-    desde: desde.toISOString().split("T")[0],
-    hasta: hasta.toISOString().split("T")[0],
+  const getFechaHoy = (): string => {
+    const hoy = new Date();
+    const año = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+    const dia = String(hoy.getDate()).padStart(2, "0");
+    return `${año}-${mes}-${dia}`;
   };
-};
-
-const getHoy = () => {
-  const hoy = new Date();
-  const año = hoy.getFullYear();
-  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
-  const dia = String(hoy.getDate()).padStart(2, "0");
-  const fechaLocal = `${año}-${mes}-${dia}`;
-  return { desde: fechaLocal, hasta: fechaLocal };
-};
 
 const estadoSunatLabel = (estado: string) => {
   const map: Record<string, "success" | "warning" | "error"> = {
@@ -477,9 +466,7 @@ export default function DashboardPage() {
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();
   const { sucursales } = useSucursalRuc(isSuperAdmin);
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<
-    number | null
-  >(null);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
 
   // ─── Dashboard activo según contexto ──────────────────────────────
   const { dashboard, loading, error } = useMemo(() => {
@@ -489,24 +476,20 @@ export default function DashboardPage() {
   }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
-
-  // Filtro de fechas para rendimiento (default: últimos 7 días)
-  const ultimos7 = getUltimos7Dias();
+  const [fecha, setFecha] = useState<string>(getFechaHoy());
 
   // ─── Carga inicial ─────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    const { desde, hasta } = getHoy();
 
     if (isSuperAdmin) {
       // superadmin siempre carga empresa al inicio
-      hookEmpresa.fetchDashboard({ ruc: user.ruc, desde, hasta, limite: 10 });
+      hookEmpresa.fetchDashboard({ ruc: user.ruc, fecha, limite: 10 });
     } else {
       // usuario normal carga su sucursal
       hookSucursal.fetchDashboard({
         sucursalId: Number(user.sucursalID),
-        desde,
-        hasta,
+        fecha,
         limite: 10,
       });
     }
@@ -515,12 +498,9 @@ export default function DashboardPage() {
   // ─── Cuando superadmin selecciona una sucursal ────────────────────
   useEffect(() => {
     if (!isSuperAdmin || !sucursalSeleccionada) return;
-    const { desde, hasta } = getHoy();
-
     hookSucursal.fetchDashboard({
       sucursalId: sucursalSeleccionada,
-      desde,
-      hasta,
+      fecha,
       limite: 10,
     });
   }, [sucursalSeleccionada]); // 👈 dispara solo cuando cambia la sucursal
@@ -529,39 +509,40 @@ export default function DashboardPage() {
   const handleSucursalChange = (id: number | null) => {
     hookSucursal.reset();
     setSucursalSeleccionada(id);
-
     if (id === null) {
-      // volvió a "Todas las sucursales" → recarga empresa
-      const { desde, hasta } = getHoy();
-      hookEmpresa.fetchDashboard({ ruc: user!.ruc, desde, hasta, limite: 10 });
+      hookEmpresa.fetchDashboard({ ruc: user!.ruc, fecha, limite: 10 });
     }
   };
 
-  // Datos para el gráfico de rendimiento
+  const handleFechaChange = (nuevaFecha: string) => {
+    setFecha(nuevaFecha);
+    if (isSuperAdmin && sucursalSeleccionada) {
+      hookSucursal.fetchDashboard({ sucursalId: sucursalSeleccionada, fecha: nuevaFecha, limite: 10 });
+    } else if (isSuperAdmin) {
+      hookEmpresa.fetchDashboard({ ruc: user!.ruc, fecha: nuevaFecha, limite: 10 });
+    } else {
+      hookSucursal.fetchDashboard({ sucursalId: Number(user!.sucursalID), fecha: nuevaFecha, limite: 10 });
+    }
+  };
+
+  // ── chartData: los 7 días en base a `fecha` ──
   const chartData = useMemo(() => {
     const dias: { name: string; sales: number }[] = [];
+    const base = new Date(fecha + "T00:00:00"); // evita desfase de zona horaria
     for (let i = 6; i >= 0; i--) {
-      const fecha = new Date();
-      fecha.setDate(fecha.getDate() - i);
-      const fechaStr = fecha.toISOString().split("T")[0]; // 2026-04-17
-
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const fechaStr = d.toISOString().split("T")[0];
       const encontrado = (dashboard?.rendimientoVentas ?? []).find((r) =>
-        r.fecha.startsWith(fechaStr),
+        r.fecha.startsWith(fechaStr)
       );
-
       dias.push({
-        name: fecha.toLocaleDateString("es-PE", {
-          weekday: "short",
-          day: "2-digit",
-        }),
+        name: d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit" }),
         sales: encontrado ? Number(encontrado.totalVentas.toFixed(2)) : 0,
       });
     }
     return dias;
-  }, [dashboard?.rendimientoVentas]);
-
-  const statusBadgeClass = (status: string) => estadoSunatLabel(status);
-  console.log("fetch", dashboard);
+  }, [dashboard?.rendimientoVentas, fecha]);
 
   return (
     <>
@@ -570,24 +551,33 @@ export default function DashboardPage() {
       )}
 
       <div className="mb-4 flex items-center justify-between gap-4">
-        {/* Izquierda: selector de sucursal (solo superadmin) */}
-        {isSuperAdmin ? (
-          <div className="flex">
+        {/* Izquierda: dropdown (solo superadmin) + input fecha (todos) */}
+        <div className="flex items-center gap-3">
+          {isSuperAdmin && (
             <DropdownSucursal
               sucursales={sucursales}
               seleccionada={sucursalSeleccionada}
               onSelect={handleSucursalChange}
             />
+          )}
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+            <Calendar size={14} className="text-gray-400 shrink-0" />
+            <span className="text-xs text-gray-500 font-medium">Fecha</span>
+            <input
+              type="date"
+              value={fecha}
+              max={getFechaHoy()}
+              onChange={(e) => handleFechaChange(e.target.value)}
+              className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer"
+            />
           </div>
-        ) : (
-          <div />
-        )}
+        </div>
 
         {/* Derecha: siempre fijo */}
-
         <Button onClick={() => router.push("/factunet/operaciones")}>
           <Plus className="w-4 h-4" /> Nuevo Comprobante
         </Button>
+
       </div>
 
       <div className="space-y-4 animate-in fade-in duration-500 ">
@@ -946,7 +936,7 @@ export default function DashboardPage() {
                           {formatMoneda(doc.importeTotal)}
                         </td>
                         <td className="px-6 py-4">
-                          <Badge variant={statusBadgeClass(doc.estadoSunat)}>
+                          <Badge variant={estadoSunatLabel(doc.estadoSunat)}>
                             {doc.estadoSunat}
                           </Badge>
                         </td>
