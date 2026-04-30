@@ -11,7 +11,6 @@ import {
   ExternalLink,
   UserRound,
   ClipboardList,
-  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
@@ -362,8 +361,6 @@ export default function BoletaPage() {
   // ── Bolsa plástica efecto ─────────────────────────────────────
   useEffect(() => {
     if (productosSucursal.length === 0) return;
-    
-    // On first mount, if we don't have a bolsa quantity change yet, 
     // we should NOT run the logic that might clear a bolsa loaded from store.
     if (!bolsaMountedRef.current) {
       bolsaMountedRef.current = true;
@@ -450,12 +447,14 @@ export default function BoletaPage() {
   });
 
   // ── PDF ──────────────────────────────────────────────────────
-  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<
-    number | null
-  >(null);
+  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
   const [tamanoPdf, setTamanoPdf] = useState<string>("A4");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [cargandoPdf, setCargandoPdf] = useState(false);
+  const [pdfA4Url, setPdfA4Url] = useState<string | null>(null);
+  const [pdfTicketUrl, setPdfTicketUrl] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState(false);
+  const [cargandoPreview, setCargandoPreview] = useState(false);
 
   // ── Effects de inicialización ────────────────────────────────
   useEffect(() => {
@@ -1301,30 +1300,16 @@ export default function BoletaPage() {
     cargarPdf(comprobanteIdEmitido, tamanoPdf);
   }, [tamanoPdf, comprobanteIdEmitido]);
 
-  const imprimirPdf = async () => {
-    if (!comprobanteIdEmitido) return;
-    try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteIdEmitido}/pdf?tamano=Ticket58mm`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          responseType: "blob",
-        },
-      );
-      const url = URL.createObjectURL(
-        new Blob([res.data], { type: "application/pdf" }),
-      );
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        iframe.contentWindow?.print();
-        setTimeout(() => document.body.removeChild(iframe), 1000);
-      };
-    } catch {
-      showToast("Error al imprimir", "error");
-    }
+  const imprimirPdf = () => {
+    if (!pdfA4Url) return; 
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = pdfA4Url;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    };
   };
 
   // ── Preparar boleta ──────────────────────────────────────────
@@ -1363,14 +1348,19 @@ export default function BoletaPage() {
 
   // ── Emitir ───────────────────────────────────────────────────
   const emitirComprobante = async () => {
-    if (!detalles.length) { showToast("Debe agregar al menos un ítem", "error"); return; }
-    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) { showToast("Debe seleccionar o ingresar un cliente", "error"); return; }
-    const itemSinDesc = detalles.findIndex(d => !d.descripcion || d.descripcion.trim() === "");
-    if (itemSinDesc !== -1) { showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error"); return; }
-    const consumoItem = detalles.find(d => d._id === "por-consumo");
-    if (consumoItem && (consumoItem.precioVenta ?? 0) <= 0) {
-        showToast('El ítem "Por Consumo" debe tener un precio mayor a cero', "error"); return;
+    if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) {
+      showToast("Debe seleccionar o ingresar un cliente", "error"); return;
     }
+    const itemsReales = detalles.filter(d => !d._esIcbper);
+    if (!itemsReales.length) { showToast("Debe agregar al menos un ítem", "error"); return; }
+    const itemSinDesc = itemsReales.findIndex(d => !d.descripcion?.trim());
+    if (itemSinDesc !== -1) { showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error"); return; }
+    const itemSinPrecio = itemsReales.findIndex(d => {
+      const precioBase = d._precioBase ?? d.precioUnitario ?? 0;
+      const esGratuito = (d.descuentoUnitario ?? 0) >= precioBase && precioBase > 0;
+      return !esGratuito && (d.precioVenta ?? 0) <= 0;
+    });
+    if (itemSinPrecio !== -1) { showToast(`El ítem ${itemSinPrecio + 1} debe tener un precio mayor a cero`, "error"); return; }
     if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return; }
     if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return; }
 
@@ -1394,76 +1384,110 @@ export default function BoletaPage() {
       }
 
       setComprobanteIdEmitido(comprobanteId);
-      await cargarPdf(comprobanteId, tamanoPdf);
-
-      // ── Correo y WhatsApp ──
-      if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
-        try {
-          const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
-          const serieNum = `${boleta.serie}-${corrNum}`;
-          const resPdf = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`, { headers: { Authorization: `Bearer ${accessToken}` } });
-          if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
-          const pdfBlob = await resPdf.blob();
-          const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
-
-          if (enviarCorreo && correoCliente) {
-            try {
-              const formData = new FormData();
-              formData.append("toEmail", correoCliente);
-              formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
-              formData.append("subject", `Boleta Electrónica ${serieNum}`);
-              formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
-              formData.append("tipo", "3");
-              formData.append("comprobanteJson", JSON.stringify({
-                serieNumero: serieNum, estadoSunat: "ACEPTADO",
-                items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-                igv: totales.igv, total: totales.importeTotal,
-              }));
-              formData.append("adjunto", pdfFile);
-              const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-              if (!resCorreo.ok) throw new Error("Error correo");
-              showToast("Boleta enviada por correo", "success");
-            } catch { showToast("Error al enviar por correo", "error"); }
-          }
-
-          if (enviarWhatsapp && telefonoCliente) {
-            try {
-              const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-              const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
-              const uploadForm = new FormData();
-              uploadForm.append("file", pdfFile);
-              const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
-              if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
-              const fileUrl = (await resUpload.json()).datos.url;
-              const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-              const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-                body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
-              });
-              if (!resWsp.ok) throw new Error("Error WhatsApp");
-              showToast("Boleta enviada por WhatsApp", "success");
-            } catch { showToast("Error al enviar por WhatsApp", "error"); }
-          }
-        } catch { showToast("Error al procesar envíos", "error"); }
-      }
-
       setEmitido(true);
 
-      // ── Stock ──
-      const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
-      if (itemsParaStock.length > 0) {
+      const procesarSegundoPlano = async () => {
+        setCargandoPreview(true);
+        // ── PDF A4 ──
         try {
-          await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`, itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })), { headers: { Authorization: `Bearer ${accessToken}` } });
-          await fetchProductosSucursal();
-        } catch { console.error("Error al actualizar stock"); }
-      }
+          const resA4 = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          if (resA4.ok) {
+            const blob = await resA4.blob();
+            setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+          }
+        } catch { showToast("Error al cargar el PDF", "error"); }
+        finally { setCargandoPreview(false); }
 
-      // ── Correlativo ──
-      const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      setCorrelativoActual(resSucursal.data.correlativoBoleta);
-      setBoleta(prev => ({ ...prev, serie: resSucursal.data.serieBoleta, correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0") }));
+        // ── PDF Ticket ──
+        try {
+          const resTicket = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          if (resTicket.ok) {
+            const blob = await resTicket.blob();
+            setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+          }
+        } catch {}
+
+        // ── Correo y WhatsApp ──
+        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+          try {
+            const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
+            const serieNum = `${boleta.serie}-${corrNum}`;
+            const resPdf = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+            const pdfBlob = await resPdf.blob();
+            const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
+
+            if (enviarCorreo && correoCliente) {
+              try {
+                const formData = new FormData();
+                formData.append("toEmail", correoCliente);
+                formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
+                formData.append("subject", `Boleta Electrónica ${serieNum}`);
+                formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
+                formData.append("tipo", "3");
+                formData.append("comprobanteJson", JSON.stringify({
+                  serieNumero: serieNum, estadoSunat: "ACEPTADO",
+                  items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
+                  igv: totales.igv, total: totales.importeTotal,
+                }));
+                formData.append("adjunto", pdfFile);
+                const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
+                if (!resCorreo.ok) throw new Error("Error correo");
+                showToast("Boleta enviada por correo", "success");
+              } catch { showToast("Error al enviar por correo", "error"); }
+            }
+
+            if (enviarWhatsapp && telefonoCliente) {
+              try {
+                const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+                const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+                const uploadForm = new FormData();
+                uploadForm.append("file", pdfFile);
+                const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
+                if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
+                const fileUrl = (await resUpload.json()).datos.url;
+                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+                const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
+                });
+                if (!resWsp.ok) throw new Error("Error WhatsApp");
+                showToast("Boleta enviada por WhatsApp", "success");
+              } catch { showToast("Error al enviar por WhatsApp", "error"); }
+            }
+          } catch { showToast("Error al procesar envíos", "error"); }
+        }
+
+        // ── Stock ──
+        const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
+        if (itemsParaStock.length > 0) {
+          try {
+            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+              itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            await fetchProductosSucursal();
+          } catch { console.error("Error al actualizar stock"); }
+        }
+
+        // ── Correlativo ──
+        const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+        const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        setCorrelativoActual(resSucursal.data.correlativoBoleta);
+        setBoleta(prev => ({ ...prev, serie: resSucursal.data.serieBoleta, correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0") }));
+      };
+
+      procesarSegundoPlano();
 
     } catch (err: any) {
       const data = err?.response?.data;
@@ -1481,7 +1505,8 @@ export default function BoletaPage() {
     // Estado emisión
     setEmitido(false);
     setEnviarEnResumen(false);
-    setPdfUrl(null);
+    setPdfA4Url(null);
+    setPdfTicketUrl(null);
     setComprobanteIdEmitido(null);
     setErrorEmision(null);
 
@@ -2321,14 +2346,27 @@ export default function BoletaPage() {
 
         {/* ── Sidebar ── */}
         <div className="space-y-6">
-          <Card
-            title="Vista Previa"
-            subtitle="Representación gráfica del comprobante"
-          >
-            <div className="mb-3">
+          <Card title="Vista Previa" subtitle="Representación gráfica del comprobante">
+              <div className="mb-3">
               <select
                 value={tamanoPdf}
-                onChange={(e) => setTamanoPdf(e.target.value)}
+                onChange={async (e) => {
+                  setTamanoPdf(e.target.value);
+                  if (!comprobanteIdEmitido) return;
+                  setCargandoPreview(true);
+                  setPdfA4Url(null); // ← limpia el iframe anterior inmediatamente
+                  try {
+                    const res = await fetch(
+                      `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteIdEmitido}/pdf?tamano=${e.target.value}`,
+                      { headers: { Authorization: `Bearer ${accessToken}` } }
+                    );
+                    if (res.ok) {
+                      const blob = await res.blob();
+                      setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+                    }
+                  } catch { showToast("Error al cargar el PDF", "error"); }
+                  finally { setCargandoPreview(false); }
+                }}
                 className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-brand-blue"
               >
                 <option value="A4">A4</option>
@@ -2337,51 +2375,68 @@ export default function BoletaPage() {
                 <option value="Ticket58mm">Ticket 58mm</option>
                 <option value="MediaCarta">Media Carta</option>
               </select>
-            </div>
-
-            {pdfUrl ? (
-              <div className="space-y-3">
-                {cargandoPdf ? (
-                  <div className="w-full h-96 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
+              </div>
+              {pdfA4Url && !cargandoPreview ? (
+                <div className="space-y-3">
                   <iframe
-                    src={pdfUrl}
+                    src={pdfA4Url}
                     className="w-full rounded-lg border border-gray-200"
                     style={{ height: "400px" }}
                   />
+                  <div className="flex gap-2">
+                    <button type="button"
+                      onClick={() => window.open(pdfA4Url, "_blank")}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-violet-500 hover:bg-violet-400 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
+                      <ExternalLink className="w-3.5 h-3.5" /> Abrir
+                    </button>
+                    <button type="button"
+                      disabled={descargando}
+                      onClick={async () => {
+                        setDescargando(true);
+                        try {
+                          const a = document.createElement("a");
+                          a.href = pdfA4Url;
+                          a.download = `${empresa?.numeroDocumento}-03-${boleta.serie}-${boleta.correlativo}.pdf`;
+                          a.click();
+                        } finally {
+                          setTimeout(() => setDescargando(false), 1000);
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-70">
+                      {descargando
+                        ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Descargando...</>
+                        : <><Download className="w-3.5 h-3.5" /> Descargar</>
+                      }
+                    </button>
+                    <button type="button"
+                      disabled={!pdfTicketUrl}
+                      onClick={imprimirPdf}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50">
+                      {!pdfTicketUrl
+                        ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
+                        : <><Printer className="w-3.5 h-3.5" /> Imprimir</>
+                      }
+                    </button>
+                  </div>
+                </div>
+                ) : cargandoPreview ? (
+                  <div className="w-full flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200" style={{ height: "400px" }}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs text-gray-400">Cargando PDF...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                    <div className="p-4 rounded-full bg-white shadow-sm">
+                      <Printer className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
+                      <p className="text-xs text-gray-400 mt-1">Se generará automáticamente al emitir</p>
+                    </div>
+                  </div>
                 )}
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
-                    <ExternalLink className="w-3.5 h-3.5" /> Abrir
-                  </button>
-                  <button type="button" onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `boleta-${boleta.serie}-${boleta.correlativo}.pdf`; a.click(); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
-                    <Download className="w-3.5 h-3.5" /> Descargar
-                  </button>
-                  <button type="button" onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
-                    <Printer className="w-3.5 h-3.5" /> Imprimir
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <div className="p-4 rounded-full bg-white shadow-sm">
-                  <Printer className="w-8 h-8 text-gray-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Previsualización del PDF
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Se generará automáticamente al emitir
-                  </p>
-                </div>
-              </div>
-            )}
 
             <div className="mt-6 space-y-3">
               <Button className="w-full py-3 text-base" type="button"
@@ -2392,25 +2447,16 @@ export default function BoletaPage() {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Emitiendo...
                   </span>
-                ) : emitido ? 'Nueva Boleta' : 'Emitir Boleta'}
+                ) : emitido ? "Nueva Boleta" : "Emitir Boleta"}
               </Button>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input type="checkbox" checked={enviarEnResumen}
                   onChange={e => setEnviarEnResumen(e.target.checked)}
                   className="w-3.5 h-3.5 accent-brand-blue" />
-                <span className="text-xs text-gray-500">Enviar mendiante resumen (Guardar doc. en BD)</span>
+                <span className="text-xs text-gray-500">Enviar mediante resumen (Guardar doc. en BD)</span>
               </label>
-
-              {sinSucursal && (
-                <p className="text-xs text-amber-600 text-center">
-                  Selecciona una sucursal para emitir
-                </p>
-              )}
-              {errorEmision && (
-                <p className="text-xs text-red-500 text-center">
-                  {errorEmision}
-                </p>
-              )}
+              {sinSucursal && <p className="text-xs text-amber-600 text-center">Selecciona una sucursal para emitir</p>}
+              {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
             </div>
           </Card>
 
