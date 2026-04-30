@@ -1,5 +1,5 @@
 "use client";
-import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Receipt, FileCheck } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Receipt, FileCheck, AlertTriangle, Building2, Hash } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
@@ -16,7 +16,7 @@ import { useClienteFactura } from '../operaciones/factura/gestionFacturas/useCli
 import { ProductoSucursal } from '../productos/gestioProductos/Producto';
 import { useProductosSucursal } from '../productos/gestioProductos/useProductosSucursal';
 import { sharedVentaStore } from '../operaciones/sharedVentaStore';
-
+import { cn } from "@/app/utils/cn";
 // ── Tipos ──────────────────────────────────────────────────────
 type TipoComprobante = 'boleta' | 'factura';
 
@@ -1379,18 +1379,34 @@ const imprimirPdf = () => {
             )}
 
           {/* Serie destacada */}
-<div className="border border-gray-200 rounded-lg p-2 bg-green-700 shadow-sm flex items-center justify-center gap-2">
-  <p className="text-[14px] font-black tracking-tight text-center text-gray-800">
-    {isSuperAdmin && !sucursalActual
-      ? <span className="text-sm font-medium text-gray-400">Seleccionar sucursal para ver serie y correlativo</span>
-      : loadingSucursal
-      ? <span className="text-gray-400 animate-pulse">Cargando...</span>
-      : !serie
-      ? <span className="text-sm font-medium text-gray-400">No se pudo cargar la serie</span>
-      : <span className="text-gray-50">{serie}-{String(correlativoActual ?? 1).padStart(8, '0')}</span>
-    }
-  </p>
+
+
+<div className={cn(
+   "flex items-center gap-2.5 px-3 py-2 rounded-xl border w-full",
+  isSuperAdmin && !sucursalActual
+    ? "bg-amber-50 border-amber-100"
+    : serie
+    ? "bg-green-50 border-green-100"
+    : "bg-gray-50 border-gray-100"
+)}>
+  {isSuperAdmin && !sucursalActual
+    ? <span className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+        <Building2 className="w-4 h-4 shrink-0" />
+        Elige una sucursal para continuar
+      </span>
+    : loadingSucursal
+    ? <span className="text-gray-300 animate-pulse text-xs">Cargando...</span>
+    : !serie
+    ? <span className="text-xs font-medium text-gray-400">Sin serie</span>
+    : <>
+        <Hash className="w-4 h-4 text-green-600 shrink-0" />
+        <span className="text-[14px] font-bold text-gray-700">{serie}-{String(correlativoActual ?? 1).padStart(8, '0')}</span>
+      </>
+  }
 </div>
+
+
+
 
           {/* ── Medio de Pago / Moneda ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">

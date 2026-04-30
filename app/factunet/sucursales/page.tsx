@@ -555,7 +555,7 @@ export default function SucursalesPage() {
             <button
               type="button"
               onClick={() => setModalNueva(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-sm transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-700 active:scale-95 rounded-lg shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
               Nueva sucursal

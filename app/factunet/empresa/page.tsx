@@ -519,7 +519,14 @@ export default function ConfiguracionPage() {
     (key: keyof EmpresaForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       if (!canEdit) return;
-      setForm((f) => ({ ...f, [key]: e.target.value }));
+      let value = e.target.value;
+      
+      // Validación específica para teléfono (Perú: 9 dígitos, empieza con 9)
+      if (key === 'telefono') {
+        value = value.replace(/\D/g, '').slice(0, 9);
+      }
+      
+      setForm((f) => ({ ...f, [key]: value }));
     };
 
   // ── PUT empresa ───────────────────────────────────────────────────────────
@@ -530,6 +537,18 @@ export default function ConfiguracionPage() {
       showToast('Completa los campos obligatorios', 'error');
       return;
     }
+
+    // Validación de Teléfono (Perú: 9 dígitos y empieza con 9)
+    // Se hace obligatorio porque la API no permite borrarlo una vez establecido
+    if (!form.telefono) {
+      showToast('El teléfono no puede quedar vacío. Si deseas cambiarlo, ingresa el nuevo número.', 'error');
+      return;
+    }
+    if (!/^9\d{8}$/.test(form.telefono)) {
+      showToast('El teléfono debe tener exactamente 9 dígitos y empezar con 9', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -658,8 +677,17 @@ export default function ConfiguracionPage() {
                 <SectionHeader icon={Phone} title="Datos de Contacto" subtitle="Información de comunicación de la empresa" />
               </div>
 
-              <Input label="Teléfono" value={form.telefono} onChange={upd('telefono')}
-                placeholder="Ej: 01 234 5678 / 999 123 456" type="tel" disabled={!canEdit} />
+              <Input 
+                label="Teléfono" 
+                value={form.telefono} 
+                onChange={upd('telefono')}
+                required
+                placeholder="999 123 456" 
+                type="tel" 
+                disabled={!canEdit}
+                maxLength={9}
+                hint="Formato Perú: 9 dígitos, empieza con 9"
+              />
               <Input label="Email" value={form.email} onChange={upd('email')}
                 required placeholder="contacto@empresa.pe" type="email" disabled={!canEdit}
                 hint="Se usará para notificaciones y envío de comprobantes" />
