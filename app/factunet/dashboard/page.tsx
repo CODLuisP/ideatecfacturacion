@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   Eye,
   Plus,
-  Building2,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -35,7 +34,6 @@ import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardEmpresa } from "./gestionDashboard/UseDashboardEmpresa";
 import { useDashboardSucursal } from "./gestionDashboard/UseDashboardSucursal";
-
 import { Skeleton } from "@/app/components/ui/Skeleton";
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { DropdownSucursal } from "@/app/components/ui/DropdownSucursal";
@@ -130,17 +128,20 @@ const formatFecha = (fechaStr: string) => {
 };
 
 const formatMoneda = (valor: number) =>
-  `S/ ${valor.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `S/ ${valor.toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
-  const getFechaHoy = (): string => {
-    const hoy = new Date();
-    const año = hoy.getFullYear();
-    const mes = String(hoy.getMonth() + 1).padStart(2, "0");
-    const dia = String(hoy.getDate()).padStart(2, "0");
-    return `${año}-${mes}-${dia}`;
-  };
+const getFechaHoy = (): string => {
+  const hoy = new Date();
+  const año = hoy.getFullYear();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  return `${año}-${mes}-${dia}`;
+};
 
-const estadoSunatLabel = (estado: string) => {
+const estadoSunatLabel = (estado: string): "success" | "warning" | "error" => {
   const map: Record<string, "success" | "warning" | "error"> = {
     ACEPTADO: "success",
     PENDIENTE: "warning",
@@ -275,12 +276,7 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     : "hover:bg-slate-50 border-l-2 border-l-transparent",
                 )}
               >
-                <div
-                  className={cn(
-                    "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                    cfg.dot,
-                  )}
-                />
+                <div className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", cfg.dot)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-bold text-slate-900 leading-tight">
@@ -306,6 +302,7 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             );
           })}
         </div>
+
         {selected ? (
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             <div className="flex items-start gap-3">
@@ -313,8 +310,7 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
                   {
-                    "bg-emerald-100 text-emerald-600":
-                      selected.type === "success",
+                    "bg-emerald-100 text-emerald-600": selected.type === "success",
                     "bg-amber-100 text-amber-600": selected.type === "warning",
                     "bg-rose-100 text-rose-600": selected.type === "error",
                     "bg-blue-100 text-blue-600": selected.type === "info",
@@ -324,18 +320,14 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 {iconConfig[selected.type].icon}
               </div>
               <div>
-                <h4 className="text-base font-bold text-slate-900">
-                  {selected.title}
-                </h4>
+                <h4 className="text-base font-bold text-slate-900">{selected.title}</h4>
                 <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                   <Calendar size={11} /> {selected.fecha}
                 </p>
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {selected.detail}
-              </p>
+              <p className="text-sm text-slate-700 leading-relaxed">{selected.detail}</p>
             </div>
             {selected.comprobante && (
               <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/50">
@@ -394,67 +386,6 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-// ─── Filtro de Fechas ──────────────────────────────────────────────────────────
-
-interface FiltroFechasProps {
-  desde: string;
-  hasta: string;
-  onDesdeChange: (v: string) => void;
-  onHastaChange: (v: string) => void;
-  onAplicar: () => void;
-  onLimpiar: () => void;
-  loading: boolean;
-}
-
-const FiltroFechas: React.FC<FiltroFechasProps> = ({
-  desde,
-  hasta,
-  onDesdeChange,
-  onHastaChange,
-  onAplicar,
-  onLimpiar,
-  loading,
-}) => (
-  <div className="flex items-center gap-3 flex-wrap">
-    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
-      <Calendar size={14} className="text-gray-400 shrink-0" />
-      <span className="text-xs text-gray-500 font-medium">Desde</span>
-      <input
-        type="date"
-        value={desde}
-        onChange={(e) => onDesdeChange(e.target.value)}
-        className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer"
-      />
-    </div>
-    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
-      <Calendar size={14} className="text-gray-400 shrink-0" />
-      <span className="text-xs text-gray-500 font-medium">Hasta</span>
-      <input
-        type="date"
-        value={hasta}
-        onChange={(e) => onHastaChange(e.target.value)}
-        className="text-sm text-gray-700 border-none outline-none bg-transparent cursor-pointer"
-      />
-    </div>
-    <Button
-      variant="primary"
-      onClick={onAplicar}
-      disabled={loading}
-      className="px-4 py-2 text-sm"
-    >
-      {loading ? "Cargando..." : "Aplicar"}
-    </Button>
-    <Button
-      variant="outline"
-      onClick={onLimpiar}
-      disabled={loading}
-      className="px-4 py-2 text-sm"
-    >
-      Limpiar
-    </Button>
-  </div>
-);
-
 // ─── Dashboard Page ────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -462,91 +393,75 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
 
-  // ─── Hooks según rol
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();
   const { sucursales } = useSucursalRuc(isSuperAdmin);
+
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
-
-  // ─── Dashboard activo según contexto ──────────────────────────────
-  const { dashboard, loading, error } = useMemo(() => {
-    if (isSuperAdmin && sucursalSeleccionada) return hookSucursal; // superadmin + sucursal elegida
-    if (isSuperAdmin) return hookEmpresa; // superadmin sin selección
-    return hookSucursal; // usuario normal
-  }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
-
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
   const [fecha, setFecha] = useState<string>(getFechaHoy());
 
-  // ─── Carga de Datos (Consolidada) ──────────────────────────────
-  const fetchData = useCallback(async () => {
-    if (!user) return;
+  // ─── Dashboard activo según contexto ──────────────────────────────
+  const { dashboard, loading, error } = useMemo(() => {
+    if (isSuperAdmin && sucursalSeleccionada) return hookSucursal;
+    if (isSuperAdmin) return hookEmpresa;
+    return hookSucursal;
+  }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
-    if (isSuperAdmin) {
-      if (sucursalSeleccionada) {
-        await hookSucursal.fetchDashboard({
-          sucursalId: sucursalSeleccionada,
-          desde,
-          hasta,
-          limite: 10,
-        });
+  // ─── Fetch centralizado ────────────────────────────────────────────
+  const fetchData = useCallback(
+    (fechaParam: string, sucursalParam: number | null) => {
+      if (!user) return;
+      if (isSuperAdmin) {
+        if (sucursalParam) {
+          hookSucursal.fetchDashboard({ sucursalId: sucursalParam, fecha: fechaParam, limite: 10 });
+        } else {
+          hookEmpresa.fetchDashboard({ ruc: user.ruc, fecha: fechaParam, limite: 10 });
+        }
       } else {
-        await hookEmpresa.fetchDashboard({
-          ruc: user.ruc,
-          desde,
-          hasta,
-          limite: 10,
-        });
+        hookSucursal.fetchDashboard({ sucursalId: Number(user.sucursalID), fecha: fechaParam, limite: 10 });
       }
-    } else {
-      await hookSucursal.fetchDashboard({
-        sucursalId: Number(user.sucursalID),
-        desde,
-        hasta,
-        limite: 10,
-      });
-    }
-  }, [user, isSuperAdmin, sucursalSeleccionada, hookEmpresa.fetchDashboard, hookSucursal.fetchDashboard]);
+    },
+    [user, isSuperAdmin],
+  );
 
+  // ─── Carga inicial ─────────────────────────────────────────────────
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(fecha, sucursalSeleccionada);
+  }, [user]);
 
-  // ─── Handler de selección ──────────────────────────────────────────
+  // ─── Handler: cambio de sucursal ──────────────────────────────────
   const handleSucursalChange = (id: number | null) => {
-    // Al resetear, el useEffect se encargará de disparar el fetch correcto
-    if (id === null) hookEmpresa.reset();
-    else hookSucursal.reset();
+    if (id === null) hookSucursal.reset();
+    else hookEmpresa.reset();
     setSucursalSeleccionada(id);
-
-    if (id === null) {
-      // volvió a "Todas las sucursales" → recarga empresa
-      const { desde, hasta } = getHoy();
-      hookEmpresa.fetchDashboard({ ruc: user!.ruc, desde, hasta, limite: 10 });
-    }
+    fetchData(fecha, id);
   };
 
-  // ── chartData: los 7 días en base a `fecha` ──
+  // ─── Handler: cambio de fecha ─────────────────────────────────────
+  const handleFechaChange = (nuevaFecha: string) => {
+    setFecha(nuevaFecha);
+    fetchData(nuevaFecha, sucursalSeleccionada);
+  };
+
+  // ─── Chart data (7 días hacia atrás desde `fecha`) ────────────────
   const chartData = useMemo(() => {
     const dias: { name: string; sales: number }[] = [];
+    const base = new Date(fecha + "T00:00:00");
     for (let i = 6; i >= 0; i--) {
       const d = new Date(base);
       d.setDate(d.getDate() - i);
       const fechaStr = d.toISOString().split("T")[0];
       const encontrado = (dashboard?.rendimientoVentas ?? []).find((r) =>
-        r.fecha.startsWith(fechaStr)
+        r.fecha.startsWith(fechaStr),
       );
       dias.push({
         name: d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit" }),
         sales: encontrado ? Number(encontrado.totalVentas.toFixed(2)) : 0,
-        fechaRaw: fechaStr,
       });
     }
     return dias;
-  }, [dashboard?.rendimientoVentas]);
-
-  const statusBadgeClass = (status: string) => estadoSunatLabel(status);
-  console.log("fetch", dashboard);
+  }, [dashboard?.rendimientoVentas, fecha]);
 
   return (
     <>
@@ -554,8 +469,8 @@ export default function DashboardPage() {
         <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />
       )}
 
+      {/* ─── Header ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center justify-between gap-4">
-        {/* Izquierda: dropdown (solo superadmin) + input fecha (todos) */}
         <div className="flex items-center gap-3">
           {isSuperAdmin && (
             <DropdownSucursal
@@ -576,15 +491,12 @@ export default function DashboardPage() {
             />
           </div>
         </div>
-
-        {/* Derecha: siempre fijo */}
         <Button onClick={() => router.push("/factunet/operaciones")}>
           <Plus className="w-4 h-4" /> Nuevo Comprobante
         </Button>
-
       </div>
 
-      {/* Alerta de Error */}
+      {/* ─── Alerta de error ─────────────────────────────────────────── */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-4 duration-300">
           <div className="flex items-center gap-3">
@@ -596,9 +508,9 @@ export default function DashboardPage() {
               <p className="text-xs text-red-600 mt-0.5">{error}</p>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={() => fetchData()}
+          <Button
+            variant="outline"
+            onClick={() => fetchData(fecha, sucursalSeleccionada)}
             className="bg-white border-red-200 text-red-700 hover:bg-red-50 text-xs px-3 py-1.5"
           >
             <RotateCcw size={14} className="mr-2" /> Reintentar
@@ -606,9 +518,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="space-y-4 animate-in fade-in duration-500 ">
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 ">
+      <div className="space-y-4 animate-in fade-in duration-500">
+        {/* ─── KPI Grid ───────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="p-0">
@@ -684,7 +596,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sales Chart */}
+          {/* ─── Gráfico de ventas ──────────────────────────────────────── */}
           {loading ? (
             <Card className="lg:col-span-2">
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
@@ -704,42 +616,20 @@ export default function DashboardPage() {
               subtitle="Resumen de los últimos 7 días"
             >
               <div className="h-80 w-full mt-4 min-h-0">
-                {!isMounted || !dashboard || chartData.every((d) => d.sales === 0) ? (
+                {!dashboard || chartData.every((d) => d.sales === 0) ? (
                   <div className="h-full flex items-center justify-center text-gray-400 text-sm">
                     Sin datos en el período seleccionado
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart 
-                      data={chartData} 
-                      onClick={handleChartClick}
-                      style={{ cursor: 'pointer' }}
-                    >
+                    <AreaChart data={chartData}>
                       <defs>
-                        <linearGradient
-                          id="colorSales"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#0052CC"
-                            stopOpacity={0.1}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#0052CC"
-                            stopOpacity={0}
-                          />
+                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0052CC" stopOpacity={0.1} />
+                          <stop offset="95%" stopColor="#0052CC" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="#f0f0f0"
-                      />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                       <XAxis
                         dataKey="name"
                         axisLine={false}
@@ -779,7 +669,7 @@ export default function DashboardPage() {
             </Card>
           )}
 
-          {/* SUNAT Notifications */}
+          {/* ─── Notificaciones SUNAT ───────────────────────────────────── */}
           {loading ? (
             <Card className="border-t-4 border-t-brand-red">
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
@@ -826,12 +716,8 @@ export default function DashboardPage() {
                       )}
                     />
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {notif.title}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                        {notif.desc}
-                      </p>
+                      <p className="text-sm font-semibold text-gray-800">{notif.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{notif.desc}</p>
                       <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase">
                         {notif.time}
                       </p>
@@ -850,7 +736,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Comprobantes Recientes */}
+        {/* ─── Comprobantes Recientes ──────────────────────────────────── */}
         {loading ? (
           <Card>
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
@@ -861,38 +747,21 @@ export default function DashboardPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50">
-                    <th className="px-6 py-3">
-                      <Skeleton className="h-3 w-24" />
-                    </th>
-                    <th className="px-6 py-3">
-                      <Skeleton className="h-3 w-32" />
-                    </th>
-                    <th className="px-6 py-3">
-                      <Skeleton className="h-3 w-20" />
-                    </th>
-                    <th className="px-6 py-3">
-                      <Skeleton className="h-3 w-16" />
-                    </th>
-                    <th className="px-6 py-3">
-                      <Skeleton className="h-3 w-20" />
-                    </th>
+                    {["w-24", "w-32", "w-20", "w-16", "w-20"].map((w, i) => (
+                      <th key={i} className="px-6 py-3">
+                        <Skeleton className={`h-3 ${w}`} />
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      <td className="px-6 py-4">
-                        <Skeleton className="h-4 w-24" />
-                      </td>
-                      <td className="px-6 py-4">
-                        <Skeleton className="h-4 w-40" />
-                      </td>
-                      <td className="px-6 py-4">
-                        <Skeleton className="h-4 w-20" />
-                      </td>
-                      <td className="px-6 py-4">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
+                      {["w-24", "w-40", "w-20", "w-16"].map((w, j) => (
+                        <td key={j} className="px-6 py-4">
+                          <Skeleton className={`h-4 ${w}`} />
+                        </td>
+                      ))}
                       <td className="px-6 py-4">
                         <Skeleton className="h-6 w-20 rounded-full" />
                       </td>
@@ -919,39 +788,26 @@ export default function DashboardPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50">
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      ID Comprobante
-                    </th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Cliente
-                    </th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Fecha
-                    </th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </th>
+                    {["ID Comprobante", "Cliente", "Fecha", "Total", "Estado"].map((h) => (
+                      <th
+                        key={h}
+                        className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {(dashboard?.comprobantesRecientes ?? []).length === 0 ? (
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 text-center text-sm text-gray-400"
-                      >
+                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
                         Sin comprobantes recientes
                       </td>
                     </tr>
                   ) : (
                     (dashboard?.comprobantesRecientes ?? []).map((doc, i) => (
-                      <tr
-                        key={i}
-                        className="hover:bg-gray-50/50 transition-colors"
-                      >
+                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-6 py-4">
                           <span className="text-sm font-medium text-brand-blue">
                             {doc.numeroCompleto}
