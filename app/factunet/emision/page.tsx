@@ -130,6 +130,11 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
     setClienteVarios(false);
     
+    // Si ya se emitió un comprobante y se cambia el tipo, reiniciamos todo el formulario
+    if (emitido) {
+      resetForm();
+    }
+
     if (isFirstRenderTipo.current) {
       isFirstRenderTipo.current = false;
       return;
@@ -207,6 +212,12 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     setEnviarCorreo(false);
     setEnviarWhatsapp(false);
   }, [cliente]);
+
+  useEffect(() => {
+    if (emitido) {
+      sharedVentaStore.clear();
+    }
+  }, [emitido]);
 
   useEffect(() => {
     if (errorCli) setNoEncontrado(true); setErrorVisible(true);
@@ -513,6 +524,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       isFirstSaveRef.current = false;
       return;
     }
+    if (emitido) return;
     sharedVentaStore.save(clienteSeleccionado, items, {
       porConsumo,
       cantidadBolsa,
@@ -879,6 +891,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
 
 
 const resetForm = () => {
+  sharedVentaStore.clear(); // Limpiar persistencia al reiniciar
   // ── Items ──────────────────────────────────────
   setItems([]); setBusquedaProducto([]); setShowDropdownProducto([]); inputRefs.current = [];
   setPorConsumo(false);

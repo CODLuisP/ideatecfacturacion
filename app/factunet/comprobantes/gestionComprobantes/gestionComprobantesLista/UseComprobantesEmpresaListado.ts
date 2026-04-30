@@ -7,6 +7,8 @@ interface UseComprobantesEmpresaListadoParams {
   ruc: string
   fechaDesde?: string | null
   fechaHasta?: string | null
+  limit?: number
+  page?: number
 }
 
 interface UseComprobantesEmpresaListadoReturn {
@@ -25,7 +27,7 @@ export const useComprobantesEmpresaListado = (): UseComprobantesEmpresaListadoRe
   const [error, setError] = useState<string | null>(null)
 
   const fetchComprobantes = useCallback(async ({
-    ruc, fechaDesde, fechaHasta,
+    ruc, fechaDesde, fechaHasta, limit = 100, page = 1
   }: UseComprobantesEmpresaListadoParams): Promise<ComprobanteListado[]> => {
     setLoading(true)
     setError(null)
@@ -33,7 +35,8 @@ export const useComprobantesEmpresaListado = (): UseComprobantesEmpresaListadoRe
       const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/listado/ruc/${ruc}`)
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
-      url.searchParams.append("limit", "200") 
+      url.searchParams.append("limit", limit.toString()) 
+      url.searchParams.append("page", page.toString()) 
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` }

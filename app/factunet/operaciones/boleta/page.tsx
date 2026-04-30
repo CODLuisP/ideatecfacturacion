@@ -550,6 +550,7 @@ export default function BoletaPage() {
       isFirstSaveRef.current = false;
       return;
     }
+    if (emitido) return;
     sharedVentaStore.save(boleta.cliente ?? null, detalles, {
       porConsumo,
       cantidadBolsa,
@@ -580,6 +581,12 @@ export default function BoletaPage() {
     setCorreoCliente("");
     setTelefonoCliente("");
   }, [cliente]);
+
+  useEffect(() => {
+    if (emitido) {
+      sharedVentaStore.clear();
+    }
+  }, [emitido]);
 
   useEffect(() => {
     if (!sucursalDelHook) return;
@@ -1502,6 +1509,7 @@ export default function BoletaPage() {
 
   // ── Nueva boleta ─────────────────────────────────────────────
   const nuevaBoleta = () => {
+    sharedVentaStore.clear();
     // Estado emisión
     setEmitido(false);
     setEnviarEnResumen(false);
