@@ -130,6 +130,11 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
     setClienteVarios(false);
     
+    // Si ya se emitió un comprobante y se cambia el tipo, reiniciamos todo el formulario
+    if (emitido) {
+      resetForm();
+    }
+
     if (isFirstRenderTipo.current) {
       isFirstRenderTipo.current = false;
       return;
