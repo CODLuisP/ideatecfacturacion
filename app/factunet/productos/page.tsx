@@ -72,7 +72,7 @@ export default function ProductosPage() {
 
   // REEMPLAZA el bloque filtered:
   const filtrosAvanzadosActivos =
-    filtroStock || filtroAfectacion.length > 0 || filtroTipoProducto.length > 0 || !!filtroSucursal;
+    filtroStock || filtroAfectacion.length > 0 || filtroTipoProducto.length > 0;
 
   const filtered = productos.filter((p) => {
     const matchSearch =
@@ -179,6 +179,29 @@ export default function ProductosPage() {
 
             {/* Filtros + acciones — derecha, bajan juntos */}
             <div className="flex items-center gap-2 flex-wrap">
+                  {/* filtro por suscursal si es superadmin */}
+                  {isSuperAdmin && (
+                    <div className="relative">
+                      <select
+                        value={filtroSucursal}
+                        onChange={(e) => setFiltroSucursal(e.target.value)}
+                        className={cn(
+                          "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                          filtroSucursal
+                            ? "bg-blue-50 border-blue-300 text-blue-700"
+                            : "bg-white border-gray-200 text-gray-600"
+                        )}
+                      >
+                        <option value="">Sucursal: Todas</option>
+                        {sucursales.map((s) => (
+                          <option key={s.sucursalId} value={s.nombre}>
+                            {s.nombre}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
+                  )}
                 <div className="relative">
                     <select
                         value={filterCategoria}
@@ -324,39 +347,6 @@ export default function ProductosPage() {
               </div>
             </div>
               
-            {/* filtro por suscursal si es superadmin */}
-            {isSuperAdmin && (
-            <>
-              <div className="w-px h-4 bg-gray-200 shrink-0" />
-
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap shrink-0">
-                  Sucursal
-                </span>
-                <div className="relative">
-                  <select
-                    value={filtroSucursal}
-                    onChange={(e) => setFiltroSucursal(e.target.value)}
-                    className={cn(
-                      "appearance-none pl-3 pr-8 py-1 text-xs font-medium border rounded-lg outline-none cursor-pointer transition-all",
-                      filtroSucursal
-                        ? "bg-blue-50 border-blue-300 text-green-700"
-                        : "bg-white border-gray-200 text-gray-500"
-                    )}
-                  >
-                    <option value="">Todas</option>
-                    {sucursales.map((s) => (
-                      <option key={s.sucursalId} value={s.nombre}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-            </>
-          )}
-
             {/* Limpiar — empujado a la derecha */}
             {filtrosAvanzadosActivos && (
               <>

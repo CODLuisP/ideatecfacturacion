@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart3, TrendingUp, Calendar, Download,
   PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Loader2,
-  ChevronLeft, ChevronRight, Users
+  ChevronLeft, ChevronRight, Users,
+  Building2
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -17,6 +18,9 @@ import { useReportesEmpresa } from './gestionReportes/UseReportesEmpresa';
 import { useReportesSucursal } from './gestionReportes/UseReportesSucursal';
 import { Periodo, GraficoBarra } from './gestionReportes/Reportes';
 import { useUsuariosReporte } from './gestionReportes/UseUsuariosReporte';
+import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursalRuc';
+import { DropdownSucursal } from '@/app/components/ui/DropdownSucursal';
+import { DropdownUsuario } from '@/app/components/ui/DropdownUsuario';
 
 // ─── Colores donut ────────────────────────────────────────────────────────────
 const DOC_COLORS = {
@@ -73,8 +77,12 @@ export default function ReportesPage() {
 
   const hookEmpresa  = useReportesEmpresa();
   const hookSucursal = useReportesSucursal();
-  const { reportes, loading, loadingExport, fetchReportes, fetchExport } =
-    isSuperAdmin ? hookEmpresa : hookSucursal;
+
+    // Sucursales
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null)
+  const { sucursales, loadingSucursales } = useSucursalRuc(isSuperAdmin)
+
+  const { reportes, loading, loadingExport, fetchReportes, fetchExport } = isSuperAdmin && !sucursalSeleccionada ? hookEmpresa : hookSucursal;
 
   const [periodo, setPeriodo]           = useState<DateRange>('hoy');
   const [showCustom, setShowCustom]     = useState(false);
@@ -85,7 +93,7 @@ export default function ReportesPage() {
   const [paginaGrafico, setPaginaGrafico] = useState(0);
 
   // Usuarios
-  const { usuarios, fetchUsuarios } = useUsuariosReporte();
+  const { usuarios, fetchUsuarios } = useUsuariosReporte(); 
 
   useEffect(() => {
     if (puedeVerUsuarios) fetchUsuarios()
@@ -93,19 +101,24 @@ export default function ReportesPage() {
   }, [user])
 
   // ── Fetch al cambiar período / usuario ──────────────────────────────────────
-  const doFetch = (p: DateRange, uId: number | null = usuarioId) => {
-    if (!user) return;
+  const doFetch = (p: DateRange, uId: number | null = usuarioId, sId: number | null = sucursalSeleccionada) => {
+    if (!user) return
     const params = {
       periodo: p as Periodo,
       limite: 10,
       usuarioId: uId ?? undefined,
-    };
-    if (isSuperAdmin) {
-      (hookEmpresa.fetchReportes as Function)({ ...params, ruc: user.ruc });
-    } else {
-      (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
     }
-  };
+    if (isSuperAdmin && sId) {
+      // superadmin con sucursal seleccionada → reporte por sucursal
+      ;(hookSucursal.fetchReportes as Function)({ ...params, sucursalId: sId })
+    } else if (isSuperAdmin) {
+      // superadmin sin sucursal → reporte global por RUC
+      ;(hookEmpresa.fetchReportes as Function)({ ...params, ruc: user.ruc })
+    } else {
+      // admin/usuario → su sucursal
+      ;(hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) })
+    }
+  }
 
   useEffect(() => {
     doFetch('hoy');
@@ -138,6 +151,12 @@ export default function ReportesPage() {
       (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
     }
   };
+
+  // 4. Handler para cambio de sucursal:
+  const handleSucursal = (id: number | null) => {
+    setSucursalSeleccionada(id)
+    doFetch(periodo, usuarioId, id)
+  }
 
   // ── Datos gráfico con paginación (solo mes y personalizado) ────────────────
   const graficoCompleto: GraficoBarra[] = reportes?.grafico ?? [];
@@ -200,10 +219,12 @@ export default function ReportesPage() {
       usuarioId: usuarioId ?? undefined,
     };
     let data;
-    if (isSuperAdmin) {
-      data = await hookEmpresa.fetchExport({ ...params, ruc: user.ruc });
+    if (isSuperAdmin && !sucursalSeleccionada) {
+      data = await hookEmpresa.fetchExport({ ...params, ruc: user.ruc })
+    } else if (isSuperAdmin && sucursalSeleccionada) {
+      data = await hookSucursal.fetchExport({ ...params, sucursalId: sucursalSeleccionada })
     } else {
-      data = await hookSucursal.fetchExport({ ...params, sucursalId: Number(user.sucursalID) });
+      data = await hookSucursal.fetchExport({ ...params, sucursalId: Number(user.sucursalID) })
     }
     if (!data?.length) return;
 
@@ -240,7 +261,7 @@ export default function ReportesPage() {
   const periodoActivo = showCustom ? null : periodo;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 animate-in fade-in duration-500">
 
       {/* ── Header / Filtros ─────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -248,7 +269,7 @@ export default function ReportesPage() {
 
           {/* Botones de período + select usuario */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1 bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm">
               {(['hoy', 'semana', 'mes', 'año'] as DateRange[]).map((range) => (
                 <button
                   key={range}
@@ -268,24 +289,22 @@ export default function ReportesPage() {
               ))}
             </div>
 
-            {/* Select de usuario — solo admin/superadmin */}
-            {puedeVerUsuarios && (
-            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
-              <Users size={14} className="text-gray-400 shrink-0" />
-              <select
-                value={usuarioId ?? ''}
-                onChange={e => handleUsuario(e.target.value ? Number(e.target.value) : null)}
-                className="text-xs text-gray-700 border-none outline-none bg-transparent cursor-pointer pr-1"
-              >
-                <option value="">Todos los usuarios</option>
-                {usuarios.map(u => (
-                  <option key={u.usuarioID} value={u.usuarioID}>
-                    {u.username}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+              {isSuperAdmin && (
+                <DropdownSucursal
+                  sucursales={sucursales}
+                  seleccionada={sucursalSeleccionada}
+                  onSelect={handleSucursal}
+                />
+              )}
+
+              {/* Select de usuario — solo admin/superadmin */}
+              {puedeVerUsuarios && (
+                <DropdownUsuario
+                  usuarios={usuarios}
+                  seleccionado={usuarioId}
+                  onSelect={handleUsuario}
+                />
+              )}
           </div>
 
           {/* Personalizar fechas */}
