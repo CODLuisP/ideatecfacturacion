@@ -573,7 +573,7 @@ export default function DashboardPage() {
   }, []);
 
   const statusBadgeClass = (status: string) => estadoSunatLabel(status);
-  console.log("fetch", dashboard);
+
 
   return (
     <>
