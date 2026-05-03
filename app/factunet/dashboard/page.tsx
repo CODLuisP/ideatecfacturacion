@@ -479,7 +479,7 @@ export default function DashboardPage() {
               onSelect={handleSucursalChange}
             />
           )}
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2.5 hover:border-gray-300 hover:shadow-md">
             <Calendar size={14} className="text-gray-400 shrink-0" />
             <span className="text-xs text-gray-500 font-medium">Fecha</span>
             <input

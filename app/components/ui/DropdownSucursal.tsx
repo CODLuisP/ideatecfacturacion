@@ -44,7 +44,7 @@ export function DropdownSucursal({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md",
+          "flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5   hover:border-gray-300 hover:shadow-md",
           isOpen && "border-blue-500 ring-4 ring-blue-50"
         )}
       >
@@ -56,7 +56,8 @@ export function DropdownSucursal({
           )}
         />
         <div className="flex flex-col items-start min-w-35">
-          <span className="text-[10px] font-bold text-gray-500 tracking-wider leading-none mb-1">
+                     <span className="text-[10px] text-gray-500 font-medium">
+
             Sucursal
           </span>
           <span className="text-[12px] font-bold text-gray-700 leading-none">

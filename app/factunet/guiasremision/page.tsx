@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   MapPin,
   Package,
+  Calendar,
+  Hash,
 } from "lucide-react";
 import { cn } from "@/app/utils/cn";
 import { Card } from "@/app/components/ui/Card";
@@ -330,7 +332,7 @@ export default function GuiasRemisionPage() {
                       ? "Buscar por destinatario, RUC/DNI o N° guía..."
                       : "Buscar por remitente, RUC/DNI o N° guía..."
                   }
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm"
                 />
                 {search && (
                   <button
@@ -369,14 +371,6 @@ export default function GuiasRemisionPage() {
                 />
               </button>
 
-              {filtroEstado !== "Todos" && (
-                <button
-                  onClick={() => setFiltroEstado("Todos")}
-                  className="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors"
-                >
-                  Limpiar
-                </button>
-              )}
             </div>
 
             {/* Botón nueva guía */}
@@ -385,7 +379,7 @@ export default function GuiasRemisionPage() {
                 onClick={() =>
                   router.push("/factunet/operaciones/guia-remision")
                 }
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-brand-blue hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
               >
                 <Plus size={14} /> Nueva Guía
               </button>
@@ -394,13 +388,13 @@ export default function GuiasRemisionPage() {
 
           {/* ── Panel avanzado ── */}
           {showAvanzado && (
-            <div className="border border-blue-100 bg-blue-50/40 rounded-xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-200">
               {/* Tabs de modo */}
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit">
+              <div className="flex border-b border-gray-100">
                 {(
                   [
-                    { key: "fechas", label: "Por fechas" },
-                    { key: "unico", label: "Guía única" },
+                    { key: "fechas", label: "Por fechas", icon: <Calendar size={14} /> },
+                    { key: "unico", label: "Guía única", icon: <Hash size={14} /> },
                   ] as const
                 ).map((tab) => (
                   <button
@@ -413,107 +407,113 @@ export default function GuiasRemisionPage() {
                       setAvNumero("");
                     }}
                     className={cn(
-                      "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors",
+                      "flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap",
                       modoAvanzado === tab.key
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-600 hover:bg-gray-100",
+                        ? "border-blue-600 text-blue-600 bg-blue-50/50"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50",
                     )}
                   >
+                    <span className="shrink-0">{tab.icon}</span>
                     {tab.label}
                   </button>
                 ))}
               </div>
 
               {/* Campos según modo */}
-              <div className="flex flex-wrap items-end gap-3">
-                {modoAvanzado === "fechas" && (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
-                        Fecha desde
-                      </label>
-                      <input
-                        type="date"
-                        value={avFechaDesde}
-                        max={hoy}
-                        onChange={(e) => {
-                          setAvFechaDesde(e.target.value);
-                          if (avFechaHasta && e.target.value > avFechaHasta)
-                            setAvFechaHasta("");
-                        }}
-                        className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
-                        Fecha hasta
-                      </label>
-                      <input
-                        type="date"
-                        value={avFechaHasta}
-                        min={avFechaDesde || undefined}
-                        max={hoy}
-                        onChange={(e) => setAvFechaHasta(e.target.value)}
-                        className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400"
-                      />
-                    </div>
-                  </>
-                )}
+              <div className="p-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  {modoAvanzado === "fechas" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Fecha desde
+                        </label>
+                        <input
+                          type="date"
+                          value={avFechaDesde}
+                          max={hoy}
+                          onChange={(e) => {
+                            setAvFechaDesde(e.target.value);
+                            if (avFechaHasta && e.target.value > avFechaHasta)
+                              setAvFechaHasta("");
+                          }}
+                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Fecha hasta
+                        </label>
+                        <input
+                          type="date"
+                          value={avFechaHasta}
+                          min={avFechaDesde || undefined}
+                          max={hoy}
+                          onChange={(e) => setAvFechaHasta(e.target.value)}
+                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
 
-                {modoAvanzado === "unico" && (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
-                        Serie
-                      </label>
-                      <input
-                        value={avSerie}
-                        onChange={(e) =>
-                          setAvSerie(e.target.value.toUpperCase())
-                        }
-                        placeholder="T001"
-                        className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-28"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
-                        Número
-                      </label>
-                      <input
-                        type="number"
-                        value={avNumero}
-                        onChange={(e) => setAvNumero(e.target.value)}
-                        placeholder="1"
-                        className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-28"
-                      />
-                    </div>
-                  </>
-                )}
+                  {modoAvanzado === "unico" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Serie
+                        </label>
+                        <input
+                          value={avSerie}
+                          onChange={(e) =>
+                            setAvSerie(e.target.value.toUpperCase())
+                          }
+                          placeholder="T001"
+                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Número
+                        </label>
+                        <input
+                          type="number"
+                          value={avNumero}
+                          onChange={(e) => setAvNumero(e.target.value)}
+                          placeholder="1"
+                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                        />
+                      </div>
+                    </>
+                  )}
 
-                <button
-                  onClick={buscarAvanzado}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors self-end"
-                >
-                  {loading ? (
-                    <RefreshCw size={14} className="animate-spin" />
-                  ) : (
-                    <Search size={14} />
-                  )}{" "}
-                  Buscar
-                </button>
-                <button
-                  onClick={() => {
-                    setAvFechaDesde("");
-                    setAvFechaHasta("");
-                    setAvSerie("");
-                    setAvNumero("");
-                    cargarGuias(tipoGuia);
-                  }}
-                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors self-end pb-2"
-                >
-                  <X size={12} /> Limpiar
-                </button>
+                  {/* Botones acción */}
+                  <div className="flex items-center gap-2 self-end">
+                    <button
+                      onClick={buscarAvanzado}
+                      disabled={loading}
+                      className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-sm transition-all"
+                    >
+                      {loading ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <Search size={14} />
+                      )}{" "}
+                      Buscar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAvFechaDesde("");
+                        setAvFechaHasta("");
+                        setAvSerie("");
+                        setAvNumero("");
+                        cargarGuias(tipoGuia);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-xl transition-all"
+                    >
+                      <X size={13} /> Limpiar
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1022,7 +1022,7 @@ const DropdownFiltro = ({
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex items-center gap-2 pl-3 pr-2.5 py-2 text-sm font-medium border rounded-lg outline-none transition-all shadow-sm whitespace-nowrap",
+          "flex items-center gap-2 pl-3 pr-2.5 py-2.5 text-sm font-medium border rounded-lg outline-none transition-all shadow-sm whitespace-nowrap",
           active
             ? "bg-blue-600 text-white border-blue-600"
             : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -1046,7 +1046,7 @@ const DropdownFiltro = ({
         )}
       </button>
       {open && (
-        <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-44">
+        <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-44">
           {options.map((opt) => (
             <button
               key={opt}
