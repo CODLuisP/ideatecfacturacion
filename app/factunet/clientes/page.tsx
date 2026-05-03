@@ -339,7 +339,7 @@ export default function ClientesPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por RUC, DNI o Nombre..."
-          className="w-full pl-10 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm text-sm"
+          className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm text-xs"
         />
         <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
         {search && (
@@ -355,7 +355,7 @@ export default function ClientesPage() {
               value={filtroSucursal}
               onChange={(e) => setFiltroSucursal(Number(e.target.value))}
               className={cn(
-                "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
                 filtroSucursal
                   ? "bg-blue-50 border-blue-300 text-blue-700"
                   : "bg-white border-gray-200 text-gray-600"
@@ -374,7 +374,7 @@ export default function ClientesPage() {
             value={filterTipo}
             onChange={e => setFilterTipo(e.target.value as typeof filterTipo)}
             className={cn(
-              "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+              "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
               filterTipo !== 'Todos'
                 ? 'bg-blue-50 border-blue-300 text-blue-700'
                 : 'bg-white border-gray-200 text-gray-600'
@@ -390,13 +390,13 @@ export default function ClientesPage() {
         {activeFilters > 0 && (
           <button
             onClick={() => { setFilterStatus('Todos'); setFilterTipo('Todos'); setFiltroSucursal(0); }}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition-colors"
           >
             <X size={12} /> Limpiar ({activeFilters})
           </button>
         )}
-        <Button onClick={() => setIsNuevoOpen(true)}>
-          <Plus className="w-4 h-4" /> Nuevo Cliente
+        <Button onClick={() => setIsNuevoOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
+          <Plus className="w-3.5 h-3.5" /> Nuevo Cliente
         </Button>
       </div>
     </div>

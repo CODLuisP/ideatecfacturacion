@@ -172,7 +172,7 @@ export default function ProductosPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Buscar productos por código o nombre..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm text-sm"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all shadow-sm text-xs"
                 />
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
@@ -186,7 +186,7 @@ export default function ProductosPage() {
                         value={filtroSucursal}
                         onChange={(e) => setFiltroSucursal(e.target.value)}
                         className={cn(
-                          "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                          "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
                           filtroSucursal
                             ? "bg-blue-50 border-blue-300 text-blue-700"
                             : "bg-white border-gray-200 text-gray-600"
@@ -207,7 +207,7 @@ export default function ProductosPage() {
                         value={filterCategoria}
                         onChange={(e) => setFilterCategoria(e.target.value)}
                         className={cn(
-                            "appearance-none pl-3 pr-8 py-2 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all",
+                            "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
                             filterCategoria !== "Todos"
                                 ? "bg-blue-50 border-blue-300 text-blue-700"
                                 : "bg-white border-gray-200 text-gray-600"
@@ -226,13 +226,13 @@ export default function ProductosPage() {
                 <button
                     onClick={() => setShowFiltrosAvanzados((prev) => !prev)}
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border rounded-xl transition-all whitespace-nowrap",
+                        "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md transition-all whitespace-nowrap shadow-sm",
                         filtrosAvanzadosActivos
                             ? "bg-green-50 border-green-300 text-green-700"
                             : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
                     )}
                 >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                             d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                     </svg>
@@ -246,11 +246,11 @@ export default function ProductosPage() {
 
                 <div className="w-px h-6 bg-gray-200" />
 
-                <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-                    <Upload className="w-4 h-4" /> Importar
+                <Button variant="outline" onClick={() => setIsImportOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
+                    <Upload className="w-3.5 h-3.5" /> Importar
                 </Button>
-                <Button onClick={() => setIsNewOpen(true)}>
-                    <Plus className="w-4 h-4" /> Nuevo Producto
+                <Button onClick={() => setIsNewOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
+                    <Plus className="w-3.5 h-3.5" /> Nuevo Producto
                 </Button>
             </div>
         </div>

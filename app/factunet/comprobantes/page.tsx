@@ -475,7 +475,7 @@ export default function VerComprobantesPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por cliente, RUC/DNI o N° comprobante..."
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-xs"
                 />
                 {search && (
                   <button
@@ -506,7 +506,7 @@ export default function VerComprobantesPage() {
               <button
                 onClick={() => setShowAvanzado((o) => !o)}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium border rounded-lg transition-all shadow-sm",
+                  "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md transition-all shadow-sm",
                   showAvanzado
                     ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -554,8 +554,8 @@ export default function VerComprobantesPage() {
 
             {/* Div 2: Nuevo Comprobante */}
             <div className="shrink-0">
-              <Button onClick={() => router.push("/factunet/operaciones")}>
-                <Plus className="w-4 h-4" /> Nuevo Comprobante
+              <Button className="py-2.5 px-3 text-xs rounded-md h-auto" onClick={() => router.push("/factunet/operaciones")}>
+                <Plus className="w-3.5 h-3.5" /> Nuevo Comprobante
               </Button>
             </div>
           </div>
@@ -586,7 +586,7 @@ export default function VerComprobantesPage() {
                       setAvFechaHasta("");
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap",
+                      "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap",
                       modoAvanzado === tab.key
                         ? "border-blue-600 text-blue-600 bg-blue-50/50"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50",
@@ -604,7 +604,7 @@ export default function VerComprobantesPage() {
                   {modoAvanzado === "fechas" && (
                     <>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha desde
                         </label>
                         <input
@@ -616,11 +616,11 @@ export default function VerComprobantesPage() {
                             if (avFechaHasta && e.target.value > avFechaHasta)
                               setAvFechaHasta("");
                           }}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha hasta
                         </label>
                         <input
@@ -629,7 +629,7 @@ export default function VerComprobantesPage() {
                           min={avFechaDesde || undefined}
                           max={hoy}
                           onChange={(e) => setAvFechaHasta(e.target.value)}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                     </>
@@ -637,18 +637,18 @@ export default function VerComprobantesPage() {
                   {modoAvanzado === "unico" && (
                     <>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Serie
                         </label>
                         <input
                           value={avSerie}
                           onChange={(e) => setAvSerie(e.target.value)}
                           placeholder="F001"
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Número
                         </label>
                         <input
@@ -656,7 +656,7 @@ export default function VerComprobantesPage() {
                           value={avNumero}
                           onChange={(e) => setAvNumero(e.target.value)}
                           placeholder="135"
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
                         />
                       </div>
                     </>
@@ -664,18 +664,18 @@ export default function VerComprobantesPage() {
                   {modoAvanzado === "cliente" && (
                     <>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Nº Doc. Cliente
                         </label>
                         <input
                           value={avClienteDoc}
                           onChange={(e) => setAvClienteDoc(e.target.value)}
                           placeholder="20601234567"
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-40"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-40"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha desde
                         </label>
                         <input
@@ -687,11 +687,11 @@ export default function VerComprobantesPage() {
                             if (avFechaHasta && e.target.value > avFechaHasta)
                               setAvFechaHasta("");
                           }}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha hasta
                         </label>
                         <input
@@ -700,7 +700,7 @@ export default function VerComprobantesPage() {
                           min={avFechaDesde || undefined}
                           max={hoy}
                           onChange={(e) => setAvFechaHasta(e.target.value)}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                     </>
@@ -708,7 +708,7 @@ export default function VerComprobantesPage() {
                   {modoAvanzado === "usuario" && (
                     <>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           ID Usuario
                         </label>
                         <input
@@ -716,11 +716,11 @@ export default function VerComprobantesPage() {
                           value={avUsuarioId}
                           onChange={(e) => setAvUsuarioId(e.target.value)}
                           placeholder="1"
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-15"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha desde
                         </label>
                         <input
@@ -732,11 +732,11 @@ export default function VerComprobantesPage() {
                             if (avFechaHasta && e.target.value > avFechaHasta)
                               setAvFechaHasta("");
                           }}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha hasta
                         </label>
                         <input
@@ -745,7 +745,7 @@ export default function VerComprobantesPage() {
                           min={avFechaDesde || undefined}
                           max={hoy}
                           onChange={(e) => setAvFechaHasta(e.target.value)}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                     </>
@@ -757,12 +757,12 @@ export default function VerComprobantesPage() {
                       onClick={() => buscarAvanzado(1)}
                       disabled={loading}
                       className={cn(
-                        "flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-all shadow-sm",
+                        "flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white rounded-md transition-all shadow-sm",
                         COLORS.btnPrimary,
                         loading && COLORS.btnDisabled,
                       )}
                     >
-                      <Search size={14} /> Buscar
+                      <Search size={13} /> Buscar
                     </button>
                     <button
                       onClick={() => {
@@ -776,9 +776,9 @@ export default function VerComprobantesPage() {
                         setCurrentPage(1);
                         cargarComprobantes(1);
                       }}
-                      className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-xl transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-md transition-all"
                     >
-                      <X size={13} /> Limpiar
+                      <X size={12} /> Limpiar
                     </button>
                   </div>
                 </div>
@@ -925,7 +925,7 @@ export default function VerComprobantesPage() {
                         <span className="text-sm font-medium text-gray-900">
                           {doc.cliente.numeroDocumento}
                         </span>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-[12px] text-gray-600">
                           {doc.cliente.razonSocial}
                         </span>
                       </div>
@@ -1068,30 +1068,28 @@ interface DropdownFiltroProps {
   colorMap?: Record<string, string>;
 }
 
-const DropdownFiltro = ({
-  label,
-  value,
-  options,
-  onChange,
-  colorMap,
-}: DropdownFiltroProps) => {
+
+
+const DropdownFiltro = ({ label, value, options, onChange, colorMap }: DropdownFiltroProps) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
   const active = value !== "Todos";
+
   return (
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex items-center gap-2 pl-3 pr-2.5 py-2.5 text-sm font-medium border rounded-lg outline-none transition-all shadow-sm whitespace-nowrap",
+          "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md outline-none transition-all shadow-sm whitespace-nowrap",
           active
             ? "bg-blue-600 text-white border-blue-600"
             : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -1099,46 +1097,28 @@ const DropdownFiltro = ({
       >
         {active ? value : label}
         {active ? (
-          <X
-            size={13}
-            className="text-white/80"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange("Todos");
-            }}
-          />
+          <X size={11} className="text-white/80" onClick={(e) => { e.stopPropagation(); onChange("Todos"); }} />
         ) : (
-          <ChevronDown
-            size={14}
-            className={cn("transition-transform", open && "rotate-180")}
-          />
+          <ChevronDown size={12} className={cn("transition-transform", open && "rotate-180")} />
         )}
       </button>
+
       {open && (
-        <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-45">
+        <div className="absolute top-full mt-1 left-0 z-40 bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden min-w-36">
           {options.map((opt) => (
             <button
               key={opt}
-              onClick={() => {
-                onChange(opt);
-                setOpen(false);
-              }}
+              onClick={() => { onChange(opt); setOpen(false); }}
               className={cn(
-                "w-full flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors text-left",
-                value === opt
-                  ? "bg-blue-50 text-blue-700 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50",
+                "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left",
+                value === opt ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700 hover:bg-gray-50",
               )}
             >
-              <span className="flex items-center gap-2">
-                {colorMap && opt !== "Todos" && (
-                  <span className={cn("w-2 h-2 rounded-full", colorMap[opt])} />
-                )}
+              <span className="flex items-center gap-1.5">
+                {colorMap && opt !== "Todos" && <span className={cn("w-1.5 h-1.5 rounded-full", colorMap[opt])} />}
                 {opt}
               </span>
-              {value === opt && (
-                <Check size={13} className="text-blue-600 shrink-0" />
-              )}
+              {value === opt && <Check size={11} className="text-blue-600 shrink-0" />}
             </button>
           ))}
         </div>
