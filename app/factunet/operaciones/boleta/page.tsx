@@ -1,5 +1,5 @@
 "use client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Printer,
@@ -40,6 +40,7 @@ import { useSucursalRuc } from "./gestionBoletas/useSucursalRuc";
 import { DatePickerLimitado } from "@/app/components/ui/DatePickerLimitado";
 import { ModalGuardarClienteBoleta } from "./gestionBoletas/Modalguardarclienteboleta";
 import { sharedVentaStore } from "../sharedVentaStore";
+import { useComprobanteUnicoId } from "../../comprobantes/gestionComprobantes/UseComprobanteUnicoId";
 
 // ── Interfaces locales ───────────────────────────────────────
 interface DetalleLocal extends Partial<BoletaDetalle> {
@@ -78,8 +79,7 @@ export default function BoletaPage() {
   const IGV_DEFAULT = user?.igv ?? 18;
 
   const { empresa } = useEmpresaEmisor();
-  const { cliente, loadingCliente, errorCliente, buscarCliente } =
-    useClienteBoleta();
+  const { cliente, loadingCliente, errorCliente, buscarCliente } = useClienteBoleta();
   const { clientes, loadingClientes, fetchClientes } = useClientesRuc();
 
   const { sucursal: sucursalDelHook, loadingSucursal } = useSucursal();
@@ -88,6 +88,126 @@ export default function BoletaPage() {
   const [correlativoActual, setCorrelativoActual] = useState<number | null>(
     null,
   );
+
+  //Editar y renvia por parametros url
+  const searchParams = useSearchParams();
+  const { comprobante, fetchComprobante: fetchComprobanteById } = useComprobanteUnicoId();
+  const cargandoComprobante = !!searchParams.get('comprobanteId') && !comprobante;
+
+  useEffect(() => {
+    const comprobanteId = searchParams.get('comprobanteId');
+    const establecimiento = searchParams.get('establecimiento');
+    if (!comprobanteId) return;
+    fetchComprobanteById(Number(comprobanteId));
+    if (isSuperAdmin && establecimiento && sucursales.length > 0) {
+      const sucursalEncontrada = sucursales.find(
+        (s: Sucursal) => s.codEstablecimiento === establecimiento
+      );
+      if (sucursalEncontrada) {
+        setSucursal(sucursalEncontrada);
+      }
+    }
+  }, [sucursales]);
+
+  useEffect(() => {
+    if (!comprobante) return;
+
+    setBoleta(prev => ({
+      ...prev,
+      tipoMoneda: comprobante.tipoMoneda ?? 'PEN',
+      tipoPago: comprobante.tipoPago ?? 'Contado',
+      tipoOperacion: comprobante.tipoOperacion ?? '0101',
+      fechaVencimiento: comprobante.fechaVencimiento?.slice(0, 10) ?? fecha,
+      cliente: comprobante.cliente ? {
+        clienteId: comprobante.cliente.clienteId ?? null,
+        tipoDocumento: comprobante.cliente.tipoDocumento,
+        numeroDocumento: comprobante.cliente.numeroDocumento,
+        razonSocial: comprobante.cliente.razonSocial,
+        ubigeo: comprobante.cliente.ubigeo ?? '',
+        direccionLineal: comprobante.cliente.direccionLineal ?? '',
+        departamento: comprobante.cliente.departamento ?? '',
+        provincia: comprobante.cliente.provincia ?? '',
+        distrito: comprobante.cliente.distrito ?? '',
+      } : undefined,
+    }));
+
+    // Cliente búsqueda
+    setBusqueda(comprobante.cliente?.numeroDocumento ?? '');
+    setTipoDoc(comprobante.cliente?.tipoDocumento ?? '01');
+    setCorreoCliente(comprobante.cliente?.correo ?? '');
+    setTelefonoCliente(comprobante.cliente?.whatsApp ?? '');
+
+    // Detalles
+    if (comprobante.details && comprobante.details.length > 0) {
+      const nuevosDetalles: DetalleLocal[] = comprobante.details.map((d, idx) => ({
+        item: idx + 1,
+        productoId: d.productoId ?? null,
+        codigo: d.codigo ?? null,
+        descripcion: d.descripcion,
+        cantidad: d.cantidad,
+        unidadMedida: d.unidadMedida,
+        precioUnitario: d.precioUnitario,
+        tipoAfectacionIGV: d.tipoAfectacionIGV,
+        porcentajeIGV: d.porcentajeIGV,
+        montoIGV: d.montoIGV,
+        baseIgv: d.baseIgv,
+        codigoTipoDescuento: d.codigoTipoDescuento ?? '00',
+        descuentoUnitario: d.descuentoUnitario ?? 0,
+        descuentoTotal: d.descuentoTotal ?? 0,
+        valorVenta: d.valorVenta,
+        precioVenta: d.precioVenta,
+        totalVentaItem: d.totalVentaItem,
+        icbper: d.icbper ?? 0,
+        factorIcbper: d.factorIcbper ?? 0,
+        _precioBase: d.precioUnitario,
+        _precioBaseOriginal: d.precioUnitario,
+        _precioVentaConIGV: d.precioVenta,
+        _incluirIGV: false,
+      }));
+      setDetalles(nuevosDetalles);
+      setBusquedaProducto(nuevosDetalles.map(d => d.descripcion ?? ''));
+      setShowDropdownProducto(nuevosDetalles.map(() => false));
+      inputRefs.current = nuevosDetalles.map(() => null);
+    }
+
+    // Pagos
+    if (comprobante.pagos && comprobante.pagos.length > 0) {
+      setPagos(comprobante.pagos.map(p => ({
+        medioPago: p.medioPago,
+        monto: String(p.monto),
+        numeroOperacion: p.numeroOperacion ?? '',
+        entidadFinanciera: p.entidadFinanciera ?? '',
+        observaciones: p.observaciones ?? '',
+      })));
+    }
+
+    // Cuotas
+    if (comprobante.cuotas && comprobante.cuotas.length > 0) {
+      setNumeroCuotas(comprobante.cuotas.length);
+      setCuotas(comprobante.cuotas.map(c => ({
+        numeroCuota: c.numeroCuota,
+        monto: String(c.monto),
+        fechaVencimiento: c.fechaVencimiento?.slice(0, 10) ?? '',
+      })));
+    }
+
+    // Guías
+    if (comprobante.guias && comprobante.guias.length > 0) {
+      setGuias(comprobante.guias.map(g => {
+        const partes = g.guiaNumeroCompleto?.split('-') ?? [];
+        return {
+          serie: partes[0] ?? '',
+          numero: partes[1] ?? '',
+          tipoDoc: g.guiaTipoDoc ?? '09',
+        };
+      }));
+    }
+
+    // Descuento global
+    setDescuentoGlobal(comprobante.descuentoGlobal ?? 0);
+    setCodigoTipoDescGlobal(comprobante.codigoTipoDescGlobal ?? '02');
+
+  }, [comprobante]);
 
   // Productos según sucursal
   const { productosSucursal, fetchProductosSucursal } = useProductosSucursal(
@@ -174,6 +294,10 @@ export default function BoletaPage() {
   // ── Emisión ──────────────────────────────────────────────────
   const [emitiendo, setEmitiendo] = useState(false);
   const [errorEmision, setErrorEmision] = useState<string | null>(null);
+
+  //Reintentar envio por mala conexiona a api sunat
+  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
+  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
 
   // ── Guías de Remisión ────────────────────────────────────────
   const [showGuias, setShowGuias] = useState(false);
@@ -668,19 +792,32 @@ export default function BoletaPage() {
   }, [pagos, boleta.tipoPago]);
 
   useEffect(() => {
-    if (boleta.tipoPago !== "Credito" && boleta.tipoPago !== "CreditoInicial")
-      return;
-    const cuotasFormateadas: BoletaCuota[] = cuotas.map((c) => ({
-      numeroCuota: c.numeroCuota,
-      monto: Number(c.monto) || 0,
-      fechaVencimiento: c.fechaVencimiento,
-    }));
-    if (boleta.tipoPago === "Credito") {
-      setBoleta((prev) => ({ ...prev, cuotas: cuotasFormateadas, pagos: [] }));
-    } else {
-      setBoleta((prev) => ({ ...prev, cuotas: cuotasFormateadas }));
-    }
-  }, [cuotas, boleta.tipoPago]);
+      if (boleta.tipoPago !== "Credito" && boleta.tipoPago !== "CreditoInicial") return;
+      const cuotasFormateadas: BoletaCuota[] = cuotas.map((c) => ({
+        numeroCuota: c.numeroCuota,
+        monto: Number(c.monto) || 0,
+        fechaVencimiento: c.fechaVencimiento,
+      }));
+
+      // ✅ Tomar fecha de vencimiento de la última cuota
+      const ultimaCuota = cuotas[cuotas.length - 1];
+      const fechaVencimientoFinal = ultimaCuota?.fechaVencimiento ?? boleta.fechaVencimiento;
+
+      if (boleta.tipoPago === "Credito") {
+        setBoleta((prev) => ({ 
+          ...prev, 
+          cuotas: cuotasFormateadas, 
+          pagos: [],
+          fechaVencimiento: fechaVencimientoFinal,
+        }));
+      } else {
+        setBoleta((prev) => ({ 
+          ...prev, 
+          cuotas: cuotasFormateadas,
+          fechaVencimiento: fechaVencimientoFinal,
+        }));
+      }
+    }, [cuotas, boleta.tipoPago]);
 
   useEffect(() => {
     const detallesLimpios = detalles.map(
@@ -1375,136 +1512,189 @@ export default function BoletaPage() {
     setErrorEmision(null);
     try {
       const boletaFinal = prepararBoleta();
-      const resBoleta = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`, boletaFinal, { headers: { Authorization: `Bearer ${accessToken}` } });
+
+      // Primera API: solo guarda en BD
+      const resBoleta = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
+        boletaFinal,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const comprobanteId = resBoleta.data.comprobanteId;
 
-      // ── Enviar a SUNAT o guardar en resumen ──
+      // ✅ Guardar id ANTES de llamar a SUNAT
+      setComprobanteIdEmitido(comprobanteId);
+
       if (!enviarEnResumen) {
-        const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
-        if (resSunat.data.exitoso) {
-          showToast(resSunat.data.mensaje ?? "Boleta emitida correctamente.", "success");
-        } else {
-          showToast(`Boleta ${boletaFinal.serie}-${boletaFinal.correlativo} generada pero rechazada por SUNAT`, "error");
-        }
+        // Segunda API: enviar a SUNAT
+        await enviarASunat(comprobanteId);
       } else {
         showToast("Boleta guardada como pendiente en resumen", "success");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
-
-      setComprobanteIdEmitido(comprobanteId);
-      setEmitido(true);
-
-      const procesarSegundoPlano = async () => {
-        setCargandoPreview(true);
-        // ── PDF A4 ──
-        try {
-          const resA4 = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          if (resA4.ok) {
-            const blob = await resA4.blob();
-            setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
-          }
-        } catch { showToast("Error al cargar el PDF", "error"); }
-        finally { setCargandoPreview(false); }
-
-        // ── PDF Ticket ──
-        try {
-          const resTicket = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          if (resTicket.ok) {
-            const blob = await resTicket.blob();
-            setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
-          }
-        } catch {}
-
-        // ── Correo y WhatsApp ──
-        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
-          try {
-            const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
-            const serieNum = `${boleta.serie}-${corrNum}`;
-            const resPdf = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
-            const pdfBlob = await resPdf.blob();
-            const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
-
-            if (enviarCorreo && correoCliente) {
-              try {
-                const formData = new FormData();
-                formData.append("toEmail", correoCliente);
-                formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
-                formData.append("subject", `Boleta Electrónica ${serieNum}`);
-                formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
-                formData.append("tipo", "3");
-                formData.append("comprobanteJson", JSON.stringify({
-                  serieNumero: serieNum, estadoSunat: "ACEPTADO",
-                  items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-                  igv: totales.igv, total: totales.importeTotal,
-                }));
-                formData.append("adjunto", pdfFile);
-                const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-                if (!resCorreo.ok) throw new Error("Error correo");
-                showToast("Boleta enviada por correo", "success");
-              } catch { showToast("Error al enviar por correo", "error"); }
-            }
-
-            if (enviarWhatsapp && telefonoCliente) {
-              try {
-                const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-                const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
-                const uploadForm = new FormData();
-                uploadForm.append("file", pdfFile);
-                const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
-                if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
-                const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-                const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
-                });
-                if (!resWsp.ok) throw new Error("Error WhatsApp");
-                showToast("Boleta enviada por WhatsApp", "success");
-              } catch { showToast("Error al enviar por WhatsApp", "error"); }
-            }
-          } catch { showToast("Error al procesar envíos", "error"); }
-        }
-
-        // ── Stock ──
-        const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
-        if (itemsParaStock.length > 0) {
-          try {
-            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-              itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            await fetchProductosSucursal();
-          } catch { console.error("Error al actualizar stock"); }
-        }
-
-        // ── Correlativo ──
-        const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-        const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-        setCorrelativoActual(resSucursal.data.correlativoBoleta);
-        setBoleta(prev => ({ ...prev, serie: resSucursal.data.serieBoleta, correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0") }));
-      };
-
-      procesarSegundoPlano();
 
     } catch (err: any) {
       const data = err?.response?.data;
-      const mensaje = data?.mensaje ?? data?.message ?? "Error al emitir el comprobante";
+      const mensaje = data?.mensaje ?? data?.message ?? "Error al generar el comprobante";
       const detalle = data?.detalle;
       setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
-      showToast("Error al emitir comprobante.", "error");
+      showToast("Error al generar el comprobante.", "error");
     } finally {
       setEmitiendo(false);
     }
+  };
+
+  const reintentarEnvio = async () => {
+    if (!comprobanteIdEmitido) return;
+    setEmitiendo(true);
+    setErrorEmision(null);
+    setComprobanteRechazado(false);
+    await enviarASunat(comprobanteIdEmitido);
+    setEmitiendo(false);
+  };
+
+  const enviarASunat = async (comprobanteId: number) => {
+    try {
+      const resSunat = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (resSunat.data.exitoso) {
+        showToast(resSunat.data.mensaje ?? "Boleta emitida correctamente.", "success");
+        setEmitido(true);
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(false);
+        procesarSegundoPlano(comprobanteId);
+      } else {
+        // ❌ SUNAT rechazó — nueva boleta obligatoria
+        setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(true);
+        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+      }
+    } catch (err: any) {
+      const tieneRespuesta = !!err?.response;
+      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+
+      if (tieneRespuesta) {
+        // ❌ Error con respuesta — nueva boleta
+        setErrorEmision(mensaje || "Comprobante rechazado por SUNAT");
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(true);
+        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+      } else {
+        // ❌ SUNAT caída — SÍ permitir reintento
+        setErrorEmision("No se pudo conectar con SUNAT. Puedes reintentar el envío.");
+        setComprobanteRechazado(true);
+        setRechazadoPorSunat(false);
+        showToast("SUNAT no responde. Puedes reintentar.", "error");
+      }
+    }
+  };
+
+  const procesarSegundoPlano = async (comprobanteId: number) => {
+    setCargandoPreview(true);
+    try {
+      const resA4 = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (resA4.ok) {
+        const blob = await resA4.blob();
+        setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+      }
+    } catch { showToast("Error al cargar el PDF", "error"); }
+    finally { setCargandoPreview(false); }
+
+    try {
+      const resTicket = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (resTicket.ok) {
+        const blob = await resTicket.blob();
+        setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+      }
+    } catch {}
+
+    if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+      try {
+        const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
+        const serieNum = `${boleta.serie}-${corrNum}`;
+        const resPdf = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+        const pdfBlob = await resPdf.blob();
+        const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
+
+        if (enviarCorreo && correoCliente) {
+          try {
+            const formData = new FormData();
+            formData.append("toEmail", correoCliente);
+            formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
+            formData.append("subject", `Boleta Electrónica ${serieNum}`);
+            formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
+            formData.append("tipo", "3");
+            formData.append("comprobanteJson", JSON.stringify({
+              serieNumero: serieNum, estadoSunat: "ACEPTADO",
+              items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
+              igv: totales.igv, total: totales.importeTotal,
+            }));
+            formData.append("adjunto", pdfFile);
+            const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
+            if (!resCorreo.ok) throw new Error("Error correo");
+            showToast("Boleta enviada por correo", "success");
+          } catch { showToast("Error al enviar por correo", "error"); }
+        }
+
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+            const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+            const uploadForm = new FormData();
+            uploadForm.append("file", pdfFile);
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
+            if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
+            const fileUrl = (await resUpload.json()).datos.url;
+            const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+              body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
+            });
+            if (!resWsp.ok) throw new Error("Error WhatsApp");
+            showToast("Boleta enviada por WhatsApp", "success");
+          } catch { showToast("Error al enviar por WhatsApp", "error"); }
+        }
+      } catch { showToast("Error al procesar envíos", "error"); }
+    }
+
+    const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
+    if (itemsParaStock.length > 0) {
+      try {
+        await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+          itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        await fetchProductosSucursal();
+      } catch { console.error("Error al actualizar stock"); }
+    }
+
+    const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoActual(resSucursal.data.correlativoBoleta);
+    setBoleta(prev => ({
+      ...prev,
+      serie: resSucursal.data.serieBoleta,
+      correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0")
+    }));
   };
 
   // ── Nueva boleta ─────────────────────────────────────────────
@@ -1555,6 +1745,9 @@ export default function BoletaPage() {
     // Fecha emisión
     setFechaEmisionEditada(false);
 
+    setComprobanteRechazado(false);
+    setRechazadoPorSunat(false);
+
     // Boleta base
     setBoleta(prev => ({
       ublVersion: '2.1', tipoOperacion: '0101', tipoComprobante: '03',
@@ -1591,6 +1784,13 @@ export default function BoletaPage() {
     <div className="space-y-2 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+
+          {cargandoComprobante && (
+            <div className="flex items-center pb-3 gap-2 text-xs text-brand-blue">
+              <div className="w-4 h-4 shrink-0 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+              <span>Cargando datos del comprobante...</span>
+            </div>
+          )}
           
           <Card
             title="Datos del Comprobante"
@@ -2448,14 +2648,33 @@ export default function BoletaPage() {
 
             <div className="mt-6 space-y-3">
               <Button className="w-full py-3 text-base" type="button"
-                onClick={emitido ? nuevaBoleta : emitirComprobante}
-                disabled={!puedeEmitir && !emitido}>
+                onClick={
+                  emitido
+                    ? nuevaBoleta
+                    : comprobanteRechazado
+                      ? reintentarEnvio
+                      : rechazadoPorSunat
+                        ? nuevaBoleta
+                        : emitirComprobante
+                }
+                disabled={
+                  emitiendo ||
+                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
+                }
+              >
                 {emitiendo ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Emitiendo...
+                    {comprobanteRechazado ? "Reenviando..." : "Emitiendo..."}
                   </span>
-                ) : emitido ? "Nueva Boleta" : "Emitir Boleta"}
+                ) : emitido
+                    ? "Nueva Boleta"
+                    : comprobanteRechazado
+                      ? "🔄 Reintentar envío a SUNAT"
+                      : rechazadoPorSunat
+                        ? "Nueva Boleta"
+                        : "Emitir Boleta"
+                }
               </Button>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input type="checkbox" checked={enviarEnResumen}

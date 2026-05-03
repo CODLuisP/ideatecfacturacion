@@ -118,7 +118,7 @@ export default function AgregarProducto({
 
     // 👇 genera código automático usando el componente
     const codigoAuto = value.trim().length > 0
-      ? generarCodigoProducto(value, productosEmpresa.length + 1)
+      ? generarCodigoProducto(value, productosEmpresa.length === 0 ? 0 : productosEmpresa.length)
       : "";
 
     setForm((prev) => ({ ...prev, nomProducto: value, codigo: codigoAuto }));

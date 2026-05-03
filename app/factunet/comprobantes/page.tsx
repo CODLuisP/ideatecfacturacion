@@ -242,13 +242,13 @@ export default function VerComprobantesPage() {
         router.push(`/factunet/operaciones/factura?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
         break;
         case '03':
-        router.push(`/factunet/operaciones/boleta?comprobanteId=${c.comprobanteId}`);
+        router.push(`/factunet/operaciones/boleta?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
         break;
         case '07':
-        router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}`);
         break;
         case '08':
-        router.push(`/factunet/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+        router.push(`/factunet/operaciones/nota-debito?serie=${c.serie}`);
         break;
         default:
         break;

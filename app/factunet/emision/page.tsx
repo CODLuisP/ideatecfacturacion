@@ -121,6 +121,10 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
 
+  //REITENTAR ENVIO A SUNAT SI NO RESPONDE API SUNAT
+  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
+  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
+
   const isFirstRenderTipo = useRef(true);
   useEffect(() => {
     setTipoDoc(tipo === 'factura' ? '06' : '01');
@@ -516,7 +520,6 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const [aplicarIcbper, setAplicarIcbper] = useState(false);
   const [showBolsaOpts, setShowBolsaOpts] = useState(false);
 
-  // Guard: skip save on first render so we don't overwrite the store
   // before the load effect reads it (both fire on mount in order)
   const isFirstSaveRef = useRef(true);
   useEffect(() => {
@@ -614,7 +617,6 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
 
   const emitirComprobante = async () => {
-
     if (!clienteSeleccionado && !clienteVarios) { showToast('Debe ingresar un cliente', 'error'); return; }
     if (tipo === 'factura' && clienteSeleccionado?.tipoDocumento !== '06' && clienteSeleccionado?.tipoDocumento !== '04') {
       showToast('Para factura el cliente debe tener RUC o CE', 'error'); return;
@@ -625,13 +627,11 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     if (sinDesc !== -1) { showToast(`El ítem ${sinDesc + 1} no tiene descripción`, 'error'); return; }
     if (enviarCorreo && !correoCliente.trim()) { showToast('Ingrese el correo del cliente', 'error'); return; }
     const sinPrecio = itemsReales.findIndex(i => i.precioVentaConIGV <= 0);
-    if (sinPrecio !== -1) {
-      showToast(`El ítem ${sinPrecio + 1} debe tener un precio mayor a cero`, 'error'); return;
-    }
+    if (sinPrecio !== -1) { showToast(`El ítem ${sinPrecio + 1} debe tener un precio mayor a cero`, 'error'); return; }
 
     setEmitiendo(true);
     setErrorEmision(null);
-    setComprobanteIdEmitido(null);
+
     try {
       const { fechaHora: ahora, fecha: hoy } = formatoFechaActual();
       const clienteFinal = {
@@ -643,9 +643,11 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         provincia: clienteSeleccionado?.provincia || null,
         distrito: clienteSeleccionado?.distrito || null,
       };
+
       const details = items.map((item, idx) => {
         const calc = calcItem(item);
-        const icbper = item._esIcbper && aplicarIcbper ? parseFloat((item.cantidad * ICBPER_FACTOR).toFixed(2)) : 0;
+        const icbper = item._esIcbper && aplicarIcbper
+          ? parseFloat((item.cantidad * ICBPER_FACTOR).toFixed(2)) : 0;
         return {
           item: idx + 1,
           productoId: item.productoId, codigo: item.codigo,
@@ -672,15 +674,23 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         fechaEmision: ahora, horaEmision: ahora, fechaVencimiento: hoy,
         tipoPago: 'Contado',
         serie, correlativo: String(correlativoActual ?? 1).padStart(8, '0'),
-        company: { ...empresa, establecimientoAnexo: sucursalActual?.codEstablecimiento ?? empresa?.establecimientoAnexo ?? '0000' },
-        cliente: { ...clienteFinal,
+        company: {
+          ...empresa,
+          establecimientoAnexo: sucursalActual?.codEstablecimiento ?? empresa?.establecimientoAnexo ?? '0000'
+        },
+        cliente: {
+          ...clienteFinal,
           correo: correoCliente || null,
           enviadoPorCorreo: enviarCorreo,
           whatsApp: telefonoCliente || null,
           enviadoPorWhatsApp: enviarWhatsapp,
         },
         details,
-        pagos: [{ medioPago, monto: totales.importeTotal, fechaPago: ahora, numeroOperacion: '', entidadFinanciera: '', observaciones: '' }],
+        pagos: [{
+          medioPago, monto: totales.importeTotal,
+          fechaPago: ahora, numeroOperacion: '',
+          entidadFinanciera: '', observaciones: ''
+        }],
         cuotas: [], guias: [],
         totalOperacionesGravadas: totales.gravadas,
         totalOperacionesExoneradas: totales.exoneradas,
@@ -698,9 +708,8 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         enviadoEnResumen: tipo === 'factura' ? null : enviarEnResumen,
         legends: [{ code: '1000', value: numeroALetras(totales.importeTotal, moneda) }],
       };
-      console.log('comprobante:', payload);
 
-      // ── 1. Generar XML ──────────────────────────────────────
+      // ── 1. Generar XML y guardar en BD ──────────────────────
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
         payload,
@@ -708,187 +717,209 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       );
       const comprobanteId = res.data.comprobanteId;
 
-      // ── 2. Enviar a SUNAT o guardar en resumen ──────────────
-      if (!enviarEnResumen) {
-        const resSunat = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
-          null,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (resSunat.data.exitoso) {
-          showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
-        } else {
-          showToast('Comprobante generado pero rechazado por SUNAT', 'error');
-        }
-      } else {
-        showToast('Comprobante guardado como pendiente', 'success');
-      }
-
-      // ── 3. Setear id y PDF (siempre, independiente del modo) ─
+      // ✅ Guardar id ANTES de llamar a SUNAT
       setComprobanteIdEmitido(comprobanteId);
 
-      const procesarSegundoPlano = async () => {
-      // ── 4. PDF + correo + whatsapp (siempre si hay contacto) ─
-      const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
-      const serieNum = `${serie}-${corrNum}`;
-      const esBoleta = tipo === 'boleta';
-
-      try {
-        const resPdf = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
-        const pdfBlob = await resPdf.blob();
-
-        // ← Para el botón Abrir
-        setPdfUrlEmitido(URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' })));
-
-
-         const resTicket = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (resTicket.ok) {
-    const ticketBlob = await resTicket.blob();
-    setPdfTicketUrl(URL.createObjectURL(new Blob([ticketBlob], { type: 'application/pdf' })));
-  }
-
-        // ← Solo si hay contacto marcado
-        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
-          const pdfFile = new File(
-            [pdfBlob],
-            `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
-            { type: 'application/pdf' }
-          );
-
-          // ── Correo ──
-          if (enviarCorreo && correoCliente) {
-            try {
-              const formData = new FormData();
-              formData.append('toEmail', correoCliente);
-              formData.append('toName', clienteSeleccionado?.razonSocial ?? 'Cliente');
-              formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
-              formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
-              formData.append('tipo', esBoleta ? '3' : '1');
-              formData.append('comprobanteJson', JSON.stringify({  // ← agregar
-                serieNumero: serieNum,
-                estadoSunat: 'ACEPTADO',
-                items: items.filter(i => !i._esIcbper).map(i => ({
-                  descripcion: i.descripcion ?? '',
-                  cantidad: i.cantidad ?? 1,
-                  precioUnitario: i.precioVentaConIGV ?? 0,
-                })),
-                igv: totales.igv,
-                total: totales.importeTotal,
-              }));
-              formData.append('adjunto', pdfFile);
-              const resCorreo = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-                { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
-              );
-              if (!resCorreo.ok) throw new Error('Error al enviar el correo');
-              showToast('Comprobante enviado por correo', 'success');
-            } catch { showToast('Error al enviar por correo', 'error'); }
-          }
-
-          // ── WhatsApp ──
-          if (enviarWhatsapp && telefonoCliente) {
-            try {
-              const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-              const whatsappBase = 'https://do.velsat.pe:8443/whatsapp';
-              const uploadForm = new FormData();
-              uploadForm.append('file', pdfFile);
-              const resUpload = await fetch(`${whatsappBase}/api/upload`, {
-                method: 'POST', headers: { 'x-api-key': whatsappApiKey }, body: uploadForm,
-              });
-              if (!resUpload.ok) throw new Error('No se pudo subir el PDF');
-              const fileUrl = (await resUpload.json()).datos.url;
-              const numeroFormateado = telefonoCliente.startsWith('51') ? telefonoCliente : `51${telefonoCliente}`;
-              const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': whatsappApiKey },
-                body: JSON.stringify({
-                  phone: numeroFormateado, type: 'documento', file_url: fileUrl,
-                  filename: `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
-                  mime_type: 'application/pdf',
-                  text: `Estimado(a) ${clienteSeleccionado?.razonSocial ?? ''}, adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica ${serieNum}.`,
-                }),
-              });
-              if (!resWsp.ok) throw new Error('Error al enviar por WhatsApp');
-              showToast('Documento enviado por WhatsApp', 'success');
-            } catch { showToast('Error al enviar por WhatsApp', 'error'); }
-          }
-        }
-      } catch { showToast('Error al obtener el PDF', 'error'); }
-
-      // ── 5. Stock ────────────────────────────────────────────
-      const itemsStock = items.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === 'BIEN');
-      if (itemsStock.length > 0) {
-        try {
-          await axios.put(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-            itemsStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad })),
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          await fetchProductosSucursal();
-        } catch {}
+      // ── 2. Enviar a SUNAT o guardar en resumen ──────────────
+      if (!enviarEnResumen) {
+        await enviarASunat(comprobanteId);
+      } else {
+        showToast('Comprobante guardado como pendiente', 'success');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
 
-      // ── 6. Correlativo nuevo ────────────────────────────────
-      const sucursalId = isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      setCorrelativoActual(tipo === 'boleta' ? resSucursal.data.correlativoBoleta : resSucursal.data.correlativoFactura);
-
-      // ── 7. Auto-guardar cliente nuevo ───────────────────────
-      const esClienteNuevo = clienteSeleccionado?.clienteId === null && clienteSeleccionado?.razonSocial;
-      const tieneContacto = (correoCliente && enviarCorreo) || (telefonoCliente && enviarWhatsapp);
-      if (esClienteNuevo && tieneContacto) {
-        try {
-          await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
-            {
-              sucursalID: isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID,
-              numeroDocumento: clienteSeleccionado.numeroDocumento,
-              razonSocialNombre: clienteSeleccionado.razonSocial,
-              nombreComercial: '',
-              telefono: telefonoCliente || '',
-              correo: correoCliente || '',
-              tipoDocumentoId: clienteSeleccionado.tipoDocumento,
-              direccion: clienteSeleccionado.tipoDocumento === '01'
-                ? {}
-                : {
-                    ubigeo: clienteSeleccionado.ubigeo ?? '',
-                    direccionLineal: clienteSeleccionado.direccionLineal ?? '',
-                    departamento: clienteSeleccionado.departamento ?? '',
-                    provincia: clienteSeleccionado.provincia ?? '',
-                    distrito: clienteSeleccionado.distrito ?? '',
-                    tipoDireccion: 'PRINCIPAL',
-                  }
-            },
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-        } catch {}
-      }
-      };
-
-      procesarSegundoPlano();
-
-      setEmitido(true);
     } catch (err: any) {
+      // Error en GenerarXml / BD — no llegó a SUNAT
       const data = err?.response?.data;
-      const msg = data?.mensaje ?? data?.message ?? 'Error al emitir el comprobante';
+      const msg = data?.mensaje ?? data?.message ?? 'Error al generar el comprobante';
       const det = data?.detalle;
       setErrorEmision(det ? `${msg}: ${det}` : msg);
-      showToast('Error al emitir comprobante.', 'error');
+      showToast('Error al generar el comprobante.', 'error');
     } finally {
       setEmitiendo(false);
     }
   };
 
+  const reintentarEnvio = async () => {
+    if (!comprobanteIdEmitido) return;
+    setEmitiendo(true);
+    setErrorEmision(null);
+    setComprobanteRechazado(false);
+    await enviarASunat(comprobanteIdEmitido);
+    setEmitiendo(false);
+  };
+
+  const enviarASunat = async (comprobanteId: number) => {
+    try {
+      const resSunat = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (resSunat.data.exitoso) {
+        showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
+        setEmitido(true);
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(false);
+        procesarSegundoPlano(comprobanteId);
+      } else {
+        // ❌ SUNAT rechazó — nueva emisión obligatoria
+        setErrorEmision(resSunat.data.mensaje ?? 'Comprobante rechazado por SUNAT');
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(true);
+        showToast('Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.', 'error');
+      }
+    } catch (err: any) {
+      const tieneRespuesta = !!err?.response;
+      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? '';
+
+      if (tieneRespuesta) {
+        // ❌ Error con respuesta — nueva emisión
+        setErrorEmision(mensaje || 'Comprobante rechazado por SUNAT');
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(true);
+        showToast('Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.', 'error');
+      } else {
+        // ❌ SUNAT caída — SÍ permitir reintento
+        setErrorEmision('No se pudo conectar con SUNAT. Puedes reintentar el envío.');
+        setComprobanteRechazado(true);
+        setRechazadoPorSunat(false);
+        showToast('SUNAT no responde. Puedes reintentar.', 'error');
+      }
+    }
+  };
+
+  const procesarSegundoPlano = async (comprobanteId: number) => {
+    const corrNum = String((correlativoActual ?? 1) - 1).padStart(8, '0');
+    const serieNum = `${serie}-${corrNum}`;
+    const esBoleta = tipo === 'boleta';
+
+    try {
+      const resPdf = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!resPdf.ok) throw new Error('No se pudo obtener el PDF');
+      const pdfBlob = await resPdf.blob();
+      setPdfUrlEmitido(URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' })));
+
+      const resTicket = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (resTicket.ok) {
+        const ticketBlob = await resTicket.blob();
+        setPdfTicketUrl(URL.createObjectURL(new Blob([ticketBlob], { type: 'application/pdf' })));
+      }
+
+      if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+        const pdfFile = new File(
+          [pdfBlob],
+          `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
+          { type: 'application/pdf' }
+        );
+
+        if (enviarCorreo && correoCliente) {
+          try {
+            const formData = new FormData();
+            formData.append('toEmail', correoCliente);
+            formData.append('toName', clienteSeleccionado?.razonSocial ?? 'Cliente');
+            formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
+            formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
+            formData.append('tipo', esBoleta ? '3' : '1');
+            formData.append('comprobanteJson', JSON.stringify({
+              serieNumero: serieNum, estadoSunat: 'ACEPTADO',
+              items: items.filter(i => !i._esIcbper).map(i => ({
+                descripcion: i.descripcion ?? '', cantidad: i.cantidad ?? 1, precioUnitario: i.precioVentaConIGV ?? 0,
+              })),
+              igv: totales.igv, total: totales.importeTotal,
+            }));
+            formData.append('adjunto', pdfFile);
+            const resCorreo = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+              { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
+            );
+            if (!resCorreo.ok) throw new Error('Error al enviar el correo');
+            showToast('Comprobante enviado por correo', 'success');
+          } catch { showToast('Error al enviar por correo', 'error'); }
+        }
+
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+            const whatsappBase = 'https://do.velsat.pe:8443/whatsapp';
+            const uploadForm = new FormData();
+            uploadForm.append('file', pdfFile);
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+              method: 'POST', headers: { 'x-api-key': whatsappApiKey }, body: uploadForm,
+            });
+            if (!resUpload.ok) throw new Error('No se pudo subir el PDF');
+            const fileUrl = (await resUpload.json()).datos.url;
+            const numeroFormateado = telefonoCliente.startsWith('51') ? telefonoCliente : `51${telefonoCliente}`;
+            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': whatsappApiKey },
+              body: JSON.stringify({
+                phone: numeroFormateado, type: 'documento', file_url: fileUrl,
+                filename: `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
+                mime_type: 'application/pdf',
+                text: `Estimado(a) ${clienteSeleccionado?.razonSocial ?? ''}, adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica ${serieNum}.`,
+              }),
+            });
+            if (!resWsp.ok) throw new Error('Error al enviar por WhatsApp');
+            showToast('Documento enviado por WhatsApp', 'success');
+          } catch { showToast('Error al enviar por WhatsApp', 'error'); }
+        }
+      }
+    } catch { showToast('Error al obtener el PDF', 'error'); }
+
+    // Stock
+    const itemsStock = items.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === 'BIEN');
+    if (itemsStock.length > 0) {
+      try {
+        await axios.put(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+          itemsStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad })),
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        await fetchProductosSucursal();
+      } catch {}
+    }
+
+    // Correlativo
+    const sucursalId = isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoActual(tipo === 'boleta' ? resSucursal.data.correlativoBoleta : resSucursal.data.correlativoFactura);
+
+    // Auto-guardar cliente nuevo
+    const esClienteNuevo = clienteSeleccionado?.clienteId === null && clienteSeleccionado?.razonSocial;
+    const tieneContacto = (correoCliente && enviarCorreo) || (telefonoCliente && enviarWhatsapp);
+    if (esClienteNuevo && tieneContacto) {
+      try {
+        await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+          {
+            sucursalID: isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID,
+            numeroDocumento: clienteSeleccionado.numeroDocumento,
+            razonSocialNombre: clienteSeleccionado.razonSocial,
+            nombreComercial: '', telefono: telefonoCliente || '', correo: correoCliente || '',
+            tipoDocumentoId: clienteSeleccionado.tipoDocumento,
+            direccion: clienteSeleccionado.tipoDocumento === '01' ? {} : {
+              ubigeo: clienteSeleccionado.ubigeo ?? '', direccionLineal: clienteSeleccionado.direccionLineal ?? '',
+              departamento: clienteSeleccionado.departamento ?? '', provincia: clienteSeleccionado.provincia ?? '',
+              distrito: clienteSeleccionado.distrito ?? '', tipoDireccion: 'PRINCIPAL',
+            }
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+      } catch {}
+    }
+  };
 
 const resetForm = () => {
   sharedVentaStore.clear(); // Limpiar persistencia al reiniciar
@@ -923,6 +954,9 @@ const resetForm = () => {
 
   //Envio por resumen
   setEnviarEnResumen(false);
+
+  setComprobanteRechazado(false);
+  setRechazadoPorSunat(false);
 };
 
   const descargarPdf = async () => {
@@ -1498,19 +1532,34 @@ const imprimirPdf = () => {
 
             {/* Botón emitir */}
             <button type="button"
-              onClick={emitido ? () => { resetForm(); } : emitirComprobante}
-              disabled={!puedeEmitir && !emitido}
+              onClick={
+                emitido
+                  ? () => resetForm()
+                  : comprobanteRechazado
+                    ? reintentarEnvio
+                    : rechazadoPorSunat
+                      ? () => resetForm()
+                      : emitirComprobante
+              }
+              disabled={
+                emitiendo ||
+                (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
+              }
               className={`w-full py-2.5 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
-                ${!puedeEmitir && !emitido
+                ${emitiendo || (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-blue-700 hover:shadow-blue-200 cursor-pointer'}`}>
               {emitiendo ? (
-                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Emitiendo...</>
-              ) : emitido ? (
-                `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
-              ) : (
-                `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
-              )}
+                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                {comprobanteRechazado ? 'Reenviando...' : 'Emitiendo...'}</>
+              ) : emitido
+                  ? `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
+                  : comprobanteRechazado
+                    ? '🔄 Reintentar envío a SUNAT'
+                    : rechazadoPorSunat
+                      ? `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
+                      : `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
+              }
             </button>
 
             {tipo === 'boleta' && (

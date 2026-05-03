@@ -233,6 +233,10 @@ export default function FacturaPage() {
   });
   const [aplicarDetraccion, setAplicarDetraccion] = useState(false);
 
+  //Manejar reenvio sunat
+  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
+  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
+
   // ── Guías de Remisión ────────────────────────────────────────
   const [showGuias, setShowGuias] = useState(false);
   const [guias, setGuias] = useState<
@@ -833,19 +837,32 @@ export default function FacturaPage() {
   }, [pagos, factura.tipoPago]);
 
   useEffect(() => {
-    if (factura.tipoPago !== "Credito" && factura.tipoPago !== "CreditoInicial")
-      return;
-    const cuotasFormateadas: FacturaCuota[] = cuotas.map((c) => ({
-      numeroCuota: c.numeroCuota,
-      monto: Number(c.monto) || 0,
-      fechaVencimiento: c.fechaVencimiento,
-    }));
-    if (factura.tipoPago === "Credito") {
-      setFactura((prev) => ({ ...prev, cuotas: cuotasFormateadas, pagos: [] }));
-    } else {
-      setFactura((prev) => ({ ...prev, cuotas: cuotasFormateadas }));
-    }
-  }, [cuotas, factura.tipoPago]);
+      if (factura.tipoPago !== "Credito" && factura.tipoPago !== "CreditoInicial") return;
+      const cuotasFormateadas: FacturaCuota[] = cuotas.map((c) => ({
+        numeroCuota: c.numeroCuota,
+        monto: Number(c.monto) || 0,
+        fechaVencimiento: c.fechaVencimiento,
+      }));
+
+      // ✅ Tomar fecha de vencimiento de la última cuota
+      const ultimaCuota = cuotas[cuotas.length - 1];
+      const fechaVencimientoFinal = ultimaCuota?.fechaVencimiento ?? factura.fechaVencimiento;
+
+      if (factura.tipoPago === "Credito") {
+        setFactura((prev) => ({ 
+          ...prev, 
+          cuotas: cuotasFormateadas, 
+          pagos: [],
+          fechaVencimiento: fechaVencimientoFinal,
+        }));
+      } else {
+        setFactura((prev) => ({ 
+          ...prev, 
+          cuotas: cuotasFormateadas,
+          fechaVencimiento: fechaVencimientoFinal,
+        }));
+      }
+    }, [cuotas, factura.tipoPago]);
 
   useEffect(() => {
     const detallesLimpios = detalles.map(
@@ -864,15 +881,16 @@ export default function FacturaPage() {
     setFactura((prev) => ({ ...prev, details: detallesLimpios }));
   }, [detalles]);
 
+  //Guias de remision enlazadas
   useEffect(() => {
-    const guiasFormateadas: FacturaGuia[] = guias
-      .filter((g) => g.serie && g.numero)
-      .map((g) => ({
-        guiaNumeroCompleto: `${g.serie}-${g.numero}`,
-        guiaTipoDoc: g.tipoDoc,
-      }));
-    setFactura((prev) => ({ ...prev, guias: guiasFormateadas }));
-  }, [guias]);
+      const guiasFormateadas: FacturaGuia[] = guias
+        .filter((g) => g.serie && g.numero)
+        .map((g) => ({
+          guiaNumeroCompleto: `${g.serie}-${g.numero.padStart(8, "0")}`,
+          guiaTipoDoc: g.tipoDoc,
+        }));
+      setFactura((prev) => ({ ...prev, guias: guiasFormateadas }));
+    }, [guias]);
 
   useEffect(() => {
     if (!aplicarDetraccion || totales.importeTotal === 0) return;
@@ -1637,12 +1655,35 @@ export default function FacturaPage() {
     setErrorEmision(null);
     try {
       const facturaFinal = prepararFactura();
+
+      // Primera API: solo guarda en BD y genera XML
       const resFactura = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
         facturaFinal,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       const comprobanteId = resFactura.data.comprobanteId;
+
+      // ✅ Guardamos el id ANTES de llamar a SUNAT
+      setComprobanteIdEmitido(comprobanteId);
+
+      // Segunda API: enviar a SUNAT
+      await enviarASunat(comprobanteId);
+
+    } catch (err: any) {
+      // Error en la primera API (GenerarXml / BD)
+      const data = err?.response?.data;
+      const mensaje = data?.mensaje ?? data?.message ?? "Error al generar el comprobante";
+      const detalle = data?.detalle;
+      setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
+      showToast("Error al generar el comprobante.", "error");
+    } finally {
+      setEmitiendo(false);
+    }
+  };
+
+  const enviarASunat = async (comprobanteId: number) => {
+    try {
       const resSunat = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
         null,
@@ -1651,130 +1692,157 @@ export default function FacturaPage() {
 
       if (resSunat.data.exitoso) {
         showToast(resSunat.data.mensaje ?? "Factura emitida correctamente.", "success");
+        setEmitido(true);
+        setComprobanteRechazado(false);
+        procesarSegundoPlano(comprobanteId);
       } else {
-        showToast(`Factura ${facturaFinal.serie}-${facturaFinal.correlativo} generada pero rechazada por SUNAT`, "error");
+        // ❌ SUNAT rechazó con exitoso: false
+        setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(true);
+        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
       }
-
-      setComprobanteIdEmitido(comprobanteId);
-      setEmitido(true);
-
-      const procesarSegundoPlano = async () => {
-        // ── PDF A4 ──
-        setCargandoPreview(true);
-        try {
-          const resA4 = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          if (resA4.ok) {
-            const blob = await resA4.blob();
-            setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
-          }
-        } catch { showToast("Error al cargar el PDF", "error"); }
-        finally { setCargandoPreview(false); }
-
-        // ── PDF Ticket ──
-        try {
-          const resTicket = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          if (resTicket.ok) {
-            const blob = await resTicket.blob();
-            setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
-          }
-        } catch {}
-
-        // ── Correo y WhatsApp ──
-        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
-          try {
-            const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
-            const serieNum = `${factura.serie}-${corrNum}`;
-            const resPdf = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
-            const pdfBlob = await resPdf.blob();
-            const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, { type: "application/pdf" });
-
-            if (enviarCorreo && correoCliente) {
-              try {
-                const formData = new FormData();
-                formData.append("toEmail", correoCliente);
-                formData.append("toName", factura.cliente?.razonSocial ?? "Cliente");
-                formData.append("subject", `Factura Electrónica ${serieNum}`);
-                formData.append("body", "Se emitió la factura electrónica por los productos/servicios indicados.");
-                formData.append("tipo", "1");
-                formData.append("comprobanteJson", JSON.stringify({
-                  serieNumero: serieNum, estadoSunat: "ACEPTADO",
-                  items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-                  igv: totales.igv, total: totales.importeTotal,
-                }));
-                formData.append("adjunto", pdfFile);
-                const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-                if (!resCorreo.ok) throw new Error("Error al enviar correo");
-                showToast("Comprobante enviado por correo", "success");
-              } catch { showToast("Error al enviar por correo", "error"); }
-            }
-
-            if (enviarWhatsapp && telefonoCliente) {
-              try {
-                const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-                const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
-                const uploadForm = new FormData();
-                uploadForm.append("file", pdfFile);
-                const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
-                if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
-                const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-                const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${factura.cliente?.razonSocial ?? ""}, adjuntamos su factura electrónica ${serieNum}.` }),
-                });
-                if (!resWsp.ok) throw new Error("Error al enviar por WhatsApp");
-                showToast("Comprobante enviado por WhatsApp", "success");
-              } catch { showToast("Error al enviar por WhatsApp", "error"); }
-            }
-          } catch { showToast("Error al procesar envíos", "error"); }
-        }
-
-        // ── Stock ──
-        const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
-        if (itemsParaStock.length > 0) {
-          try {
-            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-              itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            await fetchProductosSucursal();
-          } catch { console.error("Error al actualizar stock"); }
-        }
-
-        // ── Correlativo ──
-        const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-        const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-        setCorrelativoActual(resSucursal.data.correlativoFactura);
-        setFactura(prev => ({ ...prev, serie: resSucursal.data.serieFactura, correlativo: String(resSucursal.data.correlativoFactura).padStart(8, "0") }));
-      };
-
-      procesarSegundoPlano();
-
     } catch (err: any) {
-      const data = err?.response?.data;
-      const mensaje = data?.mensaje ?? data?.message ?? "Error al emitir el comprobante";
-      const detalle = data?.detalle;
-      setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
-      showToast("Error al emitir comprobante.", "error");
-    } finally {
-      setEmitiendo(false);
+      const tieneRespuesta = !!err?.response;
+      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+      
+      if (tieneRespuesta) {
+        // ❌ SUNAT respondió con error HTTP
+        setErrorEmision(mensaje || "Comprobante rechazado por SUNAT");
+        setComprobanteRechazado(false);
+        setRechazadoPorSunat(true);
+        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+      } else {
+        // ❌ SUNAT caída/sin respuesta
+        setErrorEmision("No se pudo conectar con SUNAT. Puedes reintentar el envío.");
+        setComprobanteRechazado(true);
+        showToast("SUNAT no responde. Puedes reintentar.", "error");
+      }
     }
+  };
+
+  const procesarSegundoPlano = async (comprobanteId: number) => {
+    // ── PDF A4 ──
+    setCargandoPreview(true);
+    try {
+      const resA4 = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (resA4.ok) {
+        const blob = await resA4.blob();
+        setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+      }
+    } catch { showToast("Error al cargar el PDF", "error"); }
+    finally { setCargandoPreview(false); }
+
+    // ── PDF Ticket ──
+    try {
+      const resTicket = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (resTicket.ok) {
+        const blob = await resTicket.blob();
+        setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+      }
+    } catch {}
+
+    // ── Correo y WhatsApp ──
+    if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+      try {
+        const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
+        const serieNum = `${factura.serie}-${corrNum}`;
+        const resPdf = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+        const pdfBlob = await resPdf.blob();
+        const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, { type: "application/pdf" });
+
+        if (enviarCorreo && correoCliente) {
+          try {
+            const formData = new FormData();
+            formData.append("toEmail", correoCliente);
+            formData.append("toName", factura.cliente?.razonSocial ?? "Cliente");
+            formData.append("subject", `Factura Electrónica ${serieNum}`);
+            formData.append("body", "Se emitió la factura electrónica por los productos/servicios indicados.");
+            formData.append("tipo", "1");
+            formData.append("comprobanteJson", JSON.stringify({
+              serieNumero: serieNum, estadoSunat: "ACEPTADO",
+              items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
+              igv: totales.igv, total: totales.importeTotal,
+            }));
+            formData.append("adjunto", pdfFile);
+            const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
+            if (!resCorreo.ok) throw new Error("Error al enviar correo");
+            showToast("Comprobante enviado por correo", "success");
+          } catch { showToast("Error al enviar por correo", "error"); }
+        }
+
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+            const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+            const uploadForm = new FormData();
+            uploadForm.append("file", pdfFile);
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
+            if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
+            const fileUrl = (await resUpload.json()).datos.url;
+            const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+              body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${factura.cliente?.razonSocial ?? ""}, adjuntamos su factura electrónica ${serieNum}.` }),
+            });
+            if (!resWsp.ok) throw new Error("Error al enviar por WhatsApp");
+            showToast("Comprobante enviado por WhatsApp", "success");
+          } catch { showToast("Error al enviar por WhatsApp", "error"); }
+        }
+      } catch { showToast("Error al procesar envíos", "error"); }
+    }
+
+    // ── Stock ──
+    const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
+    if (itemsParaStock.length > 0) {
+      try {
+        await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+          itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        await fetchProductosSucursal();
+      } catch { console.error("Error al actualizar stock"); }
+    }
+
+    // ── Correlativo ──
+    const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoActual(resSucursal.data.correlativoFactura);
+    setFactura(prev => ({
+      ...prev,
+      serie: resSucursal.data.serieFactura,
+      correlativo: String(resSucursal.data.correlativoFactura).padStart(8, "0")
+    }));
+  };
+
+  const reintentarEnvio = async () => {
+    if (!comprobanteIdEmitido) return;
+    setEmitiendo(true);
+    setErrorEmision(null);
+    setComprobanteRechazado(false);
+    await enviarASunat(comprobanteIdEmitido);
+    setEmitiendo(false);
   };
 
   //limpiamos para nueva factura
   const nuevaFactura = () => {
     sharedVentaStore.clear();
+    setComprobanteRechazado(false);
+    setRechazadoPorSunat(false);
     setEmitido(false);
     setPdfA4Url(null);
     setPdfTicketUrl(null);
@@ -3680,15 +3748,39 @@ export default function FacturaPage() {
             )}
 
             <div className="mt-6 space-y-3">
-              <Button className="w-full py-3 text-base" type="button"
-                onClick={emitido ? nuevaFactura : emitirComprobante}
-                disabled={emitiendo || (!emitido && sinSucursal) || (!emitido && !serieDisplay) || (!emitido && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) || (!emitido && detalles.length === 0)}>
+              <Button
+                className="w-full py-3 text-base"
+                type="button"
+                onClick={
+                  emitido
+                    ? nuevaFactura
+                    : comprobanteRechazado
+                      ? reintentarEnvio
+                      : rechazadoPorSunat  // ← nuevo
+                        ? nuevaFactura
+                        : emitirComprobante
+                }
+                disabled={
+                  emitiendo ||
+                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && sinSucursal) ||
+                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !serieDisplay) ||
+                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) ||
+                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && detalles.length === 0)
+                }
+              >
                 {emitiendo ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Emitiendo...
+                    {comprobanteRechazado ? "Reenviando..." : "Emitiendo..."}
                   </span>
-                ) : emitido ? "Nueva Factura" : "Emitir Factura"}
+                ) : emitido
+                    ? "Nueva Factura"
+                    : comprobanteRechazado
+                      ? "🔄 Reintentar envío a SUNAT"
+                      : rechazadoPorSunat   // ← nuevo
+                        ? "Nueva Factura"
+                        : "Emitir Factura"
+                }
               </Button>
               {sinSucursal && <p className="text-xs text-amber-600 text-center">Selecciona una sucursal para emitir</p>}
               {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
