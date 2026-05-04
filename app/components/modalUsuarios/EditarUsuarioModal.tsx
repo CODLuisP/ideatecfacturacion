@@ -123,7 +123,7 @@ export function EditarUsuarioModal({
                     <>
                       <option value="facturador">Facturador</option>
                       {(isSuperadmin || usuario.rol === "admin") && (
-                        <option value="admin">Admin</option>
+                        <option value="admin">Administrador</option>
                       )}
                     </>
                   )}
