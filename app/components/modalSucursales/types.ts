@@ -3,6 +3,7 @@ export interface Sucursal {
   codigo: string;
   nombre: string;
   direccion: string;
+  habilitado: boolean;
   usuario: string;
   serieFactura: string;
   correlativoFactura: number;

@@ -21,6 +21,7 @@ import { useToast } from "@/app/components/ui/Toast";
 import { useProductosEmpresaLista } from "./gestioProductos/useProductosEmpresaLista";
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { useRegistrarCategoria } from "./gestioProductos/useRegistrarCategoria";
+import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
 
 export default function ProductosPage() {
   const { showToast } = useToast();
@@ -334,49 +335,20 @@ export default function ProductosPage() {
 
             {/* Filtros + acciones — derecha, bajan juntos */}
             <div className="flex items-center gap-2 flex-wrap">
-                  {/* filtro por suscursal si es superadmin */}
-                  {isSuperAdmin && (
-                    <div className="relative">
-                      <select
-                        value={filtroSucursal}
-                        onChange={(e) => setFiltroSucursal(e.target.value)}
-                        className={cn(
-                          "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
-                          filtroSucursal
-                            ? "bg-blue-50 border-blue-300 text-blue-700"
-                            : "bg-white border-gray-200 text-gray-600"
-                        )}
-                      >
-                        <option value="">Sucursal: Todas</option>
-                        {sucursales.map((s) => (
-                          <option key={s.sucursalId} value={s.nombre}>
-                            {s.nombre}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
-                  )}
-                <div className="relative">
-                    <select
-                        value={filterCategoria}
-                        onChange={(e) => setFilterCategoria(e.target.value)}
-                        className={cn(
-                            "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
-                            filterCategoria !== "Todos"
-                                ? "bg-blue-50 border-blue-300 text-blue-700"
-                                : "bg-white border-gray-200 text-gray-600"
-                        )}
-                    >
-                        <option value="Todos">Categoría: Todos</option>
-                        {categorias.map((cat) => (
-                            <option key={cat.categoriaId} value={cat.categoriaNombre}>
-                                {cat.categoriaNombre}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                {isSuperAdmin && (
+                  <DropdownFiltro
+                    label="Sucursal: Todas"
+                    value={filtroSucursal || "Todos"}
+                    options={["Todos", ...sucursales.map(s => s.nombre)]}
+                    onChange={(v) => setFiltroSucursal(v === "Todos" ? "" : v)}
+                  />
+                )}
+                <DropdownFiltro
+                  label="Categoría: Todos"
+                  value={filterCategoria}
+                  options={["Todos", ...categorias.map(cat => cat.categoriaNombre)]}
+                  onChange={(v) => setFilterCategoria(v)}
+                />
 
                 <button
                     onClick={() => setShowFiltrosAvanzados((prev) => !prev)}

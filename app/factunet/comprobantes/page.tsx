@@ -54,6 +54,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/app/components/ui/Card";
 import { createPortal } from "react-dom";
 import { Button } from "@/app/components/ui/Button";
+import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = [
@@ -1059,73 +1060,6 @@ export default function VerComprobantesPage() {
   );
 }
 
-// ─── DropdownFiltro ───────────────────────────────────────────────────────────
-interface DropdownFiltroProps {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-  colorMap?: Record<string, string>;
-}
-
-
-
-const DropdownFiltro = ({ label, value, options, onChange, colorMap }: DropdownFiltroProps) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const active = value !== "Todos";
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md outline-none transition-all shadow-sm whitespace-nowrap",
-          active
-            ? "bg-blue-600 text-white border-blue-600"
-            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
-        )}
-      >
-        {active ? value : label}
-        {active ? (
-          <X size={11} className="text-white/80" onClick={(e) => { e.stopPropagation(); onChange("Todos"); }} />
-        ) : (
-          <ChevronDown size={12} className={cn("transition-transform", open && "rotate-180")} />
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute top-full mt-1 left-0 z-40 bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden min-w-36">
-          {options.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => { onChange(opt); setOpen(false); }}
-              className={cn(
-                "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left",
-                value === opt ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700 hover:bg-gray-50",
-              )}
-            >
-              <span className="flex items-center gap-1.5">
-                {colorMap && opt !== "Todos" && <span className={cn("w-1.5 h-1.5 rounded-full", colorMap[opt])} />}
-                {opt}
-              </span>
-              {value === opt && <Check size={11} className="text-blue-600 shrink-0" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
   // ─── BadgeSunat ───────────────────────────────────────────────────────────────
   const BadgeSunat = ({ estado }: { estado: string }) => {

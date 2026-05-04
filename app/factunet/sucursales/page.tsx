@@ -1,16 +1,11 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   Plus,
   Edit2,
-  Trash2,
   FileText,
-  Loader2,
   Building2,
-  CheckCircle2,
-  XCircle,
-  BookOpen,
   MapPin,
   Hash,
   ToggleLeft,
@@ -19,7 +14,6 @@ import {
 import { useToast } from "@/app/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
-
 import {
   EditSucursalForm,
   NuevaSucursalForm,
@@ -28,7 +22,6 @@ import {
 import { NuevaSucursalModal } from "@/app/components/modalSucursales/Nuevasucursalmodal";
 import { EditarSucursalModal } from "@/app/components/modalSucursales/Editarsucursalmodal";
 import { SeriesSucursalModal } from "@/app/components/modalSucursales/Seriessucursalmodal";
-import { EliminarModal } from "@/app/components/modalSucursales/Eliminarsucursalmodal";
 import { cn } from "@/app/utils/cn";
 
 function nextCodigo(sucursales: Sucursal[]): string {
@@ -40,14 +33,12 @@ function nextCodigo(sucursales: Sucursal[]): string {
 // ─── Stat Strip ───────────────────────────────────────────────────────────────
 function StatStrip({
   sucursales,
-  estadoSucursales,
   totalSeries,
 }: {
   sucursales: Sucursal[];
-  estadoSucursales: Record<string, boolean>;
   totalSeries: number;
 }) {
-  const activas = Object.values(estadoSucursales).filter(Boolean).length;
+  const activas = sucursales.filter((s) => s.habilitado).length;
   const inactivas = sucursales.length - activas;
 
   const items = [
@@ -56,10 +47,18 @@ function StatStrip({
       value: sucursales.length,
       color: "neutral",
       icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="7" width="20" height="14" rx="2"/>
-          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="2" y="7" width="20" height="14" rx="2" />
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
         </svg>
       ),
     },
@@ -68,10 +67,18 @@ function StatStrip({
       value: activas,
       color: "green",
       icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
       ),
     },
@@ -80,11 +87,19 @@ function StatStrip({
       value: inactivas,
       color: "red",
       icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="15" y1="9" x2="9" y2="15"/>
-          <line x1="9" y1="9" x2="15" y2="15"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
       ),
     },
@@ -93,10 +108,18 @@ function StatStrip({
       value: totalSeries,
       color: "blue",
       icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
         </svg>
       ),
     },
@@ -138,7 +161,9 @@ function StatStrip({
             key={i}
             className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3"
           >
-            <div className={`w-7 h-7 rounded-md ${p.bg} flex items-center justify-center ${p.icon} shrink-0`}>
+            <div
+              className={`w-7 h-7 rounded-md ${p.bg} flex items-center justify-center ${p.icon} shrink-0`}
+            >
               {item.icon}
             </div>
             <div>
@@ -156,15 +181,11 @@ function StatStrip({
   );
 }
 
-
-
-
-
 // ─── Series Badge ─────────────────────────────────────────────────────────────
 function SeriesBadge({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[9px] font-semibold  text-gray-400 uppercase">
+      <span className="text-[9px] font-semibold text-gray-400 uppercase">
         {label}
       </span>
       <span
@@ -184,25 +205,26 @@ function SeriesBadge({ label, value }: { label: string; value?: string }) {
 // ─── Sucursal Card ────────────────────────────────────────────────────────────
 interface SucursalCardProps {
   sucursal: Sucursal;
-  habilitado: boolean;
-  isSuperadmin: boolean;
   canManage: boolean;
+  isSuperadmin: boolean; 
   onEditar: () => void;
   onSeries: () => void;
   onToggle: () => void;
-  onEliminar: () => void;
+  togglingId: string | null;
 }
 
 function SucursalCard({
   sucursal: s,
-  habilitado,
-  isSuperadmin,
   canManage,
+  isSuperadmin,
   onEditar,
   onSeries,
   onToggle,
-  onEliminar,
+  togglingId,
 }: SucursalCardProps) {
+  const habilitado = s.habilitado;
+  const isToggling = togglingId === s.id;
+
   return (
     <div
       className={cn(
@@ -215,7 +237,7 @@ function SucursalCard({
       <div className="pl-5 pr-4 pt-4 pb-4">
         {/* Top row: badges */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[11px]  font-bold border border-gray-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[11px] font-bold border border-gray-200">
             <Hash className="w-2.5 h-2.5" />
             {s.codigo}
           </span>
@@ -250,69 +272,70 @@ function SucursalCard({
 
         {/* Series */}
         <div className="border-t border-gray-100 pt-3 mb-4">
-            <p className="text-[10px] font-semibold  text-gray-600 uppercase mb-2.5">
-              Series de comprobantes
-            </p>
-            <div className="grid grid-cols-4 gap-2">
-              <SeriesBadge label="Factura"    value={s.serieFactura} />
-              <SeriesBadge label="Boleta"     value={s.serieBoleta} />
-              <SeriesBadge label="Nota Crédito Fact."   value={s.serieNotaCreditoFactura} />
-              <SeriesBadge label="Nota Crédito Bol."    value={s.serieNotaCreditoBoleta} />
-              <SeriesBadge label="Nota Débito Fact."   value={s.serieNotaDebitoFactura} />
-              <SeriesBadge label="Nota Débito Bol."    value={s.serieNotaDebitoBoleta} />
-              <SeriesBadge label="Guía Remisión"  value={s.serieGuiaRemision} />
-              <SeriesBadge label="Guía Transp." value={s.serieGuiaTransportista} />
-            </div>
+          <p className="text-[10px] font-semibold text-gray-600 uppercase mb-2.5">
+            Series de comprobantes
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            <SeriesBadge label="Factura" value={s.serieFactura} />
+            <SeriesBadge label="Boleta" value={s.serieBoleta} />
+            <SeriesBadge
+              label="Nota Crédito Fact."
+              value={s.serieNotaCreditoFactura}
+            />
+            <SeriesBadge
+              label="Nota Crédito Bol."
+              value={s.serieNotaCreditoBoleta}
+            />
+            <SeriesBadge
+              label="Nota Débito Fact."
+              value={s.serieNotaDebitoFactura}
+            />
+            <SeriesBadge
+              label="Nota Débito Bol."
+              value={s.serieNotaDebitoBoleta}
+            />
+            <SeriesBadge label="Guía Remisión" value={s.serieGuiaRemision} />
+            <SeriesBadge
+              label="Guía Transp."
+              value={s.serieGuiaTransportista}
+            />
+          </div>
         </div>
 
         {/* Botones de acción */}
-        {/* Solo se muestran si canManage o isSuperadmin */}
-        {(canManage || isSuperadmin) && (
+        {canManage && (
           <div className="flex items-center gap-1.5 border-t border-gray-100 pt-3">
-            {canManage && (
-              <button
-                onClick={onEditar}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors"
-              >
-                <Edit2 className="w-3 h-3" />
-                Editar
-              </button>
-            )}
-            {canManage && (
-              <button
-                onClick={onSeries}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-100 hover:bg-green-100 transition-colors"
-              >
-                <FileText className="w-3 h-3" />
-                Series
-              </button>
-            )}
-            {canManage && (
+            <button
+              onClick={onEditar}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors"
+            >
+              <Edit2 className="w-3 h-3" />
+              Editar
+            </button>
+            <button
+              onClick={onSeries}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-100 hover:bg-green-100 transition-colors"
+            >
+              <FileText className="w-3 h-3" />
+              Series
+            </button>
+            {isSuperadmin && (
               <button
                 onClick={onToggle}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition-colors"
+                disabled={isToggling}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {habilitado ? (
                   <>
                     <ToggleRight className="w-3.5 h-3.5" />
-                    Inhabilitar
+                    {isToggling ? "Inhabilitando..." : "Inhabilitar"}
                   </>
                 ) : (
                   <>
                     <ToggleLeft className="w-3.5 h-3.5" />
-                    Habilitar
+                    {isToggling ? "Habilitando..." : "Habilitar"}
                   </>
                 )}
-              </button>
-            )}
-            {/* Solo superadmin puede eliminar */}
-            {isSuperadmin && (
-              <button
-                onClick={onEliminar}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors ml-auto"
-              >
-                <Trash2 className="w-3 h-3" />
-                Eliminar
               </button>
             )}
           </div>
@@ -327,26 +350,21 @@ export default function SucursalesPage() {
   const { showToast } = useToast();
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [search, setSearch] = useState("");
-  const [pageSize, setPageSize] = useState(10);
-  const [estadoSucursales, setEstadoSucursales] = useState<
-    Record<string, boolean>
-  >({});
+  const [pageSize] = useState(10);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [modalNueva, setModalNueva] = useState(false);
   const [modalEditar, setModalEditar] = useState<Sucursal | null>(null);
   const [modalSeries, setModalSeries] = useState<Sucursal | null>(null);
-  const [modalEliminar, setModalEliminar] = useState<Sucursal | null>(null);
   const [loading, setLoading] = useState(true);
 
   const { accessToken, user } = useAuth();
 
-  // ── Roles ──────────────────────────────────────────────────────────────────
   const isSuperadmin = user?.rol === "superadmin";
   const isAdmin = user?.rol === "admin";
-  const canManage = isSuperadmin || isAdmin; // admin y superadmin pueden crear, editar, series, toggle
+  const canManage = isSuperadmin || isAdmin;
 
   const visibleSucursales = isSuperadmin ? sucursales : sucursales.slice(0, 1);
-
   const filtered = visibleSucursales.filter(
     (s) =>
       s.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -370,21 +388,23 @@ export default function SucursalesPage() {
   const fetchSucursales = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal`,
-        {
-          params: {
-            ruc: user?.ruc,
-            sucursalID: user?.rol === "superadmin" ? null : user?.sucursalID,
-          },
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
-      );
+      const url = isSuperadmin
+        ? `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/todas`
+        : `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal`;
+
+      const res = await axios.get(url, {
+        params: isSuperadmin
+          ? undefined
+          : { ruc: user?.ruc, sucursalID: user?.sucursalID },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      // ... resto igual
       const data = res.data.map((s: any) => ({
         id: s.sucursalId.toString(),
         codigo: s.codEstablecimiento,
         nombre: s.nombre ?? s.codEstablecimiento,
         direccion: s.direccion ?? "",
+        habilitado: s.estado, // ← viene del backend
         usuario: "",
         serieFactura: s.serieFactura,
         correlativoFactura: s.correlativoFactura ?? 1,
@@ -404,13 +424,6 @@ export default function SucursalesPage() {
         correlativoGuiaTransportista: s.correlativoGuiaTransportista ?? 1,
       }));
       setSucursales(data);
-      setEstadoSucursales((prev) => {
-        const next = { ...prev };
-        data.forEach((s: Sucursal) => {
-          if (!(s.id in next)) next[s.id] = true;
-        });
-        return next;
-      });
     } catch {
       showToast("Error al cargar sucursales", "error");
     } finally {
@@ -419,8 +432,8 @@ export default function SucursalesPage() {
   };
 
   useEffect(() => {
-    if (accessToken) fetchSucursales();
-  }, [accessToken]);
+    if (accessToken && user) fetchSucursales();
+  }, [accessToken, user]);
 
   const handleCrear = async (form: NuevaSucursalForm) => {
     try {
@@ -504,37 +517,42 @@ export default function SucursalesPage() {
     }
   };
 
-  const handleEliminar = async (id: string) => {
-    const s = sucursales.find((x) => x.id === id);
+  const handleToggleEstado = async (id: string) => {
+    setTogglingId(id);
+    const sucursal = sucursales.find((s) => s.id === id);
     try {
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${id}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      setModalEliminar(null);
-      showToast(`Sucursal "${s?.nombre}" eliminada`, "error");
+      if (sucursal?.habilitado) {
+        // Inhabilitar → DELETE existente
+        await axios.delete(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${id}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        showToast(`Sucursal "${sucursal.nombre}" inhabilitada`, "success");
+      } else {
+        // Habilitar → nuevo endpoint
+        await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${id}/habilitar`,
+          {},
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        showToast(`Sucursal "${sucursal?.nombre}" habilitada`, "success");
+      }
       fetchSucursales();
     } catch (error: any) {
       showToast(
-        error.response?.data?.mensaje || "Error al eliminar sucursal",
+        error.response?.data?.mensaje || "Error al cambiar estado",
         "error",
       );
+    } finally {
+      setTogglingId(null);
     }
-  };
-
-  const handleToggleEstado = (id: string) => {
-    setEstadoSucursales((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
     <div className="mx-auto space-y-5 animate-in fade-in duration-500">
       {/* ── Stats (solo superadmin) ── */}
       {isSuperadmin && (
-        <StatStrip
-          sucursales={sucursales}
-          estadoSucursales={estadoSucursales}
-          totalSeries={totalSeries}
-        />
+        <StatStrip sucursales={sucursales} totalSeries={totalSeries} />
       )}
 
       {/* ── Toolbar ── */}
@@ -548,14 +566,12 @@ export default function SucursalesPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-
-        {/* Solo admin y superadmin pueden crear sucursales */}
         {canManage && (
           <div className="relative ml-auto">
             <button
               type="button"
               onClick={() => setModalNueva(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-700 active:scale-95 rounded-lg shadow-sm transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 active:scale-95 rounded-lg shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
               Nueva sucursal
@@ -564,11 +580,14 @@ export default function SucursalesPage() {
         )}
       </div>
 
-{/* ── Cards ── */}
+      {/* ── Cards ── */}
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {[1, 2].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+            <div
+              key={i}
+              className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse"
+            >
               <div className="pl-5 pr-4 pt-4 pb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="h-5 w-14 bg-gray-100 rounded-md" />
@@ -609,13 +628,12 @@ export default function SucursalesPage() {
             <SucursalCard
               key={s.id}
               sucursal={s}
-              habilitado={estadoSucursales[s.id] ?? true}
-              isSuperadmin={isSuperadmin}
               canManage={canManage}
+              isSuperadmin={isSuperadmin}
+              togglingId={togglingId}
               onEditar={() => setModalEditar(s)}
               onSeries={() => setModalSeries(s)}
               onToggle={() => handleToggleEstado(s.id)}
-              onEliminar={() => setModalEliminar(s)}
             />
           ))}
         </div>
@@ -642,13 +660,6 @@ export default function SucursalesPage() {
           sucursal={modalSeries}
           onClose={() => setModalSeries(null)}
           onSave={handleEditarSeries}
-        />
-      )}
-      {modalEliminar && (
-        <EliminarModal
-          sucursal={modalEliminar}
-          onClose={() => setModalEliminar(null)}
-          onConfirm={handleEliminar}
         />
       )}
     </div>

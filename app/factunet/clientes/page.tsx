@@ -16,6 +16,7 @@ import { EnviarCorreoCliente } from './gestionClientes/EnviarCorreoCliente';
 import { Direccion, Cliente } from './gestionClientes/typesCliente';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/app/components/ui/Toast';
+import { DropdownFiltro } from '@/app/components/ui/DropdownFiltro';
 import { useClientesRuc } from './gestionClientes/useClientesRuc';
 import { useClientesSucursal } from './gestionClientes/useClientesSucursal';
 import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursalRuc';
@@ -348,51 +349,25 @@ export default function ClientesPage() {
       </div>
       <div className="flex gap-2 flex-wrap">
         {isSuperAdmin && (
-          <div className="relative">
-            <select
-              value={filtroSucursal}
-              onChange={(e) => setFiltroSucursal(Number(e.target.value))}
-              className={cn(
-                "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
-                filtroSucursal
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "bg-white border-gray-200 text-gray-600"
-              )}
-            >
-              <option value="">Sucursal: Todas</option>
-              {sucursales.map((s) => (
-                <option key={s.sucursalId} value={s.sucursalId}>{s.nombre}</option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+          <DropdownFiltro
+            label="Sucursal: Todas"
+            value={filtroSucursal ? (sucursales.find(s => s.sucursalId === filtroSucursal)?.nombre ?? "Todos") : "Todos"}
+            options={["Todos", ...sucursales.map(s => s.nombre)]}
+            onChange={(v) => {
+              if (v === "Todos") setFiltroSucursal(0);
+              else {
+                const found = sucursales.find(s => s.nombre === v);
+                setFiltroSucursal(found ? found.sucursalId : 0);
+              }
+            }}
+          />
         )}
-        <div className="relative">
-          <select
-            value={filterTipo}
-            onChange={e => setFilterTipo(e.target.value as typeof filterTipo)}
-            className={cn(
-              "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
-              filterTipo !== 'Todos'
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'bg-white border-gray-200 text-gray-600'
-            )}
-          >
-            <option value="Todos">Tipo Doc: Todos</option>
-            <option value="RUC">RUC</option>
-            <option value="DNI">DNI</option>
-            <option value="CE">CE</option>
-          </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
-        {activeFilters > 0 && (
-          <button
-            onClick={() => { setFilterStatus('Todos'); setFilterTipo('Todos'); setFiltroSucursal(0); }}
-            className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition-colors"
-          >
-            <X size={12} /> Limpiar ({activeFilters})
-          </button>
-        )}
+        <DropdownFiltro
+          label="Tipo Doc: Todos"
+          value={filterTipo}
+          options={["Todos", "RUC", "DNI", "CE"]}
+          onChange={(v) => setFilterTipo(v as any)}
+        />
         <Button onClick={() => setIsNuevoOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
           <Plus className="w-3.5 h-3.5" /> Nuevo Cliente
         </Button>
