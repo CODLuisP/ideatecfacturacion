@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench, Download, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench, Download, CheckCircle, XCircle, Loader2, PackageSearch } from "lucide-react";
 import axios from "axios";
 
 
@@ -238,6 +238,7 @@ export default function ProductosPage() {
             huboCategoriasNuevas = true;
           } catch (err) {
             console.error(`Error creando categoría ${nombreCat}:`, err);
+            showToast(`No se pudo crear la categoría: ${nombreCat}. Los productos asociados podrían fallar.`, "error");
           }
         }
       }
@@ -429,7 +430,6 @@ export default function ProductosPage() {
                 className="w-3.5 h-3.5 accent-green-600"
               />
               <span className="text-xs font-medium text-gray-600 flex items-center gap-1 whitespace-nowrap">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
                 Sin stock
               </span>
             </label>
@@ -502,28 +502,29 @@ export default function ProductosPage() {
             </div>
               
             {/* Limpiar — empujado a la derecha */}
-            {filtrosAvanzadosActivos && (
-              <>
-                <div className="flex-1" />
-                <button
-                  onClick={() => {
-                    setFiltroStock(false);
-                    setFiltroAfectacion([]);
-                    setFiltroTipoProducto([]);
-                    setFiltroSucursal("");
-                  }}
-                  className="text-xs text-gray-400 hover:text-rose-500 font-medium transition-colors whitespace-nowrap shrink-0"
-                >
-                  ✕ Limpiar filtros
-                </button>
-              </>
-            )}
+     {filtrosAvanzadosActivos && (
+  <>
+    <div className="flex-1" />
+    <button
+      onClick={() => {
+        setFiltroStock(false);
+        setFiltroAfectacion([]);
+        setFiltroTipoProducto([]);
+        setFiltroSucursal("");
+      }}
+      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-rose-500 font-bold transition-colors whitespace-nowrap shrink-0 px-2 py-1.5 hover:bg-rose-50 rounded-md"
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+      Limpiar filtros
+    </button>
+  </>
+)}
           </div>
         )}
       </div>
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          Mostrando <span className="font-semibold text-gray-900">{productos.length}</span> productos
+          Mostrando <span className="font-semibold text-gray-900">{filtered.length}</span> productos
         </p>
       </div>
 
@@ -559,12 +560,15 @@ export default function ProductosPage() {
           ))
         )}
 
-        {!loadingProductos  && filtered.length === 0 && (
-          <p className="text-gray-400 col-span-3 text-center py-12">
-            No se encontraron productos.
-          </p>
-        )}
-
+ {!loadingProductos && filtered.length === 0 && (
+  <div className="col-span-4 flex flex-col items-center justify-center py-16 text-center">
+    <div className="bg-gray-100 rounded-full p-4 mb-3">
+      <PackageSearch className="w-10 h-10 text-gray-300" />
+    </div>
+    <p className="text-gray-500 font-semibold text-sm">No se encontraron productos</p>
+    <p className="text-gray-400 text-xs mt-1">Intenta ajustar los filtros de búsqueda</p>
+  </div>
+)}
         {!loadingProductos  && filtered.map((prod) => (
           <Card key={prod.sucursalProducto.sucursalProductoId} className="group hover:border-brand-blue transition-all">
             <div className="flex justify-between items-start">
@@ -572,16 +576,15 @@ export default function ProductosPage() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                   {prod.codigo}
                 </p>
-                {/*nomProducto */}
-                <h4 className="text-[12px] font-bold text-gray-900 group-hover:text-brand-blue transition-colors">
+                <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors line-clamp-2 min-h-10">
                   {prod.nomProducto}
                 </h4>
-                <p className="text-xs text-gray-500">
+                <p className="text-[10px] font-medium text-gray-400 bg-gray-100 w-fit px-1.5 py-0.5 rounded uppercase">
                   {prod.categoria?.categoriaNombre}
                 </p>
                 {
                   isSuperAdmin && (
-                    <p className="text-xs text-gray-500 flex">
+                    <p className="text-[10px] text-gray-400 flex mt-1 bg-blue-50 w-fit px-1.5 py-0.5 rounded">
                       <span className="font-bold">Sucursal: &nbsp; </span> {prod.sucursalProducto.nomSucursal}
                     </p>
                   )
