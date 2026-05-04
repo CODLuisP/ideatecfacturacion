@@ -52,10 +52,11 @@ interface Sucursal {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const DEPARTAMENTOS = [
-  'AMAZONAS','ÁNCASH','APURÍMAC','AREQUIPA','AYACUCHO','CAJAMARCA','CALLAO',
-  'CUSCO','HUANCAVELICA','HUÁNUCO','ICA','JUNÍN','LA LIBERTAD','LAMBAYEQUE',
-  'LIMA','LORETO','MADRE DE DIOS','MOQUEGUA','PASCO','PIURA','PUNO',
-  'SAN MARTÍN','TACNA','TUMBES','UCAYALI',
+  'AMAZONAS', 'ANCASH', 'APURIMAC', 'AREQUIPA', 'AYACUCHO', 'CAJAMARCA',
+  'CUSCO', 'HUANCAVELICA', 'HUANUCO', 'ICA', 'JUNIN', 'LA LIBERTAD',
+  'LAMBAYEQUE', 'LIMA', 'LORETO', 'MADRE DE DIOS', 'MOQUEGUA', 'PASCO',
+  'PIURA', 'PUNO', 'SAN MARTIN', 'TACNA', 'TUMBES', 'UCAYALI',
+  'PROV. CONST. DEL CALLAO'
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -299,7 +300,7 @@ function SucursalSerieRow({
           maxLength={4}
           readOnly={readOnly}
         />
-        <p className="text-[10px] text-gray-400 italic">Empieza con "{prefix}" — máx. 4 caracteres</p>
+        <p className="text-[10px] text-gray-400 font-medium">Inicia con "{prefix}"</p>
       </div>
       <div className="w-56 space-y-1.5">
         <FieldLabel>Correlativo inicial</FieldLabel>
@@ -318,7 +319,7 @@ function SucursalSerieRow({
           }
           readOnly={readOnly}
         />
-        <p className="text-[10px] text-gray-400 italic">Por defecto: 1</p>
+        <p className="text-[10px] text-gray-400 font-medium">Num. inicial</p>
       </div>
     </div>
   );
@@ -422,7 +423,7 @@ function SucursalCard({
 export default function ConfiguracionPage() {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [loadingEmpresa, setLoadingEmpresa] = useState(false);
+  const [loadingEmpresa, setLoadingEmpresa] = useState(true);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -451,7 +452,10 @@ export default function ConfiguracionPage() {
   // ── GET empresa ───────────────────────────────────────────────────────────
   useEffect(() => {
     const ruc = user?.ruc;
-    if (!ruc) return;
+    if (!ruc) {
+      if (user) setLoadingEmpresa(false);
+      return;
+    }
 
     setLoadingEmpresa(true);
     axios
@@ -477,9 +481,12 @@ export default function ConfiguracionPage() {
           setLogoDataUrl(toDataUrl(d.logoBase64));
         }
       })
-      .catch(() => showToast('No se pudo cargar los datos de la empresa', 'error'))
+      .catch(() => {
+        showToast('No se pudo cargar los datos de la empresa', 'error');
+        setLoadingEmpresa(false);
+      })
       .finally(() => setLoadingEmpresa(false));
-  }, [user?.ruc]);
+  }, [user?.ruc, user]);
 
   // ── GET sucursales ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -507,7 +514,7 @@ export default function ConfiguracionPage() {
         .catch(() => showToast('No se pudo cargar la sucursal', 'error'))
         .finally(() => setLoadingSucursales(false));
     }
-  }, [user?.ruc, user?.sucursalID, isSuperAdmin]);
+  }, [user?.ruc, user?.sucursalID, isSuperAdmin, user]);
 
   // ── Subir logo ────────────────────────────────────────────────────────────
   const handleFileSelected = (file: File, previewDataUrl: string) => {
@@ -555,6 +562,11 @@ export default function ConfiguracionPage() {
       
       setForm((f) => ({ ...f, [key]: value }));
     };
+
+  const handleDepartamentoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setForm(f => ({ ...f, departamento: val, provincia: '', distrito: '', ubigeo: '' }));
+  };
 
   // ── PUT empresa ───────────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
@@ -685,7 +697,7 @@ export default function ConfiguracionPage() {
                 <SectionHeader icon={MapPin} title="Ubicación y Domicilio Fiscal" subtitle="Dirección registrada en SUNAT para tus comprobantes" />
               </div>
 
-              <Select label="Departamento" required value={form.departamento} onChange={upd('departamento')}
+              <Select label="Departamento" required value={form.departamento} onChange={handleDepartamentoChange}
                 options={DEPARTAMENTOS.map((d) => ({ value: d, label: d }))} disabled={!canEdit} />
               <Input label="Provincia" value={form.provincia} onChange={upd('provincia')}
                 required placeholder="Ej: Cajamarca" disabled={!canEdit} />
@@ -723,15 +735,6 @@ export default function ConfiguracionPage() {
           </>
         )}
 
-        {/* Botón guardar — oculto para facturador */}
-        {canEdit && (
-          <div className="mt-8 flex justify-end">
-            <Button type="submit" disabled={saving || loadingEmpresa || uploadingLogo}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? 'Guardando...' : 'Guardar Datos de Empresa'}
-            </Button>
-          </div>
-        )}
       </Card>
 
       {/* ── Series de Comprobantes ── */}
@@ -774,7 +777,28 @@ export default function ConfiguracionPage() {
         )}
       </Card>
 
-
+      {/* Botón guardar GLOBAL — más prominente */}
+      {canEdit && !loadingEmpresa && (
+        <div className="sticky bottom-6 flex justify-end z-20">
+          <Button 
+            type="submit" 
+            className="h-12 px-8 rounded-2xl shadow-xl shadow-blue-200/50 hover:shadow-2xl hover:shadow-blue-300/50 transition-all active:scale-[0.98]"
+            disabled={saving || loadingEmpresa || uploadingLogo}
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Guardando cambios...
+              </>
+            ) : (
+              <>
+                <Building2 className="w-5 h-5 mr-2" />
+                Guardar Configuración General
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </form>
     {imageToCrop && (
       <LogoCropper

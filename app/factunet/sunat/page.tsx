@@ -358,7 +358,11 @@ export default function SunatPage() {
 
   // ── Fetch inicial ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!user?.ruc) return;
+    const ruc = user?.ruc;
+    if (!ruc) {
+      if (user) setLoadingCompany(false);
+      return;
+    }
 
     const fetchCompany = async () => {
       setLoadingCompany(true);
