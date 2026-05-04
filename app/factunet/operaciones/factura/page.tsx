@@ -233,10 +233,6 @@ export default function FacturaPage() {
   });
   const [aplicarDetraccion, setAplicarDetraccion] = useState(false);
 
-  //Manejar reenvio sunat
-  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
-  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
-
   // ── Guías de Remisión ────────────────────────────────────────
   const [showGuias, setShowGuias] = useState(false);
   const [guias, setGuias] = useState<
@@ -1624,6 +1620,7 @@ export default function FacturaPage() {
     };
   };
 
+  // ── Emitir, guardar en BD ────────
   const emitirComprobante = async () => {
     if (!factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) {
       showToast("Debe seleccionar o ingresar un cliente", "error"); return;
@@ -1693,30 +1690,34 @@ export default function FacturaPage() {
       if (resSunat.data.exitoso) {
         showToast(resSunat.data.mensaje ?? "Factura emitida correctamente.", "success");
         setEmitido(true);
-        setComprobanteRechazado(false);
         procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT rechazó con exitoso: false
+        // SUNAT respondió pero rechazó — sin reintento
+        const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
         setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+        showToast(`La factura ${serieCorrelativo} fue rechazada.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
     } catch (err: any) {
       const tieneRespuesta = !!err?.response;
-      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
-      
+
       if (tieneRespuesta) {
-        // ❌ SUNAT respondió con error HTTP
+        // SUNAT respondió con error HTTP — sin reintento
+        const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
         setErrorEmision(mensaje || "Comprobante rechazado por SUNAT");
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+        showToast(`La factura ${serieCorrelativo} fue rechazada.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT caída/sin respuesta
-        setErrorEmision("No se pudo conectar con SUNAT. Puedes reintentar el envío.");
-        setComprobanteRechazado(true);
-        showToast("SUNAT no responde. Puedes reintentar.", "error");
+        // SUNAT no responde / timeout — reintento silencioso
+        const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
+        setErrorEmision("No se pudo conectar con SUNAT.");
+        showToast(`La factura ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
       }
     }
   };
@@ -1829,22 +1830,26 @@ export default function FacturaPage() {
     }));
   };
 
-  const reintentarEnvio = async () => {
-    if (!comprobanteIdEmitido) return;
-    setEmitiendo(true);
-    setErrorEmision(null);
-    setComprobanteRechazado(false);
-    await enviarASunat(comprobanteIdEmitido);
-    setEmitiendo(false);
+  // ── Reintento silencioso — solo si SUNAT no responde ────────
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
   };
 
   //limpiamos para nueva factura
   const nuevaFactura = () => {
     sharedVentaStore.clear();
-    setComprobanteRechazado(false);
-    setRechazadoPorSunat(false);
     setEmitido(false);
     setPdfA4Url(null);
+    setTamanoPdf("A4");
     setPdfTicketUrl(null);
     setComprobanteIdEmitido(null);
     setErrorEmision(null);
@@ -3751,36 +3756,21 @@ export default function FacturaPage() {
               <Button
                 className="w-full py-3 text-base"
                 type="button"
-                onClick={
-                  emitido
-                    ? nuevaFactura
-                    : comprobanteRechazado
-                      ? reintentarEnvio
-                      : rechazadoPorSunat  // ← nuevo
-                        ? nuevaFactura
-                        : emitirComprobante
-                }
+                onClick={emitido ? nuevaFactura : emitirComprobante}
                 disabled={
                   emitiendo ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && sinSucursal) ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !serieDisplay) ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && detalles.length === 0)
+                  (!emitido && sinSucursal) ||
+                  (!emitido && !serieDisplay) ||
+                  (!emitido && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) ||
+                  (!emitido && detalles.length === 0)
                 }
               >
                 {emitiendo ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {comprobanteRechazado ? "Reenviando..." : "Emitiendo..."}
+                    Emitiendo...
                   </span>
-                ) : emitido
-                    ? "Nueva Factura"
-                    : comprobanteRechazado
-                      ? "🔄 Reintentar envío a SUNAT"
-                      : rechazadoPorSunat   // ← nuevo
-                        ? "Nueva Factura"
-                        : "Emitir Factura"
-                }
+                ) : emitido ? "Nueva Factura" : "Emitir Factura"}
               </Button>
               {sinSucursal && <p className="text-xs text-amber-600 text-center">Selecciona una sucursal para emitir</p>}
               {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}

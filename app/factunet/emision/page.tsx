@@ -121,10 +121,6 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
 
-  //REITENTAR ENVIO A SUNAT SI NO RESPONDE API SUNAT
-  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
-  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
-
   const isFirstRenderTipo = useRef(true);
   useEffect(() => {
     setTipoDoc(tipo === 'factura' ? '06' : '01');
@@ -741,15 +737,6 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
   };
 
-  const reintentarEnvio = async () => {
-    if (!comprobanteIdEmitido) return;
-    setEmitiendo(true);
-    setErrorEmision(null);
-    setComprobanteRechazado(false);
-    await enviarASunat(comprobanteIdEmitido);
-    setEmitiendo(false);
-  };
-
   const enviarASunat = async (comprobanteId: number) => {
     try {
       const resSunat = await axios.post(
@@ -761,32 +748,34 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       if (resSunat.data.exitoso) {
         showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
         setEmitido(true);
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(false);
         procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT rechazó — nueva emisión obligatoria
+        // SUNAT respondió pero rechazó — sin reintento
+        const serieCorrelativo = `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`;
         setErrorEmision(resSunat.data.mensaje ?? 'Comprobante rechazado por SUNAT');
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast('Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.', 'error');
+        showToast(`El comprobante ${serieCorrelativo} fue rechazado.`, 'error');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
     } catch (err: any) {
       const tieneRespuesta = !!err?.response;
-      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? '';
 
       if (tieneRespuesta) {
-        // ❌ Error con respuesta — nueva emisión
+        // SUNAT respondió con error HTTP — sin reintento
+        const serieCorrelativo = `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`;
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? '';
         setErrorEmision(mensaje || 'Comprobante rechazado por SUNAT');
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast('Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.', 'error');
+        showToast(`El comprobante ${serieCorrelativo} fue rechazado.`, 'error');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT caída — SÍ permitir reintento
-        setErrorEmision('No se pudo conectar con SUNAT. Puedes reintentar el envío.');
-        setComprobanteRechazado(true);
-        setRechazadoPorSunat(false);
-        showToast('SUNAT no responde. Puedes reintentar.', 'error');
+        // SUNAT no responde / timeout — reintento silencioso
+        const serieCorrelativo = `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`;
+        setErrorEmision('No se pudo conectar con SUNAT.');
+        showToast(`El comprobante ${serieCorrelativo} fue generado. Verificar estado en sección Comprobantes.`, 'error');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
       }
     }
   };
@@ -921,6 +910,19 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
   };
 
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
+  };
+
 const resetForm = () => {
   sharedVentaStore.clear(); // Limpiar persistencia al reiniciar
   // ── Items ──────────────────────────────────────
@@ -954,9 +956,6 @@ const resetForm = () => {
 
   //Envio por resumen
   setEnviarEnResumen(false);
-
-  setComprobanteRechazado(false);
-  setRechazadoPorSunat(false);
 };
 
   const descargarPdf = async () => {
@@ -1532,33 +1531,17 @@ const imprimirPdf = () => {
 
             {/* Botón emitir */}
             <button type="button"
-              onClick={
-                emitido
-                  ? () => resetForm()
-                  : comprobanteRechazado
-                    ? reintentarEnvio
-                    : rechazadoPorSunat
-                      ? () => resetForm()
-                      : emitirComprobante
-              }
-              disabled={
-                emitiendo ||
-                (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
-              }
+              onClick={emitido ? () => resetForm() : emitirComprobante}
+              disabled={emitiendo || (!emitido && !puedeEmitir)}
               className={`w-full py-2.5 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
-                ${emitiendo || (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
+                ${emitiendo || (!emitido && !puedeEmitir)
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-blue-700 hover:shadow-blue-200 cursor-pointer'}`}>
               {emitiendo ? (
-                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {comprobanteRechazado ? 'Reenviando...' : 'Emitiendo...'}</>
+                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Emitiendo...</>
               ) : emitido
                   ? `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
-                  : comprobanteRechazado
-                    ? '🔄 Reintentar envío a SUNAT'
-                    : rechazadoPorSunat
-                      ? `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
-                      : `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
+                  : `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
               }
             </button>
 
