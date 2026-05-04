@@ -366,12 +366,8 @@ export default function UsuariosPage() {
       return;
     }
 
-    // Validar que el superadmin haya seleccionado RUC y sucursal
+    // Validar que el superadmin haya seleccionado sucursal
     if (isSuperadmin) {
-      if (rucEmpresa.length !== 11) {
-        showToast("Ingresa un RUC válido de 11 dígitos", "error");
-        return;
-      }
       if (!formData.sucursalID) {
         showToast("Selecciona una sucursal", "error");
         return;
@@ -384,7 +380,7 @@ export default function UsuariosPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/register`,
         {
           username: formData.username,
-          email: formData.email,
+          email: formData.rol === "facturador" ? user?.email : formData.email,
           password: formData.password,
           rol: formData.rol,
           ruc: user?.ruc,
@@ -409,19 +405,19 @@ export default function UsuariosPage() {
   };
 
   // ── Filtrado ───────────────────────────────────────────────────────────────
-const filtered = usuarios
-  .filter((u) => {
-    const matchSearch =
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchRol = rolFilter === "todos" || u.rol === rolFilter;
-    return matchSearch && matchRol;
-  })
-  .sort((a, b) => {
-    if (a.rol === "superadmin" && b.rol !== "superadmin") return -1;
-    if (a.rol !== "superadmin" && b.rol === "superadmin") return 1;
-    return 0;
-  });
+  const filtered = usuarios
+    .filter((u) => {
+      const matchSearch =
+        u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchRol = rolFilter === "todos" || u.rol === rolFilter;
+      return matchSearch && matchRol;
+    })
+    .sort((a, b) => {
+      if (a.rol === "superadmin" && b.rol !== "superadmin") return -1;
+      if (a.rol !== "superadmin" && b.rol === "superadmin") return 1;
+      return 0;
+    });
 
   const counts = {
     todos: usuarios.length,
@@ -623,24 +619,7 @@ const filtered = usuarios
             />
           </div>
 
-          {/* Email */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Correo electrónico
-            </label>
-            <input
-              type="email"
-              placeholder="juan.p@empresa.com"
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
-              required
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-            />
-          </div>
-
-          {/* Rol */}
+          {/* Rol / Perfil */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
               Rol / Perfil
@@ -648,9 +627,15 @@ const filtered = usuarios
             <select
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               value={formData.rol}
-              onChange={(e) =>
-                setFormData({ ...formData, rol: e.target.value })
-              }
+              onChange={(e) => {
+                const nuevoRol = e.target.value;
+                setFormData({
+                  ...formData,
+                  rol: nuevoRol,
+                  // Al cambiar a admin, precarga el email del contexto
+                  email: nuevoRol === "admin" ? (user?.email ?? "") : "",
+                });
+              }}
             >
               <option value="facturador">Facturador</option>
               {(isSuperadmin || user?.rol === "admin") && (
@@ -669,6 +654,30 @@ const filtered = usuarios
               </p>
             )}
           </div>
+
+          {/* Email — solo visible si el rol es admin */}
+          {formData.rol !== "facturador" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="juan.p@empresa.com"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
+                required
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+              {formData.email === user?.email && (
+                <p className="text-[10px] text-blue-500 italic px-1">
+                  Correo sugerido
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Contraseña */}
           <div className="space-y-1.5">
