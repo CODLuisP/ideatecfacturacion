@@ -117,11 +117,13 @@ function UsuarioCard({
   canEdit,
   onEdit,
   onDelete,
+  canDelete,
 }: {
   u: any;
   canEdit: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  canDelete: boolean;
 }) {
   const cfg = ROL_CONFIG[u.rol as Rol] ?? ROL_CONFIG.facturador;
   const Icon = cfg.icon;
@@ -162,12 +164,14 @@ function UsuarioCard({
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
+              {canDelete && (
               <button
                 onClick={onDelete}
                 className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:text-rose-700 hover:bg-rose-100 transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
+              )}
             </div>
           )}
         </div>
@@ -290,7 +294,7 @@ export default function UsuariosPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal?ruc=${ruc}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
-      console.log("Sucursales response:", res.data); // 👈 revisa esto
+      console.log("Sucursales response:", res.data);
       setSucursales(res.data);
     } catch {
       showToast("Error al cargar sucursales", "error");
@@ -512,6 +516,7 @@ export default function UsuariosPage() {
               key={u.usuarioID}
               u={u}
               canEdit={canManage}
+              canDelete={canManage && !(isSuperadmin && u.rol === "superadmin")}
               onEdit={() => setModalEditar(u)}
               onDelete={() => setModalEliminar(u)}
             />
