@@ -1,12 +1,13 @@
 "use client";
 import React, { useState } from "react";
-import { X, User, Mail, Shield, Loader2 } from "lucide-react";
+import { X, User, Mail, Shield, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 
 interface EditarUsuarioForm {
   usuarioID: number;
   username: string;
   email: string;
   rol: string;
+  nuevaContrasena?: string;
 }
 
 interface Props {
@@ -23,18 +24,45 @@ export function EditarUsuarioModal({
   isSuperadmin,
 }: Props) {
   const [saving, setSaving] = useState(false);
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
+  const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
+  const [confirmarContrasena, setConfirmarContrasena] = useState("");
+  const [errorContrasena, setErrorContrasena] = useState("");
+
   const [form, setForm] = useState<EditarUsuarioForm>({
     usuarioID: usuario.usuarioID,
     username: usuario.username,
     email: usuario.email,
     rol: usuario.rol,
+    nuevaContrasena: "",
   });
+
+  const puedeEditarContrasena = isSuperadmin || usuario.rol !== "superadmin";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorContrasena("");
+
+    // Validar contraseña solo si se quiere cambiar
+    if (form.nuevaContrasena) {
+      if (form.nuevaContrasena.length < 6) {
+        setErrorContrasena("La contraseña debe tener al menos 6 caracteres.");
+        return;
+      }
+      if (form.nuevaContrasena !== confirmarContrasena) {
+        setErrorContrasena("Las contraseñas no coinciden.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      await onSave(form);
+      // Si no se ingresó nueva contraseña, no la enviamos
+      const payload: EditarUsuarioForm = {
+        ...form,
+        nuevaContrasena: form.nuevaContrasena || undefined,
+      };
+      await onSave(payload);
     } finally {
       setSaving(false);
     }
@@ -46,8 +74,9 @@ export function EditarUsuarioModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-blue-50 border border-blue-100">
               <User className="w-4 h-4 text-blue-600" />
@@ -104,7 +133,7 @@ export function EditarUsuarioModal({
               </div>
             </div>
 
-            {/* Rol — solo admin/superadmin puede cambiarlo */}
+            {/* Rol */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase">
                 Rol
@@ -135,9 +164,85 @@ export function EditarUsuarioModal({
                 </p>
               )}
             </div>
+
+            {/* Cambiar Contraseña — solo admin/superadmin */}
+            {puedeEditarContrasena && (
+              <div className="pt-2 border-t border-gray-100 space-y-4">
+                <p className="text-xs font-bold text-gray-400 uppercase">
+                  Cambiar contraseña{" "}
+                  <span className="font-normal normal-case">(opcional)</span>
+                </p>
+
+                {/* Nueva contraseña */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">
+                    Nueva contraseña
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type={mostrarContrasena ? "text" : "password"}
+                      value={form.nuevaContrasena}
+                      onChange={(e) =>
+                        setForm({ ...form, nuevaContrasena: e.target.value })
+                      }
+                      placeholder="Dejar vacío para no cambiar"
+                      className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-blue-500 placeholder:text-gray-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarContrasena(!mostrarContrasena)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {mostrarContrasena ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirmar contraseña */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">
+                    Confirmar contraseña
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type={mostrarConfirmar ? "text" : "password"}
+                      value={confirmarContrasena}
+                      onChange={(e) => setConfirmarContrasena(e.target.value)}
+                      placeholder="Repetir nueva contraseña"
+                      className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl outline-none text-sm focus:border-blue-500 placeholder:text-gray-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarConfirmar(!mostrarConfirmar)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {mostrarConfirmar ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error de contraseña */}
+                {errorContrasena && (
+                  <p className="text-xs text-red-500 font-medium">
+                    {errorContrasena}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end bg-gray-50">
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end bg-gray-50 rounded-b-2xl">
             <button
               type="button"
               onClick={onClose}

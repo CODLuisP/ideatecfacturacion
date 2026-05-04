@@ -165,12 +165,12 @@ function UsuarioCard({
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
               {canDelete && (
-              <button
-                onClick={onDelete}
-                className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:text-rose-700 hover:bg-rose-100 transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  onClick={onDelete}
+                  className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:text-rose-700 hover:bg-rose-100 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
           )}
@@ -361,12 +361,8 @@ export default function UsuariosPage() {
   const handleCrearUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(formData.password)) {
-      showToast(
-        "La contraseña debe tener mínimo 8 caracteres con letras y números",
-        "error",
-      );
+    if (formData.password.length < 8) {
+      showToast("La contraseña debe tener mínimo 8 caracteres", "error");
       return;
     }
 
@@ -693,7 +689,7 @@ export default function UsuariosPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 required
-                placeholder="Mín. 8 caracteres con letras y números"
+                placeholder="Mín. 8 caracteres"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
@@ -713,7 +709,7 @@ export default function UsuariosPage() {
               </button>
             </div>
             <p className="text-[10px] text-gray-400 italic">
-              Mínimo 8 caracteres, debe incluir letras y números.
+              Mínimo 8 caracteres.
             </p>
           </div>
 
