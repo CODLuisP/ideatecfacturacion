@@ -10,6 +10,7 @@ import {
   Hash,
   ToggleLeft,
   ToggleRight,
+  X,
 } from "lucide-react";
 import { useToast } from "@/app/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
@@ -565,6 +566,14 @@ export default function SucursalesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
         {canManage && (
           <div className="relative ml-auto">

@@ -486,16 +486,43 @@ export default function NotaDebitoPage() {
     const payload = prepararNotaDebito();
     if (!payload) return;
     setEmitiendo(true); setErrorEmision(null);
-    console.log("Nota de débito enviada:", payload);
+
     try {
-      const resND = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, payload, { headers: { Authorization: `Bearer ${accessToken}` } });
+      // ── 1. Guardar en BD ──────────────────────────────────────
+      const resND = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes`,
+        payload,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const comprobanteId = resND.data.comprobanteId;
-      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
-      console.log("Respuesta SUNAT notes:", resSunat.data);
+      setComprobanteIdEmitido(comprobanteId); // ← guardar ANTES de SUNAT
+
+      // ── 2. Enviar a SUNAT ─────────────────────────────────────
+      await enviarASunat(comprobanteId, payload);
+
+    } catch (err: any) {
+      // Solo errores del paso 1 (guardar en BD)
+      const data = err?.response?.data;
+      const mensaje = data?.mensaje ?? data?.message ?? data?.title ?? "Error al emitir la nota de débito";
+      const detalle = data?.detalle ?? (data?.errors ? JSON.stringify(data?.errors) : null);
+      setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
+      showToast("Error al emitir nota de débito.", "error");
+    } finally {
+      setEmitiendo(false);
+    }
+  };
+
+  const enviarASunat = async (comprobanteId: number, payload: NotaCredito) => {
+    try {
+      const resSunat = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
 
       if (resSunat.data.estadoSunat === "ACEPTADO" || resSunat.data.codigoRespuestaSunat === "0") {
+        // ✅ SUNAT aceptó — lógica original intacta
         showToast(resSunat.data.mensajeRespuestaSunat ?? "Nota de débito emitida correctamente.", "success");
-        setComprobanteIdEmitido(comprobanteId);
         await cargarPdf(comprobanteId, tamanoPdf);
 
         if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
@@ -538,25 +565,59 @@ export default function NotaDebitoPage() {
           } catch { showToast("Error al procesar envíos", "error"); }
         }
         setEmitido(true);
-      } else {
-        showToast(`Nota de débito ${payload.serie}-${payload.correlativo} generada pero rechazada por SUNAT`, "error");
-        setEmitido(true);
-      }
 
-      const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      setCorrelativoNDFactura(resSucursal.data.correlativoNotaDebitoFactura ?? null);
-      setCorrelativoNDBoleta(resSucursal.data.correlativoNotaDebitoBoleta ?? null);
+      } else {
+        //  SUNAT rechazó con respuesta
+        const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+        setErrorEmision(resSunat.data.mensajeRespuestaSunat ?? "Nota de débito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      }
     } catch (err: any) {
-      const data = err?.response?.data;
-      console.error("Error completo:", err?.response);
-      console.error("Data del error:", JSON.stringify(data, null, 2));
-      const mensaje = data?.mensaje ?? data?.message ?? data?.title ?? "Error al emitir la nota de débito";
-      const detalle = data?.detalle ?? (data?.errors ? JSON.stringify(data?.errors) : null);
-      setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
-      showToast("Error al emitir nota de débito.", "error");
-    } finally { setEmitiendo(false); }
+      const tieneRespuesta = !!err?.response;
+      const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+
+      if (tieneRespuesta) {
+        //  SUNAT respondió con error HTTP — sin reintento
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+        setErrorEmision(mensaje || "Nota de débito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      } else {
+        //  SUNAT no responde / timeout — reintento silencioso
+        setErrorEmision("No se pudo conectar con SUNAT.");
+        showToast(`La nota ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
+      }
+    }
+
+    // Actualizar correlativos siempre
+    const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoNDFactura(resSucursal.data.correlativoNotaDebitoFactura ?? null);
+    setCorrelativoNDBoleta(resSucursal.data.correlativoNotaDebitoBoleta ?? null);
   };
+
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
+  };
+
 
   // ── Limpiar / reset ──────────────────────────────────────────
   const limpiarBuscador = () => {
