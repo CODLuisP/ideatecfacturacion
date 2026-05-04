@@ -63,11 +63,12 @@ const TIPOS_OPTS = [
   "Nota de Crédito",
   "Nota de Débito",
 ];
-const ESTADOS_OPTS = ["Todos", "Aceptado", "Pendiente", "Rechazado"];
+const ESTADOS_OPTS = ["Todos", "Aceptado", "Pendiente", "Rechazado", "Anulado"];
 const ESTADO_COLORS_MAP: Record<string, string> = {
   Aceptado: "bg-emerald-500",
   Pendiente: "bg-amber-400",
   Rechazado: "bg-red-500",
+  Anulado: "bg-gray-400",
 };
 
 // ─── Page Principal ───────────────────────────────────────────────────────────
@@ -300,11 +301,10 @@ export default function VerComprobantesPage() {
         (c.numeroCompleto ?? "").toLowerCase().includes(search.toLowerCase());
       const matchTipo = filtroTipo === "Todos" || tipo === filtroTipo;
       const estadoLabel =
-        c.estadoSunat === "ACEPTADO"
-          ? "Aceptado"
-          : c.estadoSunat === "RECHAZADO"
-            ? "Rechazado"
-            : "Pendiente";
+        c.estadoSunat === "ACEPTADO" ? "Aceptado" :
+        c.estadoSunat === "RECHAZADO" ? "Rechazado" :
+        c.estadoSunat === "ANULADO" ? "Anulado" :
+        "Pendiente";
       const matchEstado =
         filtroEstado === "Todos" || estadoLabel === filtroEstado;
       return matchSearch && matchTipo && matchEstado;
@@ -1127,35 +1127,25 @@ const DropdownFiltro = ({ label, value, options, onChange, colorMap }: DropdownF
   );
 };
 
-// ─── BadgeSunat ───────────────────────────────────────────────────────────────
-const BadgeSunat = ({ estado }: { estado: string }) => {
-  const cfg =
-    COLORS.sunat[estado as keyof typeof COLORS.sunat] ?? COLORS.sunat.PENDIENTE;
-  const icon =
-    estado === "ACEPTADO" ? (
-      <CheckCircle2 size={11} />
-    ) : estado === "RECHAZADO" ? (
-      <X size={11} />
-    ) : (
-      <RefreshCw size={11} />
+  // ─── BadgeSunat ───────────────────────────────────────────────────────────────
+  const BadgeSunat = ({ estado }: { estado: string }) => {
+    const cfg = COLORS.sunat[estado as keyof typeof COLORS.sunat] ?? COLORS.sunat.PENDIENTE;
+    const icon =
+      estado === "ACEPTADO" ? <CheckCircle2 size={11} /> :
+      estado === "RECHAZADO" ? <X size={11} /> :
+      estado === "ANULADO" ? <Ban size={11} /> :
+      <RefreshCw size={11} />;
+    const label =
+      estado === "ACEPTADO" ? "Aceptado" :
+      estado === "RECHAZADO" ? "Rechazado" :
+      estado === "ANULADO" ? "Anulado" :
+      "Pendiente";
+    return (
+      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap", cfg.badge)}>
+        {icon} {label}
+      </span>
     );
-  const label =
-    estado === "ACEPTADO"
-      ? "Aceptado"
-      : estado === "RECHAZADO"
-        ? "Rechazado"
-        : "Pendiente";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap",
-        cfg.badge,
-      )}
-    >
-      {icon} {label}
-    </span>
-  );
-};
+  };
 
 // ─── BtnEnvio ─────────────────────────────────────────────────────────────────
 const BtnEnvio = ({
