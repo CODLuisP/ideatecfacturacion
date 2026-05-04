@@ -96,9 +96,11 @@ export default function ReportesPage() {
   const { usuarios, fetchUsuarios } = useUsuariosReporte(); 
 
   useEffect(() => {
-    if (puedeVerUsuarios) fetchUsuarios()
-    doFetch('hoy')
-  }, [user])
+    if (user) {
+      if (puedeVerUsuarios) fetchUsuarios();
+      doFetch('hoy');
+    }
+  }, [user, puedeVerUsuarios]);
 
   // ── Fetch al cambiar período / usuario ──────────────────────────────────────
   const doFetch = (p: DateRange, uId: number | null = usuarioId, sId: number | null = sucursalSeleccionada) => {
@@ -120,9 +122,6 @@ export default function ReportesPage() {
     }
   }
 
-  useEffect(() => {
-    doFetch('hoy');
-  }, [user]);
 
   const handlePeriodo = (p: DateRange) => {
     setPeriodo(p);
