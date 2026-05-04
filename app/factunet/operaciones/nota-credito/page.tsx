@@ -587,78 +587,167 @@ const actualizarStockDevolucion = async () => {
     const payload = prepararNotaCredito();
     if (!payload) return;
     setEmitiendo(true); setErrorEmision(null);
-    console.log("Nota de crédito enviada:", payload);
-    
+
     try {
-      const resNC = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, payload, { headers: { Authorization: `Bearer ${accessToken}` } });
+      // ── 1. Guardar en BD ──────────────────────────────────────
+      const resNC = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes`,
+        payload,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const comprobanteId = resNC.data.comprobanteId;
-      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
-      console.log("Respuesta SUNAT notes:", resSunat.data); 
+      setComprobanteIdEmitido(comprobanteId); // ← guardar ANTES de SUNAT
 
-      if (resSunat.data.estadoSunat === "ACEPTADO" || resSunat.data.codigoRespuestaSunat === "0") {
-        showToast(resSunat.data.mensajeRespuestaSunat ?? "Nota de crédito emitida correctamente.", "success");
-        setComprobanteIdEmitido(comprobanteId);
-        await cargarPdf(comprobanteId, tamanoPdf);
-        await actualizarStockDevolucion();
+      // ── 2. Enviar a SUNAT ─────────────────────────────────────
+      await enviarASunat(comprobanteId, payload);
 
-        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
-          const serieNum = `${payload.serie}-${payload.correlativo}`;
-          try {
-            const resPdf = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`, { headers: { Authorization: `Bearer ${accessToken}` } });
-            if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
-            const pdfFile = new File([await resPdf.blob()], `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`, { type: "application/pdf" });
-
-            if (enviarCorreo && correoCliente) {
-              try {
-                const formData = new FormData();
-                formData.append("toEmail", correoCliente);
-                formData.append("toName", comprobante?.cliente.razonSocial ?? "Cliente");
-                formData.append("subject", `Nota de Crédito Electrónica ${serieNum}`);
-                formData.append("body", "Se emitió la nota de crédito electrónica.");
-                formData.append("tipo", "7");
-                formData.append("comprobanteJson", JSON.stringify({ serieNumero: serieNum, estadoSunat: "ACEPTADO", items: detalles.map((d) => ({ descripcion: d.descripcion, cantidad: d.cantidad, precioUnitario: d.mtoPrecioUnitario })), igv: totales.mtoIGV, total: totales.mtoImpVenta }));
-                formData.append("adjunto", pdfFile);
-                const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-                if (!resCorreo.ok) throw new Error("Error correo");
-                showToast("Nota de crédito enviada por correo", "success");
-              } catch { showToast("Error al enviar por correo", "error"); }
-            }
-
-            if (enviarWhatsapp && telefonoCliente) {
-              try {
-                const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-                const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
-                const uploadForm = new FormData(); uploadForm.append("file", pdfFile);
-                const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
-                if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
-                const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-                const resWsp = await fetch(`${whatsappBase}/api/send/single`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey }, body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${comprobante?.cliente.razonSocial ?? ""}, adjuntamos su nota de crédito electrónica ${serieNum}.` }) });
-                if (!resWsp.ok) throw new Error("Error WhatsApp");
-                showToast("Nota de crédito enviada por WhatsApp", "success");
-              } catch { showToast("Error al enviar por WhatsApp", "error"); }
-            }
-          } catch { showToast("Error al procesar envíos", "error"); }
-        }
-        setEmitido(true);
-      } else {
-        showToast(`Nota de crédito ${payload.serie}-${payload.correlativo} generada pero rechazada por SUNAT`, "error");
-        setEmitido(true);
-      }
-
-      const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      setCorrelativoNCFactura(resSucursal.data.correlativoNotaCreditoFactura ?? null);
-      setCorrelativoNCBoleta(resSucursal.data.correlativoNotaCreditoBoleta ?? null);
     } catch (err: any) {
+      // Solo errores del paso 1 (guardar en BD)
       const data = err?.response?.data;
-      console.error("Error completo:", err?.response);
-      console.error("Data del error:", JSON.stringify(data, null, 2));
       const mensaje = data?.mensaje ?? data?.message ?? data?.title ?? "Error al emitir la nota de crédito";
       const detalle = data?.detalle ?? (data?.errors ? JSON.stringify(data?.errors) : null);
       setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
-      showToast("Error al emitir nota de crédito.", "error");
-    } finally { setEmitiendo(false); } 
+      showToast("Error al generar la nota de crédito.", "error");
+    } finally {
+      setEmitiendo(false);
+    }
+  };
+
+  const enviarASunat = async (comprobanteId: number, payload: NotaCredito) => {
+    try {
+      const resSunat = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (resSunat.data.estadoSunat === "ACEPTADO" || resSunat.data.codigoRespuestaSunat === "0") {
+        // ✅ SUNAT aceptó
+        showToast(resSunat.data.mensajeRespuestaSunat ?? "Nota de crédito emitida correctamente.", "success");
+        await procesarSegundoPlano(comprobanteId, payload);
+        setEmitido(true);
+      } else {
+        // ❌ SUNAT rechazó con respuesta
+        const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+        setErrorEmision(resSunat.data.mensajeRespuestaSunat ?? "Nota de crédito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      }
+    } catch (err: any) {
+      const tieneRespuesta = !!err?.response;
+      const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+
+      if (tieneRespuesta) {
+        // ❌ SUNAT respondió con error HTTP — sin reintento
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+        setErrorEmision(mensaje || "Nota de crédito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      } else {
+        // ❌ SUNAT no responde / timeout — reintento silencioso
+        setErrorEmision("No se pudo conectar con SUNAT.");
+        showToast(`La nota ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
+      }
+    }
+
+    // Actualizar correlativos siempre
+    const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoNCFactura(resSucursal.data.correlativoNotaCreditoFactura ?? null);
+    setCorrelativoNCBoleta(resSucursal.data.correlativoNotaCreditoBoleta ?? null);
+  };
+
+  const procesarSegundoPlano = async (comprobanteId: number, payload: NotaCredito) => {
+    await cargarPdf(comprobanteId, tamanoPdf);
+    await actualizarStockDevolucion();
+
+    if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+      const serieNum = `${payload.serie}-${payload.correlativo}`;
+      try {
+        const resPdf = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+        const pdfFile = new File(
+          [await resPdf.blob()],
+          `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`,
+          { type: "application/pdf" }
+        );
+
+        if (enviarCorreo && correoCliente) {
+          try {
+            const formData = new FormData();
+            formData.append("toEmail", correoCliente);
+            formData.append("toName", comprobante?.cliente.razonSocial ?? "Cliente");
+            formData.append("subject", `Nota de Crédito Electrónica ${serieNum}`);
+            formData.append("body", "Se emitió la nota de crédito electrónica.");
+            formData.append("tipo", "7");
+            formData.append("comprobanteJson", JSON.stringify({
+              serieNumero: serieNum, estadoSunat: "ACEPTADO",
+              items: detalles.map(d => ({ descripcion: d.descripcion, cantidad: d.cantidad, precioUnitario: d.mtoPrecioUnitario })),
+              igv: totales.mtoIGV, total: totales.mtoImpVenta,
+            }));
+            formData.append("adjunto", pdfFile);
+            const resCorreo = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+              { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
+            );
+            if (!resCorreo.ok) throw new Error("Error correo");
+            showToast("Nota de crédito enviada por correo", "success");
+          } catch { showToast("Error al enviar por correo", "error"); }
+        }
+
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+            const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+            const uploadForm = new FormData();
+            uploadForm.append("file", pdfFile);
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+              method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm
+            });
+            if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
+            const fileUrl = (await resUpload.json()).datos.url;
+            const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+              body: JSON.stringify({
+                phone: numeroFormateado, type: "documento", file_url: fileUrl,
+                filename: `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`,
+                mime_type: "application/pdf",
+                text: `Estimado(a) ${comprobante?.cliente.razonSocial ?? ""}, adjuntamos su nota de crédito electrónica ${serieNum}.`
+              }),
+            });
+            if (!resWsp.ok) throw new Error("Error WhatsApp");
+            showToast("Nota de crédito enviada por WhatsApp", "success");
+          } catch { showToast("Error al enviar por WhatsApp", "error"); }
+        }
+      } catch { showToast("Error al procesar envíos", "error"); }
+    }
+  };
+
+  // ── Reintento silencioso ──────────────────────────────────────
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
   };
 
   // ── Limpiar / reset ──────────────────────────────────────────

@@ -295,10 +295,6 @@ export default function BoletaPage() {
   const [emitiendo, setEmitiendo] = useState(false);
   const [errorEmision, setErrorEmision] = useState<string | null>(null);
 
-  //Reintentar envio por mala conexiona a api sunat
-  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
-  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
-
   // ── Guías de Remisión ────────────────────────────────────────
   const [showGuias, setShowGuias] = useState(false);
   const [guias, setGuias] = useState<
@@ -1544,15 +1540,7 @@ export default function BoletaPage() {
     }
   };
 
-  const reintentarEnvio = async () => {
-    if (!comprobanteIdEmitido) return;
-    setEmitiendo(true);
-    setErrorEmision(null);
-    setComprobanteRechazado(false);
-    await enviarASunat(comprobanteIdEmitido);
-    setEmitiendo(false);
-  };
-
+  // ── Enviar a SUNAT ───────────────────────────────────────────
   const enviarASunat = async (comprobanteId: number) => {
     try {
       const resSunat = await axios.post(
@@ -1562,35 +1550,40 @@ export default function BoletaPage() {
       );
 
       if (resSunat.data.exitoso) {
+        // SUNAT aceptó
         showToast(resSunat.data.mensaje ?? "Boleta emitida correctamente.", "success");
         setEmitido(true);
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(false);
         procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT rechazó — nueva boleta obligatoria
+        // SUNAT rechazó
+        const serieCorrelativo = `${boleta.serie}-${boleta.correlativo}`;
         setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+        showToast(`La boleta ${serieCorrelativo} fue rechazada.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
-    } catch (err: any) {
-      const tieneRespuesta = !!err?.response;
-      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+    } catch {
+      // SUNAT no responde / timeout — reintento silencioso
+      const serieCorrelativo = `${boleta.serie}-${boleta.correlativo}`;
+      setErrorEmision("No se pudo conectar con SUNAT.");
+      showToast(`La boleta ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+      setEmitido(true);
+      procesarSegundoPlano(comprobanteId);
+      reintentarEnSegundoPlano(comprobanteId); // ← sin await
+    }
+  };
 
-      if (tieneRespuesta) {
-        // ❌ Error con respuesta — nueva boleta
-        setErrorEmision(mensaje || "Comprobante rechazado por SUNAT");
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
-      } else {
-        // ❌ SUNAT caída — SÍ permitir reintento
-        setErrorEmision("No se pudo conectar con SUNAT. Puedes reintentar el envío.");
-        setComprobanteRechazado(true);
-        setRechazadoPorSunat(false);
-        showToast("SUNAT no responde. Puedes reintentar.", "error");
-      }
+  // ── Reintento silencioso — solo si SUNAT no responde ────────
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
     }
   };
 
@@ -1700,6 +1693,7 @@ export default function BoletaPage() {
   // ── Nueva boleta ─────────────────────────────────────────────
   const nuevaBoleta = () => {
     sharedVentaStore.clear();
+
     // Estado emisión
     setEmitido(false);
     setEnviarEnResumen(false);
@@ -1707,6 +1701,7 @@ export default function BoletaPage() {
     setPdfTicketUrl(null);
     setComprobanteIdEmitido(null);
     setErrorEmision(null);
+    setTamanoPdf("A4");
 
     // Ítems
     setDetalles([]);
@@ -1744,9 +1739,6 @@ export default function BoletaPage() {
 
     // Fecha emisión
     setFechaEmisionEditada(false);
-
-    setComprobanteRechazado(false);
-    setRechazadoPorSunat(false);
 
     // Boleta base
     setBoleta(prev => ({
@@ -2648,33 +2640,15 @@ export default function BoletaPage() {
 
             <div className="mt-6 space-y-3">
               <Button className="w-full py-3 text-base" type="button"
-                onClick={
-                  emitido
-                    ? nuevaBoleta
-                    : comprobanteRechazado
-                      ? reintentarEnvio
-                      : rechazadoPorSunat
-                        ? nuevaBoleta
-                        : emitirComprobante
-                }
-                disabled={
-                  emitiendo ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
-                }
+                onClick={emitido ? nuevaBoleta : emitirComprobante}
+                disabled={emitiendo || (!emitido && !puedeEmitir)}
               >
                 {emitiendo ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {comprobanteRechazado ? "Reenviando..." : "Emitiendo..."}
+                    Emitiendo...
                   </span>
-                ) : emitido
-                    ? "Nueva Boleta"
-                    : comprobanteRechazado
-                      ? "🔄 Reintentar envío a SUNAT"
-                      : rechazadoPorSunat
-                        ? "Nueva Boleta"
-                        : "Emitir Boleta"
-                }
+                ) : emitido ? "Nueva Boleta" : "Emitir Boleta"}
               </Button>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input type="checkbox" checked={enviarEnResumen}
