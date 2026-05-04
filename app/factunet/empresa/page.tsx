@@ -486,7 +486,7 @@ export default function ConfiguracionPage() {
         setLoadingEmpresa(false);
       })
       .finally(() => setLoadingEmpresa(false));
-  }, [user?.ruc, user]);
+  }, [user?.ruc, accessToken]);
 
   // ── GET sucursales ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -514,7 +514,7 @@ export default function ConfiguracionPage() {
         .catch(() => showToast('No se pudo cargar la sucursal', 'error'))
         .finally(() => setLoadingSucursales(false));
     }
-  }, [user?.ruc, user?.sucursalID, isSuperAdmin, user]);
+  }, [user?.ruc, user?.sucursalID, isSuperAdmin, accessToken]);
 
   // ── Subir logo ────────────────────────────────────────────────────────────
   const handleFileSelected = (file: File, previewDataUrl: string) => {
@@ -782,7 +782,7 @@ export default function ConfiguracionPage() {
         <div className="sticky bottom-6 flex justify-end z-20">
           <Button 
             type="submit" 
-            className="h-12 px-8 rounded-2xl shadow-xl shadow-blue-200/50 hover:shadow-2xl hover:shadow-blue-300/50 transition-all active:scale-[0.98]"
+            className="h-11 px-8 rounded-xl  hover:shadow-blue-500"
             disabled={saving || loadingEmpresa || uploadingLogo}
           >
             {saving ? (
