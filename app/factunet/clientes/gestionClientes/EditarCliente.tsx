@@ -78,7 +78,6 @@ export const EditarClienteModal: React.FC<Props> = ({
         clienteId: form.clienteId,
         razonSocialNombre: form.razonSocialNombre,
         numeroDocumento: form.numeroDocumento,
-        nombreComercial: form.nombreComercial,
         telefono: form.telefono,
         correo: form.correo,
       };
@@ -195,16 +194,6 @@ export const EditarClienteModal: React.FC<Props> = ({
           onChange={(e) => updateForm("razonSocialNombre", e.target.value)}
           showError={false}
         />
-
-        {form.tipoDocumento.tipoDocumentoId === "06" && (
-          <InputBase
-            label="Nombre Comercial"
-            labelOptional="(opcional)"
-            value={form.nombreComercial ?? ""}
-            onChange={(e) => updateForm("nombreComercial", e.target.value || null)}
-            showError={false}
-          />
-        )}
 
         <InputBase
           label="Correo Electrónico"

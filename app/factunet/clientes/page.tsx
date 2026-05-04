@@ -84,7 +84,6 @@ export default function ClientesPage() {
     tipoDocumentoId: '01',
     numeroDocumento: '',
     razonSocialNombre: '',
-    nombreComercial: '',
     correo: '',
     telefono: '',
     direccion: {
@@ -195,7 +194,6 @@ export default function ClientesPage() {
       if (nuevoCliente.tipoDocumentoId === "06") {
         payload = {
           ...payload,
-          nombreComercial: nuevoCliente.nombreComercial,
           telefono: nuevoCliente.telefono,
           correo: nuevoCliente.correo,
           direccion: {
@@ -435,7 +433,6 @@ export default function ClientesPage() {
         <tr className="bg-gray-100" style={{borderTopLeftRadius: '12px', borderTopRightRadius: '12px', overflow: 'hidden'}}>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">DOCUMENTO</th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">RAZÓN SOCIAL</th>
-          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">COMERCIAL</th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">DIRECCIÓN</th>
           {isSuperAdmin && (<th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">SUCURSAL</th>)}
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44 whitespace-normal wrap-break-word">CORREO</th>
@@ -467,8 +464,7 @@ export default function ClientesPage() {
               <p className="text-xs font-bold text-gray-400 uppercase">{client.tipoDocumento.tipoDocumentoNombre}</p>
               <p className="text-sm font-mono text-gray-700">{client.numeroDocumento}</p>
             </td>
-            <td className="px-5 py-4 text-sm font-semibold text-gray-900 w-40">{client.razonSocialNombre}</td>
-            <td className="px-5 py-4 text-sm text-gray-600 w-24">{client.nombreComercial ?? '-'}</td>
+            <td className="text-[12px] px-5 py-4 text-sm font-semibold text-gray-900 w-40">{client.razonSocialNombre}</td>
             <td className="px-5 py-4 text-sm text-gray-600 w-40">
               {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
             </td>

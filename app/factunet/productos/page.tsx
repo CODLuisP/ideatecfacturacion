@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench, Download, CheckCircle, XCircle, Loader2, PackageSearch } from "lucide-react";
 import axios from "axios";
+
 
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
@@ -58,6 +59,11 @@ export default function ProductosPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProductoSucursal | null>(null);
 
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSucursalId, setImportSucursalId] = useState<number>(0);
+  const [importando, setImportando] = useState(false);
+  const [importProgreso, setImportProgreso] = useState<{ total: number; actual: number } | null>(null);
+  const [importResultados, setImportResultados] = useState<{ ok: string[]; errores: { fila: number; nombre: string; error: string }[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   //Categorias
   const { categorias, setCategorias, loadingCategorias, fetchCategorias } = useCategoriasLista()
@@ -154,10 +160,159 @@ export default function ProductosPage() {
     }
   };
 
-  const handleImport = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsImportOpen(false);
+  const resetImport = () => {
     setImportFile(null);
+    setImportSucursalId(isSuperAdmin ? 0 : parseInt(user?.sucursalID ?? "0"));
+    setImportando(false);
+    setImportProgreso(null);
+    setImportResultados(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleImport = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!importFile || !accessToken) return;
+    
+    // Validar sucursal
+    if (isSuperAdmin && importSucursalId === 0) {
+      showToast("Debes seleccionar una sucursal para importar.", "error");
+      return;
+    }
+
+    setImportando(true);
+    setImportResultados(null);
+
+    try {
+      // ── PASO 1: el servidor parsea el Excel ──────────────────────
+      const formData = new FormData();
+      formData.append("file", importFile);
+
+      const parseRes = await fetch("/api/productos/importar", {
+        method: "POST",
+        body: formData,
+      });
+
+      const parseJson = await parseRes.json();
+
+      if (!parseRes.ok) {
+        showToast(parseJson.error ?? "Error al leer el archivo.", "error");
+        setImportando(false);
+        return;
+      }
+
+      const filas: {
+        fila: number;
+        nomProducto: string;
+        precioUnitario: number | null;
+        tipoProducto: string;
+        tipoAfectacionIGV: string;
+        incluirIGV: boolean;
+        unidadMedida: string;
+        categoria: string;
+        stock: number | null;
+        codigoSunat: string;
+        codigo: string;
+        errorValidacion?: string;
+      }[] = parseJson.filas;
+
+      if (!filas || filas.length === 0) {
+        showToast("El archivo no contiene productos para importar.", "error");
+        setImportando(false);
+        return;
+      }
+
+      // ── PASO 2: Asegurar que existan todas las categorías ─────────
+      const nombresCategoriasExcel = Array.from(new Set(filas.map(f => f.categoria).filter(Boolean)));
+      let categoriasActuales = [...categorias];
+      let huboCategoriasNuevas = false;
+
+      for (const nombreCat of nombresCategoriasExcel) {
+        const existe = categoriasActuales.some(c => c.categoriaNombre.toLowerCase() === nombreCat.toLowerCase());
+        if (!existe) {
+          try {
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Categorias`,
+              { categoriaNombre: nombreCat, empresaRuc: user?.ruc },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            huboCategoriasNuevas = true;
+          } catch (err) {
+            console.error(`Error creando categoría ${nombreCat}:`, err);
+            showToast(`No se pudo crear la categoría: ${nombreCat}. Los productos asociados podrían fallar.`, "error");
+          }
+        }
+      }
+
+      if (huboCategoriasNuevas && user?.ruc) {
+        categoriasActuales = await fetchCategorias(user.ruc);
+      }
+
+      // ── PASO 3: enviar cada fila al API de productos ──────────────
+      setImportProgreso({ total: filas.length, actual: 0 });
+
+      const ok: string[] = [];
+      const errores: { fila: number; nombre: string; error: string }[] = [];
+      const sucursalId = isSuperAdmin ? importSucursalId : parseInt(user?.sucursalID ?? "0");
+
+      for (let i = 0; i < filas.length; i++) {
+        const f = filas[i];
+
+        // Errores de validación detectados por el servidor
+        if (f.errorValidacion) {
+          errores.push({ fila: f.fila, nombre: f.nomProducto || "(vacío)", error: f.errorValidacion });
+          setImportProgreso({ total: filas.length, actual: i + 1 });
+          continue;
+        }
+
+        // Buscar categoría por nombre (usar la lista actualizada)
+        const catId = categoriasActuales.find(c => c.categoriaNombre.toLowerCase() === f.categoria.toLowerCase())?.categoriaId ?? 0;
+
+        const payload = {
+          nomProducto:       f.nomProducto,
+          precioUnitario:    f.precioUnitario,
+          tipoProducto:      f.tipoProducto,
+          tipoAfectacionIGV: f.tipoAfectacionIGV,
+          incluirIGV:        f.incluirIGV,
+          unidadMedida:      f.unidadMedida,
+          stock:             f.stock,
+          codigoSunat:       f.codigoSunat || "",
+          codigo:            f.codigo || "",
+          categoriaId:       catId,
+          sucursalId,
+        };
+
+        try {
+          const res = await axios.post<ProductoSucursal>(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/productos`,
+            payload,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          ok.push(f.nomProducto);
+          
+          // Actualizar lista si la sucursal coincide con el filtro o si es el admin de esa sucursal
+          const sucursalNombre = sucursales.find(s => s.sucursalId === sucursalId)?.nombre;
+          if (!isSuperAdmin || !filtroSucursal || filtroSucursal === sucursalNombre) {
+             setProductos((prev) => [...prev, res.data]);
+          }
+        } catch (err) {
+          const msg = axios.isAxiosError(err)
+            ? err.response?.data?.mensaje ?? err.response?.data?.message ?? `Error ${err.response?.status}`
+            : "Error desconocido";
+          errores.push({ fila: f.fila, nombre: f.nomProducto, error: msg });
+        }
+
+        setImportProgreso({ total: filas.length, actual: i + 1 });
+      }
+
+      setImportResultados({ ok, errores });
+      if (ok.length > 0) showToast(`${ok.length} producto(s) importado(s) correctamente.`, "success");
+      if (errores.length > 0) showToast(`${errores.length} fila(s) con error.`, "error");
+    } catch (err) {
+      console.error(err);
+      showToast("Error inesperado. Intenta nuevamente.", "error");
+    } finally {
+      setImportando(false);
+    }
   };
 
   return (
@@ -275,7 +430,6 @@ export default function ProductosPage() {
                 className="w-3.5 h-3.5 accent-green-600"
               />
               <span className="text-xs font-medium text-gray-600 flex items-center gap-1 whitespace-nowrap">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
                 Sin stock
               </span>
             </label>
@@ -348,40 +502,44 @@ export default function ProductosPage() {
             </div>
               
             {/* Limpiar — empujado a la derecha */}
-            {filtrosAvanzadosActivos && (
-              <>
-                <div className="flex-1" />
-                <button
-                  onClick={() => {
-                    setFiltroStock(false);
-                    setFiltroAfectacion([]);
-                    setFiltroTipoProducto([]);
-                    setFiltroSucursal("");
-                  }}
-                  className="text-xs text-gray-400 hover:text-rose-500 font-medium transition-colors whitespace-nowrap shrink-0"
-                >
-                  ✕ Limpiar filtros
-                </button>
-              </>
-            )}
+     {filtrosAvanzadosActivos && (
+  <>
+    <div className="flex-1" />
+    <button
+      onClick={() => {
+        setFiltroStock(false);
+        setFiltroAfectacion([]);
+        setFiltroTipoProducto([]);
+        setFiltroSucursal("");
+      }}
+      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-rose-500 font-bold transition-colors whitespace-nowrap shrink-0 px-2 py-1.5 hover:bg-rose-50 rounded-md"
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+      Limpiar filtros
+    </button>
+  </>
+)}
           </div>
         )}
       </div>
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          Mostrando <span className="font-semibold text-gray-900">{productos.length}</span> productos
+          Mostrando <span className="font-semibold text-gray-900">{filtered.length}</span> productos
         </p>
       </div>
 
       {/* Grid */}
-      <div  className="overflow-y-auto bg-gray-50 rounded-xl p-4" 
+
+      
+      <div  className="overflow-y-auto rounded-xl " 
         style={{ 
           maxHeight: showFiltrosAvanzados ? 'calc(100vh - 275px)' : 'calc(100vh - 215px)', 
           scrollbarWidth: 'thin', 
           scrollbarColor: '#CBD5E1 transparent' 
         }}
       >        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 pb-2">
+
         {loadingProductos  && (
           Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className="animate-pulse border border-gray-200 rounded-xl p-4 space-y-4">
@@ -402,12 +560,15 @@ export default function ProductosPage() {
           ))
         )}
 
-        {!loadingProductos  && filtered.length === 0 && (
-          <p className="text-gray-400 col-span-3 text-center py-12">
-            No se encontraron productos.
-          </p>
-        )}
-
+ {!loadingProductos && filtered.length === 0 && (
+  <div className="col-span-4 flex flex-col items-center justify-center py-16 text-center">
+    <div className="bg-gray-100 rounded-full p-4 mb-3">
+      <PackageSearch className="w-10 h-10 text-gray-300" />
+    </div>
+    <p className="text-gray-500 font-semibold text-sm">No se encontraron productos</p>
+    <p className="text-gray-400 text-xs mt-1">Intenta ajustar los filtros de búsqueda</p>
+  </div>
+)}
         {!loadingProductos  && filtered.map((prod) => (
           <Card key={prod.sucursalProducto.sucursalProductoId} className="group hover:border-brand-blue transition-all">
             <div className="flex justify-between items-start">
@@ -415,16 +576,15 @@ export default function ProductosPage() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                   {prod.codigo}
                 </p>
-                {/*nomProducto */}
-                <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors">
+                <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors line-clamp-2 min-h-10">
                   {prod.nomProducto}
                 </h4>
-                <p className="text-xs text-gray-500">
+                <p className="text-[10px] font-medium text-gray-400 bg-gray-100 w-fit px-1.5 py-0.5 rounded uppercase">
                   {prod.categoria?.categoriaNombre}
                 </p>
                 {
                   isSuperAdmin && (
-                    <p className="text-xs text-gray-500 flex">
+                    <p className="text-[10px] text-gray-400 flex mt-1 bg-blue-50 w-fit px-1.5 py-0.5 rounded">
                       <span className="font-bold">Sucursal: &nbsp; </span> {prod.sucursalProducto.nomSucursal}
                     </p>
                   )
@@ -447,7 +607,7 @@ export default function ProductosPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex items-end justify-between">
+            <div className="mt-3 flex items-end justify-between">
               <div>
                 <p className="text-xs text-gray-400 uppercase font-bold">Stock</p>
                 <p className={cn("text-lg font-bold", prod.sucursalProducto.stock === 0 ? "text-rose-500" : "text-gray-900")}>
@@ -463,14 +623,14 @@ export default function ProductosPage() {
               </div>
 
               <div className="text-right">
-                <p className="text-xs text-gray-400 uppercase font-bold">
+                <p className="text-[12px] text-gray-400 uppercase font-bold">
                   {prod.tipoAfectacionIGV === "10" ? "Gravado" : prod.tipoAfectacionIGV === "20" ? "Exonerado" : "Inafecto"}
                 </p>
-                <p className="text-xs text-gray-400 uppercase font-bold">
+                <p className="text-[12px] text-gray-400 uppercase font-bold">
                   {prod.tipoAfectacionIGV === "10" ? (prod.incluirIGV ? "Precio (Inc. IGV)" : "Precio (Sin. IGV)") : "Precio (NA. IGV)"}
                 </p>
                 {/*prod.sucursalProducto.precioUnitario */}
-                <p className="text-xl font-black text-brand-blue">
+                <p className="text-[14px] font-black text-brand-blue">
                   S/ {prod.sucursalProducto.precioUnitario.toFixed(2)}
                 </p>
               </div>
@@ -496,30 +656,123 @@ export default function ProductosPage() {
         categorias={categorias}
       />
 
-      {/* Modal importar — sin cambios */}
-      <Modal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Importar Productos">
-        <form className="space-y-5" onSubmit={handleImport}>
-          <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-brand-blue transition-colors cursor-pointer">
-            <Upload className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-gray-600 mb-1">Arrastra tu archivo aquí o haz click</p>
-            <p className="text-xs text-gray-400 mb-3">Formatos: .csv, .xlsx</p>
-            {importFile ? (
-              <span className="text-xs text-brand-blue font-semibold">✓ {importFile.name}</span>
-            ) : (
-              <span className="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-lg">Seleccionar archivo</span>
-            )}
-            <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
-          </label>
-          <div className="bg-blue-50 rounded-xl p-4">
-            <p className="text-xs font-bold text-blue-700 mb-1 uppercase">Columnas esperadas</p>
-            <p className="text-xs text-blue-600 font-mono">
-              codigo, tipoProducto, codigoSunat, nomProducto, unidadMedida,
-              tipoAfectacionIGV, incluirIGV, categoriaId, sucursalId, precioUnitario, stock
-            </p>
+      {/* Modal importar */}
+      <Modal
+        isOpen={isImportOpen}
+        onClose={() => { if (!importando) { setIsImportOpen(false); resetImport(); } }}
+        title="Importar Productos desde Excel"
+      >
+        <form className="space-y-4" onSubmit={handleImport}>
+
+          {/* ── Descargar plantilla ── */}
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+            <div>
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Paso 1 — Descarga la plantilla</p>
+              <p className="text-xs text-blue-600 mt-0.5">Llena con tus productos y sube el archivo.</p>
+            </div>
+            <a
+              href="/api/productos/plantilla"
+              download
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+            >
+              <Download className="w-3.5 h-3.5" /> Descargar plantilla
+            </a>
           </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" type="button" onClick={() => setIsImportOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={!importFile}>Importar</Button>
+
+          {/* ── Configuración de Importación ── */}
+          <div className="grid grid-cols-1 gap-4">
+            {/* Sucursal (solo superadmin) */}
+            {isSuperAdmin && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  Sucursal Destino <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={importSucursalId}
+                  onChange={(e) => setImportSucursalId(Number(e.target.value))}
+                  disabled={importando || !!importResultados}
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue disabled:opacity-50"
+                >
+                  <option value={0}>Seleccione sucursal</option>
+                  {sucursales.map((s) => (
+                    <option key={s.sucursalId} value={s.sucursalId}>{s.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* ── Subir archivo ── */}
+          {!importResultados && (
+            <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-brand-blue transition-colors cursor-pointer">
+              <Upload className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-gray-600 mb-1">Paso 2 — Arrastra o selecciona tu archivo</p>
+              <p className="text-xs text-gray-400 mb-3">Solo formato .xlsx (Excel)</p>
+              {importFile ? (
+                <span className="text-xs text-brand-blue font-semibold">✓ {importFile.name}</span>
+              ) : (
+                <span className="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-lg">Seleccionar archivo</span>
+              )}
+              <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); }} />
+            </label>
+          )}
+
+          {/* ── Progreso ── */}
+          {importando && importProgreso && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-gray-500">
+                <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importando productos...</span>
+                <span className="font-semibold">{importProgreso.actual} / {importProgreso.total}</span>
+              </div>
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand-blue transition-all duration-300 rounded-full"
+                  style={{ width: `${Math.round((importProgreso.actual / importProgreso.total) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Resultados ── */}
+          {importResultados && (
+            <div className="space-y-3">
+              {importResultados.ok.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                  <p className="text-xs font-bold text-green-700 flex items-center gap-1.5 mb-1">
+                    <CheckCircle className="w-3.5 h-3.5" /> {importResultados.ok.length} producto(s) importado(s) con éxito
+                  </p>
+                </div>
+              )}
+              {importResultados.errores.length > 0 && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-1.5 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                    <XCircle className="w-3.5 h-3.5" /> {importResultados.errores.length} fila(s) con error
+                  </p>
+                  {importResultados.errores.map((e, i) => (
+                    <p key={i} className="text-xs text-rose-600">
+                      <span className="font-semibold">Fila {e.fila}</span> · {e.nombre} — {e.error}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Acciones ── */}
+          <div className="flex justify-end gap-3 pt-1">
+            {importResultados ? (
+              <>
+                <Button variant="outline" type="button" onClick={() => resetImport()}>Importar otro</Button>
+                <Button type="button" onClick={() => { setIsImportOpen(false); resetImport(); }}>Cerrar</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" type="button" onClick={() => { setIsImportOpen(false); resetImport(); }} disabled={importando}>Cancelar</Button>
+                <Button type="submit" disabled={!importFile || importando}>
+                  {importando ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importando...</> : "Importar"}
+                </Button>
+              </>
+            )}
           </div>
         </form>
       </Modal>
