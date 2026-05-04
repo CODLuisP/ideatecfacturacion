@@ -566,7 +566,6 @@ export default function UsuariosPage() {
               );
             })}
           </div>
-
           {/* ── Campos solo para superadmin: RUC + Sucursal ── */}
           {isSuperadmin && (
             <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-3">
@@ -602,8 +601,8 @@ export default function UsuariosPage() {
               )}
             </div>
           )}
-
           {/* Usuario */}
+          // Busca el campo "Usuario" en el modal y reemplázalo por esto:
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
               Usuario
@@ -613,13 +612,18 @@ export default function UsuariosPage() {
               placeholder="Ej: juan.perez"
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               required
+              minLength={4}
               value={formData.username}
               onChange={(e) =>
                 setFormData({ ...formData, username: e.target.value })
               }
             />
+            {formData.username.length > 0 && formData.username.length < 4 && (
+              <p className="text-[10px] text-rose-500 italic px-1">
+                El usuario debe tener al menos 4 caracteres
+              </p>
+            )}
           </div>
-
           {/* Rol / Perfil */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
@@ -655,7 +659,6 @@ export default function UsuariosPage() {
               </p>
             )}
           </div>
-
           {/* Email — solo visible si el rol es admin */}
           {formData.rol !== "facturador" && (
             <div className="space-y-1.5">
@@ -679,7 +682,6 @@ export default function UsuariosPage() {
               )}
             </div>
           )}
-
           {/* Contraseña */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
@@ -712,7 +714,6 @@ export default function UsuariosPage() {
               Mínimo 8 caracteres.
             </p>
           </div>
-
           <div className="pt-4 flex justify-end gap-3">
             <Button variant="outline" type="button" onClick={handleCloseModal}>
               Cancelar
