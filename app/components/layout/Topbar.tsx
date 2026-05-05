@@ -19,39 +19,13 @@ import { View } from "@/app/types";
 import { signOut } from "next-auth/react";
 import { useAuth } from "@/context/AuthContext";
 import { DateChip } from "./DateChip";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface TopbarProps {
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
   activeView: View;
 }
-
-const notifications = [
-  {
-    id: 1,
-    icon: <AlertCircle className="w-4 h-4 text-amber-500" />,
-    title: "Factura pendiente",
-    desc: "La factura #F-00234 vence hoy",
-    time: "Hace 5 min",
-    unread: true,
-  },
-  {
-    id: 2,
-    icon: <Check className="w-4 h-4 text-emerald-500" />,
-    title: "Sincronización exitosa",
-    desc: "SUNAT sincronizó 12 documentos",
-    time: "Hace 1 hora",
-    unread: true,
-  },
-  {
-    id: 3,
-    icon: <Info className="w-4 h-4 text-blue-500" />,
-    title: "Actualización disponible",
-    desc: "Nueva versión del módulo contable",
-    time: "Ayer",
-    unread: false,
-  },
-];
 
 export const Topbar = ({
   isSidebarOpen,
@@ -66,7 +40,12 @@ export const Topbar = ({
 
   const { user } = useAuth();
 
-  const isSuperAdmin = user?.username === "superAdminOpen";
+  const isSuperAdmin = user?.rol === "superadmin";
+  const { pendingDocs, lastAccepted, lastRejected, totalPending, connected } = useNotifications({
+  sucursalId: isSuperAdmin ? null : (user?.sucursalID ? Number(user.sucursalID) : null),
+  empresaRuc: isSuperAdmin ? user?.ruc : null,
+});
+
   const isBeta = user?.environment === "beta";
 
   const logoSrc = user?.logoBase64
@@ -84,7 +63,7 @@ export const Topbar = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const unreadCount = totalPending + (lastRejected ? 1 : 0);
 
   return (
     <>
@@ -208,40 +187,94 @@ export const Topbar = ({
                   <span className="text-sm font-bold text-gray-900">
                     Notificaciones
                   </span>
-                  {unreadCount > 0 && (
-                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                      {unreadCount} nuevas
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-gray-300"}`}
+                    />
+                    {unreadCount > 0 && (
+                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                        {unreadCount} nuevas
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 <ul className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-                  {notifications.map((n) => (
-                    <li
-                      key={n.id}
-                      className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
-                        n.unread ? "bg-blue-50/30" : ""
-                      }`}
-                    >
+                  {/* Pendientes */}
+                  {totalPending > 0 && (
+                    <li className="flex items-start gap-3 px-4 py-3 bg-amber-50/40">
                       <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
-                        {n.icon}
+                        <AlertCircle className="w-4 h-4 text-amber-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 leading-tight">
-                          {n.title}
+                        <p className="text-sm font-semibold text-gray-800">
+                          {totalPending} documento{totalPending > 1 ? "s" : ""}{" "}
+                          pendiente{totalPending > 1 ? "s" : ""}
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">
-                          {n.desc}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                          {n.time}
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Sin respuesta de SUNAT hoy
                         </p>
                       </div>
-                      {n.unread && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
-                      )}
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
                     </li>
-                  ))}
+                  )}
+
+                  {/* Último aceptado */}
+                  {lastAccepted && (
+                    <li className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer">
+                      <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
+                        <Check className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">
+                          Último aceptado
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {lastAccepted.numeroCompleto} —{" "}
+                          {lastAccepted.destinatario}
+                        </p>
+                        {lastAccepted.importeTotal && (
+                          <p className="text-[10px] text-emerald-600 font-semibold mt-1">
+                            {lastAccepted.tipoMoneda}{" "}
+                            {parseFloat(lastAccepted.importeTotal).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Último rechazado */}
+                  {lastRejected && (
+                    <li className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer bg-red-50/30">
+                      <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">
+                          Último rechazado
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {lastRejected.numeroCompleto} —{" "}
+                          {lastRejected.destinatario}
+                        </p>
+                        {lastRejected.mensajeRespuestaSunat && (
+                          <p className="text-[10px] text-red-500 font-medium mt-1 truncate">
+                            {lastRejected.mensajeRespuestaSunat}
+                          </p>
+                        )}
+                      </div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
+                    </li>
+                  )}
+
+                  {/* Sin notificaciones */}
+                  {totalPending === 0 && !lastAccepted && !lastRejected && (
+                    <li className="px-4 py-6 text-center text-sm text-gray-400">
+                      Sin actividad hoy
+                    </li>
+                  )}
                 </ul>
+
                 <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
                   <button className="w-full text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors text-center">
                     Ver todas las notificaciones
