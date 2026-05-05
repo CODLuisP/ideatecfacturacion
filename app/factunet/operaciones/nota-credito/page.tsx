@@ -583,8 +583,7 @@ export default function NotaCreditoPage() {
     }
 
     if (codMotivo !== "08" && totales.mtoImpVenta <= 0) { showToast("El monto total debe ser mayor a 0", "error"); return false; }
-    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return false; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return false; }
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return false; }
     return true;
   };
 
@@ -995,23 +994,37 @@ const actualizarStockDevolucion = async () => {
                       </div>
                     )}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="email" value={correoCliente} placeholder="Correo del cliente"
-                          onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="email" value={correoCliente} placeholder="Correo del cliente"
+                            onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
-                          onChange={(e) => { const s = e.target.value.replace(/\D/g, ""); setTelefonoCliente(s); if (!s) setEnviarWhatsapp(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
+                            onChange={(e) => { 
+                              const s = e.target.value.replace(/\D/g, ""); 
+                              setTelefonoCliente(s); 
+                              if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                            }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
+                        {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                        )}
+                        {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                        )}
                       </div>
                     </div>
                   </div>

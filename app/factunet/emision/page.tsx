@@ -1129,27 +1129,28 @@ const imprimirPdf = () => {
                     <span className="text-xs text-gray-500">Enviar</span>
                   </label>
                 </div>
-              <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
-                  ${enviarWhatsapp && !telefonoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
-                  <input type="tel" value={telefonoCliente}
-                    onChange={e => {
-                      const soloNumeros = e.target.value.replace(/\D/g, '');
-                      setTelefonoCliente(soloNumeros);
-                      if (soloNumeros.length !== 9) setEnviarWhatsapp(false);
-                    }}
-                    disabled={!clienteSeleccionado || clienteVarios}
-                    maxLength={9}
-                    placeholder="Teléfono / WhatsApp"
-                    className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" 
-                  />
-                  <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                    <input type="checkbox" checked={enviarWhatsapp} onChange={e => setEnviarWhatsapp(e.target.checked)} disabled={telefonoCliente.length !== 9} className="w-3.5 h-3.5 accent-brand-blue" />
-                    <span className="text-xs text-gray-500">Enviar</span>
-                  </label>
+                <div className="space-y-1">
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                    <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
+                      disabled={!clienteSeleccionado || clienteVarios}
+                      onChange={(e) => { 
+                        const s = e.target.value.replace(/\D/g, ""); 
+                        setTelefonoCliente(s); 
+                        if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                      }}
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                      <span className="text-xs text-gray-500">Enviar</span>
+                    </label>
+                  </div>
+                  {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                    <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                  )}
+                  {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                    <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                  )}
                 </div>
-                {telefonoCliente.length > 0 && telefonoCliente.length < 9 && (
-                  <p className="text-[10px] text-red-500 px-1">El teléfono debe tener 9 dígitos ({telefonoCliente.length}/9)</p>
-                )}
               </div>
             </div>
           </div>

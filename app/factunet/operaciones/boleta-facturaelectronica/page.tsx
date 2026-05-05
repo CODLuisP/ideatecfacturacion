@@ -29,6 +29,7 @@ export default function BoletaFacturaElectronicaPage() {
     <div className="flex flex-col h-full space-y-4">
       {/* Cabecera Unificada */}
       <div className="flex items-center justify-between mb-2 animate-in fade-in duration-500 py-2 rounded-xl ">
+        
         <div className="flex items-center gap-4  ">
           <Button
             variant="ghost"

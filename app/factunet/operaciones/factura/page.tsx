@@ -1584,6 +1584,7 @@ export default function FacturaPage() {
 
   // ── Preparar y emitir ────────────────────────────────────────
   const prepararFactura = () => {
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return; }
     const esCredito = factura.tipoPago === 'Credito' || factura.tipoPago === 'CreditoInicial';
     const esCreditoInicial = factura.tipoPago === 'CreditoInicial';
 
@@ -2193,33 +2194,41 @@ export default function FacturaPage() {
                         <span className="text-xs text-gray-500">Enviar</span>
                       </label>
                     </div>
-                    <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
-                      ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
-                    >
-                      <input
-                        type="tel"
-                        value={telefonoCliente}
-                        onChange={(e) => {
-                          const soloNum = e.target.value.replace(/\D/g, "");
-                          setTelefonoCliente(soloNum);
-                          if (!soloNum) setEnviarWhatsapp(false);
-                        }}
-                        disabled={!factura.cliente?.razonSocial}
-                        maxLength={9}
-                        placeholder="Teléfono / WhatsApp"
-                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
-                      />
-                      <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                    <div className="space-y-1">
+                      <div
+                        className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
+                        ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                      >
                         <input
-                          type="checkbox"
-                          checked={enviarWhatsapp}
-                          onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                          disabled={!telefonoCliente}
-                          className="w-3.5 h-3.5 accent-brand-blue"
+                          type="tel"
+                          value={telefonoCliente}
+                          onChange={(e) => {
+                            const soloNum = e.target.value.replace(/\D/g, "");
+                            setTelefonoCliente(soloNum);
+                            if (!soloNum || soloNum.length < 9 || !soloNum.startsWith("9")) setEnviarWhatsapp(false);
+                          }}
+                          disabled={!factura.cliente?.razonSocial}
+                          maxLength={9}
+                          placeholder="Teléfono / WhatsApp"
+                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
                         />
-                        <span className="text-xs text-gray-500">Enviar</span>
-                      </label>
+                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={enviarWhatsapp}
+                            onChange={(e) => setEnviarWhatsapp(e.target.checked)}
+                            disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")}
+                            className="w-3.5 h-3.5 accent-brand-blue"
+                          />
+                          <span className="text-xs text-gray-500">Enviar</span>
+                        </label>
+                      </div>
+                      {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                      )}
+                      {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                      )}
                     </div>
                   </div>
 
