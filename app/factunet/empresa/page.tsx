@@ -327,21 +327,26 @@ function SucursalSerieRow({
 
 // ─── Sucursal Card ────────────────────────────────────────────────────────────
 function SucursalCard({
-  sucursal, onChange, onSave, saving, readOnly,
+  sucursal, onChange, onSave, saving, readOnly, defaultExpanded = false
 }: {
   sucursal: Sucursal;
   onChange: (updated: Sucursal) => void;
   onSave: (s: Sucursal) => void;
   saving: boolean;
   readOnly?: boolean;
+  defaultExpanded?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const upd = (field: keyof Sucursal) => (val: string | number) =>
     onChange({ ...sucursal, [field]: val });
 
   return (
-    <div className="border border-gray-200 rounded-2xl overflow-hidden">
+    <div className="border border-gray-200 rounded-2xl overflow-hidden transition-all duration-300">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 bg-gray-50 border-b border-gray-100">
+      <div 
+        className="flex items-center justify-between px-5 py-3.5 bg-gray-50 border-b border-gray-100 cursor-pointer hover:bg-gray-100/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
         <div className="flex items-center gap-3">
           <div className="p-1.5 rounded-lg bg-blue-50 border border-blue-100">
             <Store className="w-4 h-4 text-brand-blue" />
@@ -351,68 +356,75 @@ function SucursalCard({
             <p className="text-xs text-gray-500">{sucursal.direccion}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 uppercase tracking-wide">
-            Cod. {sucursal.codEstablecimiento}
-          </span>
-          <span
-            className={cn(
-              'text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide',
-              sucursal.estado
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                : 'bg-rose-50 text-rose-500 border border-rose-100'
-            )}
-          >
-            {sucursal.estado ? 'Activo' : 'Inactivo'}
-          </span>
-          {readOnly && (
-            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-wide flex items-center gap-1">
-              <Lock className="w-2.5 h-2.5" /> Solo lectura
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 uppercase tracking-wide">
+              Cod. {sucursal.codEstablecimiento}
             </span>
-          )}
+            <span
+              className={cn(
+                'text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide',
+                sucursal.estado
+                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                  : 'bg-rose-50 text-rose-500 border border-rose-100'
+              )}
+            >
+              {sucursal.estado ? 'Activo' : 'Inactivo'}
+            </span>
+            {readOnly && (
+              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-wide flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5" /> Solo lectura
+              </span>
+            )}
+          </div>
+          <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform duration-200", expanded && "rotate-180")} />
         </div>
       </div>
 
       {/* Body */}
-      <div className="p-5 space-y-4">
-        <SucursalSerieRow label="Factura" serie={sucursal.serieFactura} correlativo={sucursal.correlativoFactura}
-          onSerieChange={(v) => upd('serieFactura')(v)} onCorrelativoChange={(v) => upd('correlativoFactura')(v)}
-          prefix="F" hint="F001" readOnly={readOnly} />
-        <SucursalSerieRow label="Boleta" serie={sucursal.serieBoleta} correlativo={sucursal.correlativoBoleta}
-          onSerieChange={(v) => upd('serieBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoBoleta')(v)}
-          prefix="B" hint="B001" readOnly={readOnly} />
-        <SucursalSerieRow label="Nota de Crédito (Factura)" serie={sucursal.serieNotaCreditoFactura} correlativo={sucursal.correlativoNotaCreditoFactura}
-          onSerieChange={(v) => upd('serieNotaCreditoFactura')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCreditoFactura')(v)}
-          prefix="F" hint="FC01" readOnly={readOnly} />
-        <SucursalSerieRow label="Nota de Crédito (Boleta)" serie={sucursal.serieNotaCreditoBoleta} correlativo={sucursal.correlativoNotaCreditoBoleta}
-          onSerieChange={(v) => upd('serieNotaCreditoBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCreditoBoleta')(v)}
-          prefix="B" hint="BC01" readOnly={readOnly} />
-        <SucursalSerieRow label="Nota de Débito (Factura)" serie={sucursal.serieNotaDebitoFactura} correlativo={sucursal.correlativoNotaDebitoFactura}
-          onSerieChange={(v) => upd('serieNotaDebitoFactura')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebitoFactura')(v)}
-          prefix="F" hint="FD01" readOnly={readOnly} />
-        <SucursalSerieRow label="Nota de Débito (Boleta)" serie={sucursal.serieNotaDebitoBoleta} correlativo={sucursal.correlativoNotaDebitoBoleta}
-          onSerieChange={(v) => upd('serieNotaDebitoBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebitoBoleta')(v)}
-          prefix="B" hint="BD01" readOnly={readOnly} />
-        <SucursalSerieRow label="Guía de Remisión" serie={sucursal.serieGuiaRemision} correlativo={sucursal.correlativoGuiaRemision}
-          onSerieChange={(v) => upd('serieGuiaRemision')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaRemision')(v)}
-          prefix="T" hint="T001" readOnly={readOnly} />
-        <SucursalSerieRow label="Guía Transportista" serie={sucursal.serieGuiaTransportista} correlativo={sucursal.correlativoGuiaTransportista}
-          onSerieChange={(v) => upd('serieGuiaTransportista')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaTransportista')(v)}
-          prefix="V" hint="V001" readOnly={readOnly} />
-      </div>
+      {expanded && (
+        <div className="animate-in slide-in-from-top-2 duration-300">
+          <div className="p-5 space-y-4">
+            <SucursalSerieRow label="Factura" serie={sucursal.serieFactura} correlativo={sucursal.correlativoFactura}
+              onSerieChange={(v) => upd('serieFactura')(v)} onCorrelativoChange={(v) => upd('correlativoFactura')(v)}
+              prefix="F" hint="F001" readOnly={readOnly} />
+            <SucursalSerieRow label="Boleta" serie={sucursal.serieBoleta} correlativo={sucursal.correlativoBoleta}
+              onSerieChange={(v) => upd('serieBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoBoleta')(v)}
+              prefix="B" hint="B001" readOnly={readOnly} />
+            <SucursalSerieRow label="Nota de Crédito (Factura)" serie={sucursal.serieNotaCreditoFactura} correlativo={sucursal.correlativoNotaCreditoFactura}
+              onSerieChange={(v) => upd('serieNotaCreditoFactura')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCreditoFactura')(v)}
+              prefix="F" hint="FC01" readOnly={readOnly} />
+            <SucursalSerieRow label="Nota de Crédito (Boleta)" serie={sucursal.serieNotaCreditoBoleta} correlativo={sucursal.correlativoNotaCreditoBoleta}
+              onSerieChange={(v) => upd('serieNotaCreditoBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoNotaCreditoBoleta')(v)}
+              prefix="B" hint="BC01" readOnly={readOnly} />
+            <SucursalSerieRow label="Nota de Débito (Factura)" serie={sucursal.serieNotaDebitoFactura} correlativo={sucursal.correlativoNotaDebitoFactura}
+              onSerieChange={(v) => upd('serieNotaDebitoFactura')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebitoFactura')(v)}
+              prefix="F" hint="FD01" readOnly={readOnly} />
+            <SucursalSerieRow label="Nota de Débito (Boleta)" serie={sucursal.serieNotaDebitoBoleta} correlativo={sucursal.correlativoNotaDebitoBoleta}
+              onSerieChange={(v) => upd('serieNotaDebitoBoleta')(v)} onCorrelativoChange={(v) => upd('correlativoNotaDebitoBoleta')(v)}
+              prefix="B" hint="BD01" readOnly={readOnly} />
+            <SucursalSerieRow label="Guía de Remisión" serie={sucursal.serieGuiaRemision} correlativo={sucursal.correlativoGuiaRemision}
+              onSerieChange={(v) => upd('serieGuiaRemision')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaRemision')(v)}
+              prefix="T" hint="T001" readOnly={readOnly} />
+            <SucursalSerieRow label="Guía Transportista" serie={sucursal.serieGuiaTransportista} correlativo={sucursal.correlativoGuiaTransportista}
+              onSerieChange={(v) => upd('serieGuiaTransportista')(v)} onCorrelativoChange={(v) => upd('correlativoGuiaTransportista')(v)}
+              prefix="V" hint="V001" readOnly={readOnly} />
+          </div>
 
-      {/* Footer — solo visible si puede editar */}
-      {!readOnly && (
-        <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
-          <Button
-            type="button"
-            className="h-9 text-xs"
-            disabled={saving}
-            onClick={() => onSave(sucursal)}
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Hash className="w-3.5 h-3.5" />}
-            {saving ? 'Guardando...' : 'Guardar Series'}
-          </Button>
+          {/* Footer — solo visible si puede editar */}
+          {!readOnly && (
+            <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <Button
+                type="button"
+                className="h-9 text-xs"
+                disabled={saving}
+                onClick={() => onSave(sucursal)}
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Hash className="w-3.5 h-3.5" />}
+                {saving ? 'Guardando...' : 'Guardar Series'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -486,7 +498,7 @@ export default function ConfiguracionPage() {
         setLoadingEmpresa(false);
       })
       .finally(() => setLoadingEmpresa(false));
-  }, [user?.ruc, user]);
+  }, [user?.ruc, accessToken]);
 
   // ── GET sucursales ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -514,7 +526,7 @@ export default function ConfiguracionPage() {
         .catch(() => showToast('No se pudo cargar la sucursal', 'error'))
         .finally(() => setLoadingSucursales(false));
     }
-  }, [user?.ruc, user?.sucursalID, isSuperAdmin, user]);
+  }, [user?.ruc, user?.sucursalID, isSuperAdmin, accessToken]);
 
   // ── Subir logo ────────────────────────────────────────────────────────────
   const handleFileSelected = (file: File, previewDataUrl: string) => {
@@ -762,7 +774,7 @@ export default function ConfiguracionPage() {
           <>
             {isFacturador && <ReadOnlyBanner />}
             <div className="space-y-5">
-              {sucursales.map((sucursal) => (
+              {sucursales.map((sucursal, idx) => (
                 <SucursalCard
                   key={sucursal.sucursalId}
                   sucursal={sucursal}
@@ -770,6 +782,7 @@ export default function ConfiguracionPage() {
                   onSave={handleSaveSucursal}
                   saving={savingSucursalId === sucursal.sucursalId}
                   readOnly={!canEdit}
+                  defaultExpanded={idx === 0}
                 />
               ))}
             </div>
@@ -782,7 +795,7 @@ export default function ConfiguracionPage() {
         <div className="sticky bottom-6 flex justify-end z-20">
           <Button 
             type="submit" 
-            className="h-12 px-8 rounded-2xl shadow-xl shadow-blue-200/50 hover:shadow-2xl hover:shadow-blue-300/50 transition-all active:scale-[0.98]"
+            className="h-11 px-8 rounded-xl  hover:shadow-blue-500"
             disabled={saving || loadingEmpresa || uploadingLogo}
           >
             {saving ? (

@@ -55,6 +55,7 @@ import { Card } from "@/app/components/ui/Card";
 import { createPortal } from "react-dom";
 import { Button } from "@/app/components/ui/Button";
 import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
+import { ModalResumen } from "@/app/components/modalGenerarResumen/ModalResumen";
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = [
@@ -91,6 +92,9 @@ export default function VerComprobantesPage() {
   const hookUnico = useComprobanteUnico();
 
   const { sucursales, loadingSucursales } = useSucursalRuc(isSuperAdmin);
+
+  //Modal Resumen
+  const [showModalResumen, setShowModalResumen] = useState(false);
 
   // ── Estado local ──
   const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([]);
@@ -401,6 +405,29 @@ export default function VerComprobantesPage() {
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
       {/* Modales */}
+      {showModalResumen && (
+        <ModalResumen
+          comprobantes={comprobantes}
+          onClose={() => setShowModalResumen(false)}
+          onEmitido={(resumenId, estadoSunat) => {
+            // Actualizar estado de los comprobantes que fueron aceptados
+            if (estadoSunat === "ACEPTADO" || estadoSunat === "ACEPTADO_CON_OBSERVACIONES") {
+              setComprobantes((prev) =>
+                prev.map((c) => {
+                  const esBoleta = c.tipoComprobante === "03";
+                  const mismaFecha = c.fechaEmision?.startsWith(
+                    new Date().toISOString().split("T")[0]
+                  );
+                  if (esBoleta && mismaFecha && c.estadoSunat === "PENDIENTE") {
+                    return { ...c, estadoSunat: "ACEPTADO_MEDIANTE_RESUMEN", enviadoEnResumen: true };
+                  }
+                  return c;
+                })
+              );
+            }
+          }}
+        />
+      )}
       {detalle && (
         <ModalDetalle
           comprobante={
@@ -554,7 +581,14 @@ export default function VerComprobantesPage() {
             </div>
 
             {/* Div 2: Nuevo Comprobante */}
-            <div className="shrink-0">
+            {/* Div 2: Botones acción */}
+            <div className="shrink-0 flex items-center gap-2">
+              <Button
+                className="py-2.5 px-3 text-xs rounded-md h-auto bg-white border border-gray-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-sm"
+                onClick={() => setShowModalResumen(true)}
+              >
+                <FileText className="w-3.5 h-3.5" /> Generar Resumen
+              </Button>
               <Button className="py-2.5 px-3 text-xs rounded-md h-auto" onClick={() => router.push("/factunet/operaciones")}>
                 <Plus className="w-3.5 h-3.5" /> Nuevo Comprobante
               </Button>

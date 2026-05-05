@@ -27,13 +27,22 @@ const MOTIVOS_ND = [
   { code: "03", label: "Penalidades / otros conceptos" },
 ];
 
+// ── Helper: obtener fecha local ──────────────────────────────
+const obtenerFechaLocal = (offsetDias = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDias);
+  const offsetMinutos = d.getTimezoneOffset();
+  const fechaLocal = new Date(d.getTime() - offsetMinutos * 60000);
+  return fechaLocal.toISOString().slice(0, 10);
+};
+
 // ── Interface local para detalles editables ──────────────────
 interface DetalleEditable {
   productoId: number;
   codProducto: string | null;
   unidad: string;
   descripcion: string;
-  cantidad: number;
+  cantidad: number | string;
   mtoValorUnitario: number;
   mtoBaseIgv: number;
   porcentajeIgv: number;
@@ -44,26 +53,28 @@ interface DetalleEditable {
   totalVentaItem: number;
   icbper: number;
   factorIcbper: number;
-  _montoConIgv?: number;
+  _montoConIgv?: number | string;
   _precioVentaOriginal?: number; // precio unitario con IGV original (referencia motivo 02)
 }
 
 // ── Helper: recalcular desde monto CON IGV ───────────────────
-const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): DetalleEditable => {
+const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgvRaw: number | string): DetalleEditable => {
+  const montoConIgv = Number(montoConIgvRaw) || 0;
   const es10 = d.tipAfeIgv === 10;
   const pct = d.porcentajeIgv || 18;
   const round2 = (n: number) => Math.round(n * 100) / 100;
+  const numCant = Number(d.cantidad) || 0;
   
   const mtoValorUnitario = es10
     ? parseFloat((montoConIgv / (1 + pct / 100)).toFixed(6))
     : montoConIgv;
-  const mtoBaseIgv = round2(mtoValorUnitario * d.cantidad);
-  const igv = es10 ? round2(montoConIgv * d.cantidad - mtoBaseIgv) : 0;
-  const totalVentaItem = round2(montoConIgv * d.cantidad);
+  const mtoBaseIgv = round2(mtoValorUnitario * numCant);
+  const igv = es10 ? round2(montoConIgv * numCant - mtoBaseIgv) : 0;
+  const totalVentaItem = round2(montoConIgv * numCant);
 
   return {
     ...d,
-    _montoConIgv: montoConIgv,
+    _montoConIgv: montoConIgvRaw,
     mtoValorUnitario,
     mtoBaseIgv,
     igv,
@@ -76,7 +87,8 @@ const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): De
 // ── Helper: recalcular fila normal ───────────────────────────
 const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
   const es10 = d.tipAfeIgv === 10;
-  const baseIgv = parseFloat((d.mtoValorUnitario * d.cantidad).toFixed(2));
+  const numCant = Number(d.cantidad) || 0;
+  const baseIgv = parseFloat((d.mtoValorUnitario * numCant).toFixed(2));
   const igv = es10 ? parseFloat(((baseIgv * d.porcentajeIgv) / 100).toFixed(2)) : 0;
   const precioConIGV = es10
     ? parseFloat((d.mtoValorUnitario * (1 + d.porcentajeIgv / 100)).toFixed(2))
@@ -87,7 +99,7 @@ const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
     igv,
     mtoValorVenta: baseIgv,
     mtoPrecioUnitario: precioConIGV,
-    totalVentaItem: parseFloat((precioConIGV * d.cantidad).toFixed(2)),
+    totalVentaItem: parseFloat((precioConIGV * numCant).toFixed(2)),
   };
 };
 
@@ -297,8 +309,10 @@ export default function NotaDebitoPage() {
     const correlativo = searchParams.get('correlativo')
     if (!serie || !correlativo) return
 
-    if (serieInput === serie && correlativoInput === correlativo) {
-        buscarComprobante(serie, correlativo)
+    if (!loadingComprobante && !comprobante) {
+      setSerieInput(serie);
+      setCorrelativoInput(correlativo);
+      buscarComprobante(serie, correlativo);
     }
   }, [sucursal])
 
@@ -336,11 +350,11 @@ export default function NotaDebitoPage() {
   const actualizarDescripcion = (i: number, descripcion: string) =>
     setDetalles((prev) => { const n = [...prev]; n[i] = { ...n[i], descripcion }; return n; });
 
-  const actualizarMontoConIgv = (i: number, montoConIgv: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDesdeMontoConIgv(n[i], Math.max(0, montoConIgv)); return n; });
+  const actualizarMontoConIgv = (i: number, montoConIgv: number | string) =>
+    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDesdeMontoConIgv(n[i], montoConIgv); return n; });
 
-  const actualizarCantidad = (i: number, cantidad: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDetalle({ ...n[i], cantidad: Math.max(1, cantidad) }); return n; });
+  const actualizarCantidad = (i: number, cantidad: number | string) =>
+    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDetalle({ ...n[i], cantidad }); return n; });
 
   const eliminarDetalle = (i: number) => setDetalles((prev) => prev.filter((_, idx) => idx !== i));
   const agregarDetalle = () => setDetalles((prev) => [...prev, itemVacio("", detallesOriginales[0]?.porcentajeIgv ?? 18)]);
@@ -373,12 +387,13 @@ export default function NotaDebitoPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=${tamano}`,
         { headers: { Authorization: `Bearer ${accessToken}` }, responseType: "blob" },
       );
-      setPdfUrl(URL.createObjectURL(new Blob([res.data], { type: "application/pdf" })));
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
     } catch { showToast("Error al cargar el PDF", "error"); }
     finally { setCargandoPdf(false); }
   };
 
-  useEffect(() => { if (!comprobanteIdEmitido) return; cargarPdf(comprobanteIdEmitido, tamanoPdf); }, [tamanoPdf, comprobanteIdEmitido]);
+  useEffect(() => { if (!comprobanteIdEmitido) return; cargarPdf(comprobanteIdEmitido, tamanoPdf); }, [tamanoPdf]);
 
   const imprimirPdf = async () => {
     if (!comprobanteIdEmitido) return;
@@ -391,7 +406,7 @@ export default function NotaDebitoPage() {
       const iframe = document.createElement("iframe");
       iframe.style.display = "none"; iframe.src = url;
       document.body.appendChild(iframe);
-      iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 1000); };
+      iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000); };
     } catch { showToast("Error al imprimir", "error"); }
   };
 
@@ -451,7 +466,7 @@ export default function NotaDebitoPage() {
       mtoImpVenta: totales.mtoImpVenta,
       details: detalles.map((d) => ({
         productoId: d.productoId, codProducto: d.codProducto, unidad: d.unidad,
-        descripcion: d.descripcion, cantidad: d.cantidad,
+        descripcion: d.descripcion, cantidad: Number(d.cantidad) || 0,
         mtoValorUnitario: d.mtoValorUnitario, mtoValorVenta: d.mtoValorVenta,
         mtoBaseIgv: d.mtoBaseIgv, porcentajeIgv: d.porcentajeIgv, igv: d.igv,
         tipAfeIgv: d.tipAfeIgv, mtoPrecioUnitario: d.mtoPrecioUnitario,
@@ -476,7 +491,6 @@ export default function NotaDebitoPage() {
     if (sinMonto !== -1) { showToast(`El ítem ${sinMonto + 1} debe tener un monto mayor a 0`, "error"); return false; }
     if (totales.mtoImpVenta <= 0) { showToast("El monto total debe ser mayor a 0", "error"); return false; }
     if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return false; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return false; }
     return true;
   };
 
@@ -556,7 +570,7 @@ export default function NotaDebitoPage() {
                 const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
                 if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
                 const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+                const numeroFormateado = `51${telefonoCliente}`;
                 const resWsp = await fetch(`${whatsappBase}/api/send/single`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey }, body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-NotaDebito-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${comprobante?.cliente.razonSocial ?? ""}, adjuntamos su nota de débito electrónica ${serieNum}.` }) });
                 if (!resWsp.ok) throw new Error("Error WhatsApp");
                 showToast("Nota de débito enviada por WhatsApp", "success");
@@ -655,10 +669,14 @@ export default function NotaDebitoPage() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Header */}
-          <div className="flex items-center gap-4 mb-2">
-            <Button variant="ghost" onClick={() => router.push("/factunet/operaciones")} className="h-10 w-10 p-0 rounded-full">
-              <ChevronLeft className="w-6 h-6" />
-            </Button>
+          <div className="flex items-center gap-4">
+           <Button
+            variant="ghost"
+            onClick={() => router.push("/factunet/operaciones")}
+            className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Nueva Nota de Débito</h3>
               <p className="text-sm text-gray-500">Regresar a selección de comprobante</p>
@@ -680,7 +698,7 @@ export default function NotaDebitoPage() {
                         if (!e.target.value) { setSucursal(null); setCorrelativoNDFactura(null); setCorrelativoNDBoleta(null); setSerieInput(""); return; }
                         const sel = sucursales.find((s: Sucursal) => s.sucursalId === Number(e.target.value));
                         if (!sel) return;
-                        setSucursal(sel); setSerieInput("");
+                        setSucursal(sel); setSerieInput(""); setCorrelativoInput("");
                         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
                         setCorrelativoNDFactura(res.data.correlativoNotaDebitoFactura ?? null);
                         setCorrelativoNDBoleta(res.data.correlativoNotaDebitoBoleta ?? null);
@@ -753,7 +771,7 @@ export default function NotaDebitoPage() {
                         <button type="button" 
                           onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); 
                             if (vieneDesdeLista) {
-                                router.replace('/factunet/operaciones/nota-credito')
+                                router.replace('/factunet/operaciones/nota-debito')
                                 setVieneDesdeLista(false)
                             } }} title="Limpiar"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
@@ -838,23 +856,37 @@ export default function NotaDebitoPage() {
                       </div>
                     )}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="email" value={correoCliente} placeholder="Correo del cliente"
-                          onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="email" value={correoCliente} placeholder="Correo del cliente"
+                            onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
-                          onChange={(e) => { const s = e.target.value.replace(/\D/g, ""); setTelefonoCliente(s); if (!s) setEnviarWhatsapp(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
+                            onChange={(e) => { 
+                              const s = e.target.value.replace(/\D/g, ""); 
+                              setTelefonoCliente(s); 
+                              if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                            }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
+                        {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                        )}
+                        {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -886,7 +918,7 @@ export default function NotaDebitoPage() {
                     <div className="space-y-1 pt-1">
                       <label className="text-[10px] font-bold text-gray-400 uppercase">Descripción del motivo</label>
                       <input type="text" value={desMotivo} onChange={(e) => setDesMotivo(e.target.value)}
-                        placeholder="Descripción del motivo..."
+                        placeholder="Descripción del motivo..." maxLength={250}
                         className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                     </div>
                   )}
@@ -904,8 +936,8 @@ export default function NotaDebitoPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Emisión</label>
                   <input type="date" value={fechaEmision}
-                    max={new Date().toISOString().slice(0, 10)}
-                    min={(() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().slice(0, 10); })()}
+                    max={obtenerFechaLocal()}
+                    min={obtenerFechaLocal(-2)}
                     onChange={(e) => setFechaEmision(e.target.value)}
                     className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                 </div>
@@ -982,12 +1014,12 @@ export default function NotaDebitoPage() {
                               <td className="px-2 py-1.5">
                                 {codMotivo === "03" && !incluyePenalidad ? (
                                   <div className="flex items-center gap-1">
-                                    <button type="button" onClick={() => actualizarCantidad(i, d.cantidad - 1)}
+                                    <button type="button" onClick={() => actualizarCantidad(i, Math.max(1, (Number(d.cantidad) || 0) - 1))}
                                       className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">−</button>
                                     <input type="number" min={1} step="1" value={d.cantidad}
-                                      onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
+                                      onChange={(e) => actualizarCantidad(i, e.target.value === "" ? "" : Number(e.target.value))}
                                       className="w-12 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
-                                    <button type="button" onClick={() => actualizarCantidad(i, d.cantidad + 1)}
+                                    <button type="button" onClick={() => actualizarCantidad(i, (Number(d.cantidad) || 0) + 1)}
                                       className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">+</button>
                                   </div>
                                 ) : (
@@ -998,8 +1030,8 @@ export default function NotaDebitoPage() {
                               {/* Monto con IGV + precio original debajo (motivo 02) */}
                               <td className="px-2 py-1.5">
                                 <div className="space-y-0.5">
-                                  <input type="number" min={0} step="0.01" value={d._montoConIgv ?? 0}
-                                    onChange={(e) => actualizarMontoConIgv(i, Number(e.target.value))}
+                                  <input type="number" min={0} step="0.01" value={d._montoConIgv ?? ""}
+                                    onChange={(e) => actualizarMontoConIgv(i, e.target.value === "" ? "" : Number(e.target.value))}
                                     disabled={codMotivo === "01" && comprobante?.tipoPago === "Contado"}
                                     className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono disabled:opacity-50 disabled:cursor-not-allowed" />
                                   {/* Precio venta original — solo motivo 02 */}

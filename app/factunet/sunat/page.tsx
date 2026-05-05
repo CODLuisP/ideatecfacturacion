@@ -330,7 +330,7 @@ export default function SunatPage() {
   const { showToast } = useToast();
   const { user, setEnvironment, accessToken } = useAuth();
 
-  console.log("User data in SUNAT page:", user);
+
 
   // ── Permisos ──────────────────────────────────────────────────────────────
   const canEditCredentials =
@@ -692,17 +692,28 @@ export default function SunatPage() {
             </div>
           </CollapsibleSection>
 
-          {/* ── Botón guardar ── */}
-          <div className="flex justify-end gap-3 py-4">
-            <Button type="submit" disabled={savingConfig || loadingCompany}>
-              {savingConfig ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ShieldCheck className="w-4 h-4" />
-              )}
-              {savingConfig ? "Guardando..." : "Guardar Configuración"}
-            </Button>
-          </div>
+      {/* Botón guardar GLOBAL — más prominente y consistente con Empresa */}
+      {canEditCredentials && !loadingCompany && (
+        <div className="sticky bottom-6 flex justify-end z-20">
+          <Button
+            type="submit"
+            className="h-11 px-8 rounded-xl  hover:shadow-blue-500"
+            disabled={savingConfig || loadingCompany}
+          >
+            {savingConfig ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Guardando cambios...
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-5 h-5 mr-2" />
+                Guardar Configuración SUNAT
+              </>
+            )}
+          </Button>
+        </div>
+      )}
         </form>
       </div>
     </>

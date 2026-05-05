@@ -43,7 +43,7 @@ interface DetalleEditable {
   codProducto: string | null;
   unidad: string;
   descripcion: string;
-  cantidad: number;
+  cantidad: number | string;
   mtoValorUnitario: number;   // precio sin IGV
   mtoBaseIgv: number;
   porcentajeIgv: number;
@@ -56,7 +56,7 @@ interface DetalleEditable {
   factorIcbper: number;
   _sucursalProductoId?: number | null;
   // Para motivos 04/05/09: monto ingresado CON igv por el usuario
-  _montoConIgv?: number;
+  _montoConIgv?: number | string;
   // Precio venta original del comprobante (máximo a descontar/disminuir)
   _precioVentaOriginal?: number;
 }
@@ -84,17 +84,19 @@ const mapearDetalle = (d: ComprobanteObtenido["details"][0]): DetalleEditable =>
 });
 
 // ── Helper: recalcular fila para motivos 04/05/09 desde monto CON igv ──
-const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): DetalleEditable => {
+const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number | string): DetalleEditable => {
+  const cant = Number(d.cantidad) || 0;
+  const montoNum = Number(montoConIgv) || 0;
   const es10 = d.tipAfeIgv === 10;
   const pct = d.porcentajeIgv || 18;
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
   const mtoValorUnitario = es10
-    ? parseFloat((montoConIgv / (1 + pct / 100)).toFixed(6))
-    : montoConIgv;
-  const mtoBaseIgv = round2(mtoValorUnitario * d.cantidad);
-  const igv = es10 ? round2(montoConIgv * d.cantidad - mtoBaseIgv) : 0;
-  const totalVentaItem = round2(montoConIgv * d.cantidad);
+    ? parseFloat((montoNum / (1 + pct / 100)).toFixed(6))
+    : montoNum;
+  const mtoBaseIgv = round2(mtoValorUnitario * cant);
+  const igv = es10 ? round2(montoNum * cant - mtoBaseIgv) : 0;
+  const totalVentaItem = round2(montoNum * cant);
 
   return {
     ...d,
@@ -110,13 +112,14 @@ const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): De
 
 // ── Helper: recalcular fila normal ───────────────────────────
 const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
+  const cant = Number(d.cantidad) || 0;
   const es15 = d.tipAfeIgv === 15;
   if (es15) {
-    const baseIgv = parseFloat((d.mtoPrecioUnitario / (1 + (d.porcentajeIgv || 18) / 100) * d.cantidad).toFixed(2));
+    const baseIgv = parseFloat((d.mtoPrecioUnitario / (1 + (d.porcentajeIgv || 18) / 100) * cant).toFixed(2));
     return { ...d, mtoValorUnitario: 0, mtoValorVenta: 0, mtoBaseIgv: baseIgv, igv: 0, totalVentaItem: 0 };
   }
   const es10 = d.tipAfeIgv === 10;
-  const baseIgv = parseFloat((d.mtoValorUnitario * d.cantidad).toFixed(2));
+  const baseIgv = parseFloat((d.mtoValorUnitario * cant).toFixed(2));
   const igv = es10 ? parseFloat(((baseIgv * d.porcentajeIgv) / 100).toFixed(2)) : 0;
   const precioConIGV = es10
     ? parseFloat((d.mtoValorUnitario * (1 + d.porcentajeIgv / 100)).toFixed(2))
@@ -127,7 +130,7 @@ const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
     igv,
     mtoValorVenta: baseIgv,
     mtoPrecioUnitario: precioConIGV,
-    totalVentaItem: parseFloat((precioConIGV * d.cantidad).toFixed(2)),
+    totalVentaItem: parseFloat((precioConIGV * cant).toFixed(2)),
   };
 };
 
@@ -185,6 +188,13 @@ const construirDetallesPorMotivo = (
   }
 };
 
+const obtenerFechaLocal = (offsetDias = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDias);
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
+};
+
 export default function NotaCreditoPage() {
   const { showToast } = useToast();
   const router = useRouter();
@@ -212,7 +222,7 @@ export default function NotaCreditoPage() {
   const [errorEmision, setErrorEmision] = useState<string | null>(null);
   const [codMotivo, setCodMotivo] = useState("");
   const [desMotivo, setDesMotivo] = useState("");
-  const [fechaEmision, setFechaEmision] = useState(fechaHora.slice(0, 10));
+  const [fechaEmision, setFechaEmision] = useState(obtenerFechaLocal(0));
   const [detalles, setDetalles] = useState<DetalleEditable[]>([]);
   const [detallesOriginales, setDetallesOriginales] = useState<DetalleEditable[]>([]);
   const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
@@ -292,9 +302,10 @@ export default function NotaCreditoPage() {
     const correlativo = searchParams.get('correlativo')
     if (!serie || !correlativo) return
 
-    // Solo buscar si los inputs ya fueron pre-rellenados
-    if (serieInput === serie && correlativoInput === correlativo) {
-        buscarComprobante(serie, correlativo)
+    if (!comprobante && !loadingComprobante) {
+        setSerieInput(serie);
+        setCorrelativoInput(correlativo);
+        buscarComprobante(serie, correlativo);
     }
   }, [sucursal]) // cuando la sucursal se setee, buscar
 
@@ -371,12 +382,22 @@ export default function NotaCreditoPage() {
     setDetalles((prev) => { const n = [...prev]; n[i] = { ...n[i], descripcion }; return n; });
 
   // ── Actualizar cantidad ───────────────────────────────────────
-  const actualizarCantidad = (i: number, cantidad: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDetalle({ ...n[i], cantidad: Math.max(0, cantidad) }); return n; });
+  const actualizarCantidad = (i: number, cantidad: number | string) =>
+    setDetalles((prev) => { 
+      const n = [...prev]; 
+      const originalCantidad = detallesOriginales[i]?.cantidad ? Number(detallesOriginales[i].cantidad) : Infinity;
+      let val: number | string = cantidad === "" ? "" : Math.min(Math.max(0, Number(cantidad)), originalCantidad);
+      n[i] = recalcularDetalle({ ...n[i], cantidad: val }); 
+      return n; 
+    });
 
   // ── Actualizar monto CON IGV (04/05/09) ──────────────────────
-  const actualizarMontoConIgv = (i: number, montoConIgv: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDesdeMontoConIgv(n[i], Math.max(0, montoConIgv)); return n; });
+  const actualizarMontoConIgv = (i: number, montoConIgv: number | string) =>
+    setDetalles((prev) => { 
+      const n = [...prev]; 
+      n[i] = recalcularDesdeMontoConIgv(n[i], montoConIgv === "" ? "" : Math.max(0, Number(montoConIgv))); 
+      return n; 
+    });
 
   // ── Actualizar precio libre sin IGV (motivo 10) ───────────────
   const actualizarPrecioLibre = (i: number, precio: number) =>
@@ -403,7 +424,10 @@ export default function NotaCreditoPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=${tamano}`,
         { headers: { Authorization: `Bearer ${accessToken}` }, responseType: "blob" },
       );
-      setPdfUrl(URL.createObjectURL(new Blob([res.data], { type: "application/pdf" })));
+      setPdfUrl(prev => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      });
     } catch { showToast("Error al cargar el PDF", "error"); }
     finally { setCargandoPdf(false); }
   };
@@ -421,7 +445,10 @@ export default function NotaCreditoPage() {
       const iframe = document.createElement("iframe");
       iframe.style.display = "none"; iframe.src = url;
       document.body.appendChild(iframe);
-      iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 1000); };
+      iframe.onload = () => { 
+        iframe.contentWindow?.print(); 
+        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000); 
+      };
     } catch { showToast("Error al imprimir", "error"); }
   };
 
@@ -481,7 +508,7 @@ export default function NotaCreditoPage() {
       mtoImpVenta: totales.mtoImpVenta,
       details: detalles.map((d) => ({
         productoId: d.productoId, codProducto: d.codProducto, unidad: d.unidad,
-        descripcion: d.descripcion, cantidad: d.cantidad,
+        descripcion: d.descripcion, cantidad: Number(d.cantidad) || 0,
         mtoValorUnitario: d.mtoValorUnitario, mtoValorVenta: d.mtoValorVenta,
         mtoBaseIgv: d.mtoBaseIgv, porcentajeIgv: d.porcentajeIgv, igv: d.igv,
         tipAfeIgv: d.tipAfeIgv, mtoPrecioUnitario: d.mtoPrecioUnitario,
@@ -515,9 +542,10 @@ export default function NotaCreditoPage() {
     if (codMotivo === "05") {
       for (let i = 0; i < detalles.length; i++) {
         const d = detalles[i];
-        const montoIngresado = d._montoConIgv ?? 0;
-        const totalConCantidad = parseFloat((montoIngresado * d.cantidad).toFixed(2));
-        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * d.cantidad).toFixed(2)) : null;
+        const montoIngresado = Number(d._montoConIgv) || 0;
+        const cant = Number(d.cantidad) || 0;
+        const totalConCantidad = parseFloat((montoIngresado * cant).toFixed(2));
+        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * cant).toFixed(2)) : null;
         if (montoIngresado <= 0) {
           showToast(`El descuento del ítem ${i + 1} debe ser mayor a 0`, "error");
           return false;
@@ -539,9 +567,10 @@ export default function NotaCreditoPage() {
     if (codMotivo === "09") {
       for (let i = 0; i < detalles.length; i++) {
         const d = detalles[i];
-        const montoIngresado = d._montoConIgv ?? 0;
-        const totalConCantidad = parseFloat((montoIngresado * d.cantidad).toFixed(2));
-        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * d.cantidad).toFixed(2)) : null;
+        const montoIngresado = Number(d._montoConIgv) || 0;
+        const cant = Number(d.cantidad) || 0;
+        const totalConCantidad = parseFloat((montoIngresado * cant).toFixed(2));
+        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * cant).toFixed(2)) : null;
         if (montoIngresado <= 0) {
           showToast(`La disminución del ítem ${i + 1} debe ser mayor a 0`, "error");
           return false;
@@ -554,8 +583,7 @@ export default function NotaCreditoPage() {
     }
 
     if (codMotivo !== "08" && totales.mtoImpVenta <= 0) { showToast("El monto total debe ser mayor a 0", "error"); return false; }
-    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return false; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return false; }
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return false; }
     return true;
   };
 
@@ -574,7 +602,7 @@ const actualizarStockDevolucion = async () => {
       items.map((d) => ({
         productoId: d.productoId,
         sucursalId: sucursalId,
-        cantidad: d.cantidad,
+        cantidad: Number(d.cantidad) || 0,
       })),
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
@@ -693,7 +721,7 @@ const actualizarStockDevolucion = async () => {
             formData.append("tipo", "7");
             formData.append("comprobanteJson", JSON.stringify({
               serieNumero: serieNum, estadoSunat: "ACEPTADO",
-              items: detalles.map(d => ({ descripcion: d.descripcion, cantidad: d.cantidad, precioUnitario: d.mtoPrecioUnitario })),
+              items: detalles.map(d => ({ descripcion: d.descripcion, cantidad: Number(d.cantidad) || 0, precioUnitario: d.mtoPrecioUnitario })),
               igv: totales.mtoIGV, total: totales.mtoImpVenta,
             }));
             formData.append("adjunto", pdfFile);
@@ -823,6 +851,7 @@ const actualizarStockDevolucion = async () => {
                         if (!sel) return;
                         setSucursal(sel);
                         setSerieInput(""); // resetear serie al cambiar sucursal
+                        setCorrelativoInput(""); // Limpiar correlativo para evitar mezcla de información
                         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
                         setCorrelativoNCFactura(res.data.correlativoNotaCreditoFactura ?? null);
                         setCorrelativoNCBoleta(res.data.correlativoNotaCreditoBoleta ?? null);
@@ -896,11 +925,12 @@ const actualizarStockDevolucion = async () => {
                       {(correlativoInput || comprobante) && (
                         <button type="button" 
                           onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); if (vieneDesdeLista) {
-                            router.replace('/factunet/operaciones/nota-debito')} setVieneDesdeLista(false)
+                            router.replace('/factunet/operaciones/nota-credito')} setVieneDesdeLista(false)
                           }} 
                           title="Limpiar búsqueda"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
                           <X className="w-3.5 h-3.5" />
+                          
                         </button>
                       )}
                     </div>
@@ -964,23 +994,37 @@ const actualizarStockDevolucion = async () => {
                       </div>
                     )}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="email" value={correoCliente} placeholder="Correo del cliente"
-                          onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="email" value={correoCliente} placeholder="Correo del cliente"
+                            onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
-                          onChange={(e) => { const s = e.target.value.replace(/\D/g, ""); setTelefonoCliente(s); if (!s) setEnviarWhatsapp(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
+                            onChange={(e) => { 
+                              const s = e.target.value.replace(/\D/g, ""); 
+                              setTelefonoCliente(s); 
+                              if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                            }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
+                        {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                        )}
+                        {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1011,7 +1055,7 @@ const actualizarStockDevolucion = async () => {
                     <div className="space-y-1 pt-1">
                       <label className="text-[10px] font-bold text-gray-400 uppercase">Descripción del motivo</label>
                       <input type="text" value={desMotivo} onChange={(e) => setDesMotivo(e.target.value)}
-                        placeholder="Descripción del motivo..."
+                        maxLength={250} placeholder="Descripción del motivo..."
                         className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                     </div>
                   )}
@@ -1020,8 +1064,8 @@ const actualizarStockDevolucion = async () => {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Emisión</label>
                   <input type="date" value={fechaEmision}
-                    max={new Date().toISOString().slice(0, 10)}
-                    min={(() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().slice(0, 10); })()}
+                    max={obtenerFechaLocal(0)}
+                    min={obtenerFechaLocal(-2)}
                     onChange={(e) => setFechaEmision(e.target.value)}
                     className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                 </div>
@@ -1080,7 +1124,8 @@ const actualizarStockDevolucion = async () => {
                         ) : (
                           detalles.map((d, i) => {
                             const maxDesc = d._precioVentaOriginal;
-                            const excede = maxDesc && d.totalVentaItem > (maxDesc * d.cantidad) && (codMotivo === "05" || codMotivo === "09");
+                            const cant = Number(d.cantidad) || 0;
+                            const excede = maxDesc && d.totalVentaItem > (maxDesc * cant) && (codMotivo === "05" || codMotivo === "09");
                             return (
                               <tr key={i} className={`hover:bg-gray-50/50 ${d.tipAfeIgv === 15 ? "bg-green-50/30" : ""} ${excede ? "bg-red-50/30" : ""}`}>
                                 <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
@@ -1101,14 +1146,19 @@ const actualizarStockDevolucion = async () => {
                                 {/* Cantidad */}
                                 <td className="px-2 py-1.5">
                                   {puedeEditarCantidad ? (
-                                    <div className="flex items-center gap-1">
-                                      <button type="button" onClick={() => actualizarCantidad(i, d.cantidad - 1)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">−</button>
-                                      <input type="number" min={0} step="0.01" value={d.cantidad}
-                                        onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
-                                        className="w-14 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
-                                      <button type="button" onClick={() => actualizarCantidad(i, d.cantidad + 1)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">+</button>
+                                    <div className="flex flex-col items-center gap-1">
+                                      <div className="flex items-center gap-1">
+                                        <button type="button" onClick={() => actualizarCantidad(i, (Number(d.cantidad)||0) - 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">−</button>
+                                        <input type="number" min={0} max={detallesOriginales[i]?.cantidad ? Number(detallesOriginales[i].cantidad) : undefined} step="0.01" value={d.cantidad}
+                                          onChange={(e) => actualizarCantidad(i, e.target.value)}
+                                          className="w-14 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
+                                        <button type="button" onClick={() => actualizarCantidad(i, (Number(d.cantidad)||0) + 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">+</button>
+                                      </div>
+                                      {detallesOriginales[i]?.cantidad && (
+                                        <span className="text-[9px] text-gray-400">Máx: {detallesOriginales[i].cantidad}</span>
+                                      )}
                                     </div>
                                   ) : (
                                     <span className="text-xs text-gray-700 text-center block">{d.cantidad}</span>
@@ -1125,8 +1175,8 @@ const actualizarStockDevolucion = async () => {
                                   ) : puedeIngresarMontoConIgv ? (
                                     // Motivos 04/05/09: monto CON igv
                                     <div className="space-y-0.5">
-                                      <input type="number" min={0} step="0.01" value={d._montoConIgv ?? 0}
-                                        onChange={(e) => actualizarMontoConIgv(i, Number(e.target.value))}
+                                      <input type="number" min={0} step="0.01" value={d._montoConIgv ?? ""}
+                                        onChange={(e) => actualizarMontoConIgv(i, e.target.value)}
                                         className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${excede ? "border-red-400 bg-red-50" : "border-gray-200 bg-gray-50"}`} />
                                       {/* Máximo permitido debajo del input */}
                                       {maxDesc !== undefined && (

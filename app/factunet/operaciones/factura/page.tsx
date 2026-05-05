@@ -1584,6 +1584,7 @@ export default function FacturaPage() {
 
   // ── Preparar y emitir ────────────────────────────────────────
   const prepararFactura = () => {
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return; }
     const esCredito = factura.tipoPago === 'Credito' || factura.tipoPago === 'CreditoInicial';
     const esCreditoInicial = factura.tipoPago === 'CreditoInicial';
 
@@ -2193,33 +2194,41 @@ export default function FacturaPage() {
                         <span className="text-xs text-gray-500">Enviar</span>
                       </label>
                     </div>
-                    <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
-                      ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
-                    >
-                      <input
-                        type="tel"
-                        value={telefonoCliente}
-                        onChange={(e) => {
-                          const soloNum = e.target.value.replace(/\D/g, "");
-                          setTelefonoCliente(soloNum);
-                          if (!soloNum) setEnviarWhatsapp(false);
-                        }}
-                        disabled={!factura.cliente?.razonSocial}
-                        maxLength={9}
-                        placeholder="Teléfono / WhatsApp"
-                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
-                      />
-                      <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                    <div className="space-y-1">
+                      <div
+                        className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
+                        ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                      >
                         <input
-                          type="checkbox"
-                          checked={enviarWhatsapp}
-                          onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                          disabled={!telefonoCliente}
-                          className="w-3.5 h-3.5 accent-brand-blue"
+                          type="tel"
+                          value={telefonoCliente}
+                          onChange={(e) => {
+                            const soloNum = e.target.value.replace(/\D/g, "");
+                            setTelefonoCliente(soloNum);
+                            if (!soloNum || soloNum.length < 9 || !soloNum.startsWith("9")) setEnviarWhatsapp(false);
+                          }}
+                          disabled={!factura.cliente?.razonSocial}
+                          maxLength={9}
+                          placeholder="Teléfono / WhatsApp"
+                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
                         />
-                        <span className="text-xs text-gray-500">Enviar</span>
-                      </label>
+                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={enviarWhatsapp}
+                            onChange={(e) => setEnviarWhatsapp(e.target.checked)}
+                            disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")}
+                            className="w-3.5 h-3.5 accent-brand-blue"
+                          />
+                          <span className="text-xs text-gray-500">Enviar</span>
+                        </label>
+                      </div>
+                      {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                      )}
+                      {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                      )}
                     </div>
                   </div>
 
@@ -3312,13 +3321,13 @@ export default function FacturaPage() {
                                   className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
                                     ${esGratuito ? "bg-green-50 border-green-200 text-green-700" : "bg-gray-50 border-gray-200"}`}
                                 >
-                                  <option value="10">10 - Gravado</option>
-                                  <option value="20">20 - Exonerado</option>
-                                  <option value="30">30 - Inafecto</option>
+                                  <option value="10">Grav.</option>
+                                  <option value="20">Exon.</option>
+                                  <option value="30">Inaf.</option>
                                   <option value="11">
                                     11 - Grav. Gratuito
                                   </option>
-                                  <option value="21">21 - Exo. Gratuito</option>
+                                  <option value="21">21 - Exon. Gratuito</option>
                                   <option value="31">
                                     31 - Inaf. Gratuito
                                   </option>
@@ -3361,8 +3370,8 @@ export default function FacturaPage() {
                                     }
                                     className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
                                   >
-                                    <option value={18}>18%</option>
-                                    <option value={10.5}>10.5%</option>
+                                    <option value={18}>18</option>
+                                    <option value={10.5}>10.5</option>
                                   </select>
                                 ) : (
                                   <span className="block text-center text-gray-400 text-xs">
@@ -3371,24 +3380,27 @@ export default function FacturaPage() {
                                 )}
                               </td>
 
-                              {/* Tipo descuento */}
+                              {/* T.Desc */}
                               <td className="px-2 py-1.5">
-                                <select
-                                  value={d.codigoTipoDescuento ?? "00"}
-                                  onChange={(e) =>
-                                    actualizarCodigoDescuento(i, e.target.value)
-                                  }
-                                  disabled={
-                                    esGratuito || !!d._esIcbper || esPorConsumo
-                                  }
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
-                                    ${esGratuito || d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
-                                >
-                                  <option value="00">00 - Afecta base</option>
-                                  <option value="01">
-                                    01 - No afecta base
-                                  </option>
-                                </select>
+                                <div className="relative w-full">
+                                  <select
+                                    value={d.codigoTipoDescuento ?? "01"}
+                                    onChange={e => actualizarCodigoDescuento(i, e.target.value)}
+                                    disabled={!!d._esIcbper || esPorConsumo}
+                                    style={{ color: "transparent" }}
+                                    className={`w-full py-1 pl-1 pr-4 border rounded-lg text-xs outline-none focus:border-brand-blue appearance-none ${
+                                      d._esIcbper || esPorConsumo
+                                        ? "bg-gray-100 border-gray-100 cursor-not-allowed"
+                                        : "bg-gray-50 border-gray-200"
+                                    }`}
+                                  >
+                                    <option style={{ color: "#374151" }} value="00">00 - Afecta base</option>
+                                    <option style={{ color: "#374151" }} value="01">01 - No afecta base</option>
+                                  </select>
+                                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-mono text-gray-700">
+                                    {d.codigoTipoDescuento ?? "01"}
+                                  </span>
+                                </div>
                               </td>
 
                               {/* Descuento unitario */}
