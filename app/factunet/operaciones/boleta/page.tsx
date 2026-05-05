@@ -2323,9 +2323,9 @@ export default function BoletaPage() {
                               <td className="px-2 py-1.5">
                                 <select value={d.tipoAfectacionIGV ?? "10"} disabled={!!d._esIcbper || esPorConsumo} onChange={e => actualizarTipoAfectacion(i, e.target.value)}
                                   className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
-                                  <option value="10">10 - Gravado</option>
-                                  <option value="20">20 - Exonerado</option>
-                                  <option value="30">30 - Inafecto</option>
+                                  <option value="10">Grav.</option>
+                                  <option value="20">Exon.</option>
+                                  <option value="30">Inaf.</option>
                                 </select>
                               </td>
 
@@ -2341,8 +2341,8 @@ export default function BoletaPage() {
                                 {d.tipoAfectacionIGV === "10" ? (
                                   <select value={d.porcentajeIGV ?? IGV_DEFAULT} disabled={!!d._esIcbper} onChange={e => actualizarPorcentajeIGV(i, Number(e.target.value))}
                                     className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
-                                    <option value={18}>18%</option>
-                                    <option value={10.5}>10.5%</option>
+                                    <option value={18}>18</option>
+                                    <option value={10.5}>10.5</option>
                                   </select>
                                 ) : (
                                   <span className="block text-center text-gray-400 text-xs">N/A</span>
@@ -2351,11 +2351,25 @@ export default function BoletaPage() {
 
                               {/* T.Desc */}
                               <td className="px-2 py-1.5">
-                                <select value={d.codigoTipoDescuento ?? "01"} onChange={e => actualizarCodigoDescuento(i, e.target.value)} disabled={!!d._esIcbper || esPorConsumo}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}>
-                                  <option value="01">01 - No afecta base</option>
-                                  <option value="00">00 - Afecta base</option>
-                                </select>
+                                <div className="relative w-full">
+                                  <select
+                                    value={d.codigoTipoDescuento ?? "01"}
+                                    onChange={e => actualizarCodigoDescuento(i, e.target.value)}
+                                    disabled={!!d._esIcbper || esPorConsumo}
+                                    style={{ color: "transparent" }}
+                                    className={`w-full py-1 pl-1 pr-4 border rounded-lg text-xs outline-none focus:border-brand-blue appearance-none ${
+                                      d._esIcbper || esPorConsumo
+                                        ? "bg-gray-100 border-gray-100 cursor-not-allowed"
+                                        : "bg-gray-50 border-gray-200"
+                                    }`}
+                                  >
+                                    <option style={{ color: "#374151" }} value="00">00 - Afecta base</option>
+                                    <option style={{ color: "#374151" }} value="01">01 - No afecta base</option>
+                                  </select>
+                                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-mono text-gray-700">
+                                    {d.codigoTipoDescuento ?? "01"}
+                                  </span>
+                                </div>
                               </td>
 
                               {/* Desc.Unit */}

@@ -82,7 +82,8 @@ export default function ReportesPage() {
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null)
   const { sucursales, loadingSucursales } = useSucursalRuc(isSuperAdmin)
 
-  const { reportes, loading, loadingExport, fetchReportes, fetchExport } = isSuperAdmin && !sucursalSeleccionada ? hookEmpresa : hookSucursal;
+  const activeHook = isSuperAdmin && !sucursalSeleccionada ? hookEmpresa : hookSucursal
+  const { reportes, loading, loadingExport, fetchExport } = activeHook
 
   const [periodo, setPeriodo]           = useState<DateRange>('hoy');
   const [showCustom, setShowCustom]     = useState(false);
@@ -103,58 +104,71 @@ export default function ReportesPage() {
   }, [user, puedeVerUsuarios]);
 
   // ── Fetch al cambiar período / usuario ──────────────────────────────────────
-  const doFetch = (p: DateRange, uId: number | null = usuarioId, sId: number | null = sucursalSeleccionada) => {
+  const doFetch = (
+    p: DateRange,
+    uId: number | null = usuarioId,
+    sId: number | null = sucursalSeleccionada,
+    desde?: string,
+    hasta?: string
+  ) => {
     if (!user) return
+
     const params = {
       periodo: p as Periodo,
       limite: 10,
       usuarioId: uId ?? undefined,
+      desde: desde || undefined,
+      hasta: hasta || undefined,
     }
+
     if (isSuperAdmin && sId) {
-      // superadmin con sucursal seleccionada → reporte por sucursal
-      ;(hookSucursal.fetchReportes as Function)({ ...params, sucursalId: sId })
+      hookSucursal.fetchReportes({ ...params, sucursalId: sId })
     } else if (isSuperAdmin) {
-      // superadmin sin sucursal → reporte global por RUC
-      ;(hookEmpresa.fetchReportes as Function)({ ...params, ruc: user.ruc })
+      hookEmpresa.fetchReportes({ ...params, ruc: user.ruc })
     } else {
-      // admin/usuario → su sucursal
-      ;(hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) })
+      hookSucursal.fetchReportes({ ...params, sucursalId: Number(user.sucursalID) })
     }
   }
 
 
   const handlePeriodo = (p: DateRange) => {
-    setPeriodo(p);
-    setShowCustom(false);
-    doFetch(p);
-  };
+    setPeriodo(p)
+    setShowCustom(false)
+    setCustomStart('')
+    setCustomEnd('')
+    doFetch(p)
+  }
 
   const handleUsuario = (id: number | null) => {
-    setUsuarioId(id);
-    doFetch(periodo, id);
-  };
+    setUsuarioId(id)
+    if (periodo === 'personalizado' && customStart) {
+      const desde = customStart
+      const hasta = customEnd || customStart  // fallback a la misma fecha
+      doFetch(periodo, id, sucursalSeleccionada, desde, hasta)
+    } else {
+      doFetch(periodo, id)
+    }
+  }
 
   const handlePersonalizar = () => {
-    if (!customStart || !customEnd) return;
-    if (!user) return;
-    const params = {
-      periodo: 'personalizado' as Periodo,
-      desde: customStart,
-      hasta: customEnd,
-      limite: 10,
-      usuarioId: usuarioId ?? undefined,
-    };
-    if (isSuperAdmin) {
-      (hookEmpresa.fetchReportes as Function)({ ...params, ruc: user.ruc });
-    } else {
-      (hookSucursal.fetchReportes as Function)({ ...params, sucursalId: Number(user.sucursalID) });
-    }
-  };
+    if (!customStart) return  // solo requiere la fecha inicio
+    const desde = customStart
+    const hasta = customEnd || customStart  // si no hay hasta, usa la misma
+    setPeriodo('personalizado')
+    setShowCustom(true)
+    doFetch('personalizado', usuarioId, sucursalSeleccionada, desde, hasta)
+  }
 
   // 4. Handler para cambio de sucursal:
   const handleSucursal = (id: number | null) => {
     setSucursalSeleccionada(id)
-    doFetch(periodo, usuarioId, id)
+    if (periodo === 'personalizado' && customStart) {
+      const desde = customStart
+      const hasta = customEnd || customStart  // fallback a la misma fecha
+      doFetch(periodo, usuarioId, id, desde, hasta)
+    } else {
+      doFetch(periodo, usuarioId, id)
+    }
   }
 
   // ── Datos gráfico con paginación (solo mes y personalizado) ────────────────
@@ -330,7 +344,7 @@ export default function ReportesPage() {
               />
               <button
                 onClick={handlePersonalizar}
-                disabled={loading || !customStart || !customEnd}  // ← deshabilitar si faltan fechas
+                disabled={loading || !customStart}  // ← deshabilitar si faltan fechas
                 className="text-xs font-bold px-3 py-1.5 bg-brand-blue text-white rounded-lg hover:opacity-90 disabled:opacity-50"
               >
                 {loading ? 'Cargando...' : 'Aplicar'}
