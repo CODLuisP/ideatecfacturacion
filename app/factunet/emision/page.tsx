@@ -1295,9 +1295,8 @@ const imprimirPdf = () => {
                               <select value={item.porcentajeIGV}
                                 onChange={e => actualizarCampo(i, 'porcentajeIGV', Number(e.target.value))}
                                 className="w-full py-1.5 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
-                                <option value={18}>18%</option>
-                                <option value={10.5}>10.5%</option>
-                                <option value={0}>0%</option>
+                                <option value={18}>18</option>
+                                <option value={10.5}>10.5</option>
                               </select>
                             )}
                           </td>
