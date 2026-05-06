@@ -41,10 +41,21 @@ export const Topbar = ({
   const { user } = useAuth();
 
   const isSuperAdmin = user?.rol === "superadmin";
-  const { pendingDocs, lastAccepted, lastRejected, totalPending, connected } = useNotifications({
-  sucursalId: isSuperAdmin ? null : (user?.sucursalID ? Number(user.sucursalID) : null),
-  empresaRuc: isSuperAdmin ? user?.ruc : null,
-});
+  const {
+    pendingDocs,
+    lastAccepted,
+    lastRejected,
+    totalPending,
+    connected,
+    certInfo,
+  } = useNotifications({
+    sucursalId: isSuperAdmin
+      ? null
+      : user?.sucursalID
+        ? Number(user.sucursalID)
+        : null,
+    empresaRuc: isSuperAdmin ? user?.ruc : null,
+  });
 
   const isBeta = user?.environment === "beta";
 
@@ -63,7 +74,10 @@ export const Topbar = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const unreadCount = totalPending + (lastRejected ? 1 : 0);
+  const unreadCount =
+    totalPending +
+    (lastRejected ? 1 : 0) +
+    (certInfo?.isExpiringSoon || certInfo?.isExpired ? 1 : 0);
 
   return (
     <>
@@ -267,19 +281,47 @@ export const Topbar = ({
                     </li>
                   )}
 
-                  {/* Sin notificaciones */}
-                  {totalPending === 0 && !lastAccepted && !lastRejected && (
-                    <li className="px-4 py-6 text-center text-sm text-gray-400">
-                      Sin actividad hoy
-                    </li>
-                  )}
-                </ul>
+                  {/* Certificado por vencer */}
+                  {certInfo &&
+                    (certInfo.isExpiringSoon || certInfo.isExpired) && (
+                      <li
+                        className={`flex items-start gap-3 px-4 py-3 ${certInfo.isExpired ? "bg-red-50/60" : "bg-amber-50/40"}`}
+                      >
+                        <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
+                          <AlertCircle
+                            className={`w-4 h-4 ${certInfo.isExpired ? "text-red-500" : "text-amber-500"}`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800">
+                            {certInfo.isExpired
+                              ? "❌ Certificado vencido"
+                              : "⚠️ Certificado por vencer"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {certInfo.isExpired
+                              ? `Venció hace ${Math.abs(certInfo.daysLeft)} días`
+                              : `Vence en ${certInfo.daysLeft} días`}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            {new Date(certInfo.expiryDate).toLocaleDateString(
+                              "es-PE",
+                            )}
+                          </p>
+                        </div>
+                      </li>
+                    )}
 
-                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
-                  <button className="w-full text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors text-center">
-                    Ver todas las notificaciones
-                  </button>
-                </div>
+                  {/* Sin notificaciones */}
+                  {totalPending === 0 &&
+                    !lastAccepted &&
+                    !lastRejected &&
+                    !certInfo?.isExpiringSoon && (
+                      <li className="px-4 py-6 text-center text-sm text-gray-400">
+                        Sin actividad hoy 🎉
+                      </li>
+                    )}
+                </ul>
               </div>
             )}
           </div>

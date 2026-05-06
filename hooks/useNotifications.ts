@@ -13,11 +13,19 @@ interface NotificationDoc {
   mensajeRespuestaSunat?: string;
 }
 
+interface CertInfo {
+  expiryDate: string;
+  daysLeft: number;
+  isExpiringSoon: boolean;
+  isExpired: boolean;
+}
+
 interface DashboardData {
   pendingDocs: NotificationDoc[];
   lastAccepted: NotificationDoc | null;
   lastRejected: NotificationDoc | null;
   totalPending: number;
+  certInfo: CertInfo | null;
   generatedAt: string;
 }
 
@@ -35,8 +43,10 @@ export function useNotifications({
     lastAccepted: null,
     lastRejected: null,
     totalPending: 0,
+    certInfo: null,
     generatedAt: "",
   });
+
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
