@@ -12,6 +12,6 @@ export const Card = ({ children, className, title, subtitle, action }: { childre
         {action}
       </div>
     )}
-    <div className="p-4">{children}</div>
+    <div className="p-2">{children}</div>
   </div>
 );

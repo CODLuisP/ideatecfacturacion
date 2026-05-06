@@ -97,7 +97,9 @@ export default function VerComprobantesPage() {
   const [search, setSearch] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("Todos");
   const [filtroEstado, setFiltroEstado] = useState("Todos");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [offset, setOffset] = useState(0);
+  const limit = 100;
+
   const [modalEnvio, setModalEnvio] = useState<{
     comprobante: ComprobanteListado;
     tipo: "email" | "whatsapp";
@@ -131,36 +133,60 @@ export default function VerComprobantesPage() {
     hookEmpresa.loading ||
     hookUnico.loading ||
     hookCliente.loading ||
-    hookUsuario.loading;
+    hookUsuario.loading ||
+    hookClienteSucursal.loading;
+
+  const hasMore = useMemo(() => {
+    if (modoAvanzado === "unico") return false;
+    if (showAvanzado) {
+      if (modoAvanzado === "fechas") {
+        return isSuperAdmin ? (sucursalFiltro ? hookSucursal.hasMore : hookEmpresa.hasMore) : hookSucursal.hasMore;
+      }
+      if (modoAvanzado === "cliente") {
+        return isSuperAdmin ? hookCliente.hasMore : hookClienteSucursal.hasMore;
+      }
+      if (modoAvanzado === "usuario") {
+        return hookUsuario.hasMore;
+      }
+    }
+    return isSuperAdmin ? (sucursalFiltro ? hookSucursal.hasMore : hookEmpresa.hasMore) : hookSucursal.hasMore;
+  }, [showAvanzado, modoAvanzado, isSuperAdmin, sucursalFiltro, hookSucursal.hasMore, hookEmpresa.hasMore, hookCliente.hasMore, hookClienteSucursal.hasMore, hookUsuario.hasMore]);
+
+
+  // ── Refs estables para evitar loop en useEffect ──
+  const fetchEmpresa = hookEmpresa.fetchComprobantes;
+  const fetchSucursal = hookSucursal.fetchComprobantes;
 
   // ── Carga inicial ──
   const cargarComprobantes = useCallback(
-    async (page: number = 1) => {
+    async (offset: number = 0) => {
       let data: ComprobanteListado[] = [];
-      const params = { fechaDesde: null, fechaHasta: null, page, limit: 100 };
+      const params = { fechaDesde: null, fechaHasta: null, offset, limit };
       if (isSuperAdmin && sucursalFiltro) {
-        data = await hookSucursal.fetchComprobantes({
+        data = await fetchSucursal({
           ...params,
           sucursalId: sucursalFiltro,
         });
       } else if (isSuperAdmin) {
-        data = await hookEmpresa.fetchComprobantes({
+        data = await fetchEmpresa({
           ...params,
           ruc: rucEmpresa,
         });
       } else {
-        data = await hookSucursal.fetchComprobantes({ ...params, sucursalId });
+        data = await fetchSucursal({ ...params, sucursalId });
       }
       setComprobantes(data);
     },
-    [isSuperAdmin, sucursalFiltro, rucEmpresa, sucursalId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isSuperAdmin, sucursalFiltro, rucEmpresa, sucursalId, limit],
   );
 
   useEffect(() => {
     if (!user || !accessToken) return;
-    setCurrentPage(1);
-    cargarComprobantes(1);
+    setOffset(0);
+    cargarComprobantes(0);
   }, [user, accessToken, cargarComprobantes]);
+
 
   const obtenerPdf = useCallback(
     async (c: ComprobanteListado) => {
@@ -210,13 +236,13 @@ export default function VerComprobantesPage() {
     [hookDetalles],
   );
 
-  const buscarAvanzado = async (page: number = 1) => {
+  const buscarAvanzado = async (offset: number = 0) => {
     let data: ComprobanteListado[] = [];
     const commonParams = {
       fechaDesde: avFechaDesde || null,
       fechaHasta: avFechaHasta || null,
-      page,
-      limit: 100,
+      offset,
+      limit,
     };
 
     if (modoAvanzado === "fechas") {
@@ -286,6 +312,7 @@ export default function VerComprobantesPage() {
       setComprobantes(data);
     }
   };
+
 
   // ── Filtrado local ──
   const filtered = useMemo(() => {
@@ -813,7 +840,7 @@ export default function VerComprobantesPage() {
                   {/* ── Botones acción ── */}
                   <div className="flex items-center gap-2 self-end">
                     <button
-                      onClick={() => buscarAvanzado(1)}
+                      onClick={() => buscarAvanzado(0)}
                       disabled={loading}
                       className={cn(
                         "flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white rounded-md transition-all shadow-sm",
@@ -832,9 +859,10 @@ export default function VerComprobantesPage() {
                         setAvFechaDesde("");
                         setAvFechaHasta("");
                         setSucursalFiltro(null);
-                        setCurrentPage(1);
-                        cargarComprobantes(1);
+                        setOffset(0);
+                        cargarComprobantes(0);
                       }}
+
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-md transition-all"
                     >
                       <X size={12} /> Limpiar
@@ -868,7 +896,7 @@ export default function VerComprobantesPage() {
                 .comp-table tbody {
                     display: block;
                     overflow-y: auto;
-                    max-height: calc(100vh - 295px);
+                    max-height: calc(100vh - 355px);
                     scrollbar-width: thin;
                     scrollbar-color: #CBD5E1 transparent;
                 }
@@ -894,7 +922,7 @@ export default function VerComprobantesPage() {
               showAvanzado && "comp-table-avanzado",
             )}
           >
-            <thead>
+            <thead >
               <tr
                 className="bg-gray-100"
                 style={{
@@ -1069,20 +1097,20 @@ export default function VerComprobantesPage() {
           </table>
         </div>
         {/* ── Footer Paginación — solo visible cuando hay más de una página posible ── */}
-        {(currentPage > 1 || comprobantes.length >= 100) && (
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        {(offset > 0 || hasMore) && (
+          <div className="px-2 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  const p = Math.max(1, currentPage - 1);
-                  setCurrentPage(p);
+                  const o = Math.max(0, offset - limit);
+                  setOffset(o);
                   if (tableBodyRef.current) tableBodyRef.current.scrollTop = 0;
-                  showAvanzado ? buscarAvanzado(p) : cargarComprobantes(p);
+                  showAvanzado ? buscarAvanzado(o) : cargarComprobantes(o);
                 }}
-                disabled={currentPage === 1 || loading}
+                disabled={offset === 0 || loading}
                 className={cn(
                   "px-4 py-2 text-sm font-medium border rounded-lg transition-colors",
-                  currentPage === 1 || loading
+                  offset === 0 || loading
                     ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed"
                     : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
                 )}
@@ -1091,15 +1119,15 @@ export default function VerComprobantesPage() {
               </button>
               <button
                 onClick={() => {
-                  const p = currentPage + 1;
-                  setCurrentPage(p);
+                  const o = offset + limit;
+                  setOffset(o);
                   if (tableBodyRef.current) tableBodyRef.current.scrollTop = 0;
-                  showAvanzado ? buscarAvanzado(p) : cargarComprobantes(p);
+                  showAvanzado ? buscarAvanzado(o) : cargarComprobantes(o);
                 }}
-                disabled={comprobantes.length < 100 || loading}
+                disabled={!hasMore || loading}
                 className={cn(
                   "px-4 py-2 text-sm font-medium border rounded-lg transition-colors",
-                  comprobantes.length < 100 || loading
+                  !hasMore || loading
                     ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed"
                     : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
                 )}
@@ -1108,11 +1136,15 @@ export default function VerComprobantesPage() {
               </button>
             </div>
             <span className="text-sm text-gray-500">
-              Página{" "}
-              <span className="font-semibold text-gray-900">{currentPage}</span>
+              Registros del{" "}
+              <span className="font-semibold text-gray-900">{offset + 1}</span> al{" "}
+              <span className="font-semibold text-gray-900">
+                {offset + comprobantes.length}
+              </span>
             </span>
           </div>
         )}
+
       </Card>
     </div>
   );
