@@ -73,8 +73,12 @@ export const generarIdentificador = (fecha: string, numeroEnvio = 1) => {
 };
 
 /** Formatea fecha a YYYY-MM-DD */
-export const formatFechaISO = (fecha: Date) =>
-  fecha.toISOString().split("T")[0];
+export const formatFechaISO = (fecha: Date) => {
+  const year = fecha.getFullYear();
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
+  const day = String(fecha.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 /** Construye el DTO a partir de la lista de comprobantes seleccionados */
 export const buildResumenDTO = (
