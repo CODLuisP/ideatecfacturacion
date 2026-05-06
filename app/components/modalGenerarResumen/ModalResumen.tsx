@@ -12,19 +12,24 @@ import {
   ChevronDown,
   Building2,
   Hash,
+  Store,
 } from "lucide-react";
 import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/app/components/ui/Toast";
 import { ComprobanteListado } from "@/app/factunet/comprobantes/gestionComprobantes/Comprobante";
 import { formatFechaISO, useResumenComprobante, generarIdentificador, buildResumenDTO } from "@/app/factunet/comprobantes/gestionComprobantes/useResumenComprobante";
+import { Sucursal } from "@/app/factunet/operaciones/boleta/gestionBoletas/Boleta";
 
-// ── Tipos permitidos en resumen ────────────────────────────────────────────────
+// ── Tipos permitidos en resumen ───────────────────────────────────────────────
 const TIPOS_RESUMEN = ["03", "07", "08"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const formatCurrency = (n: number) =>
-  n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  n.toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const tipoLabel: Record<string, string> = {
   "03": "Boleta",
@@ -32,13 +37,7 @@ const tipoLabel: Record<string, string> = {
   "08": "ND Boleta",
 };
 
-const condicionLabel: Record<string, string> = {
-  "1": "Alta",
-  "3": "Anulación",
-};
-
-// ── Fechas disponibles (hoy y 2 días anteriores) ──────────────────────────────
-const getFechasDisponibles = () => {
+const getFechasDisponibles = (): string[] => {
   const fechas: string[] = [];
   for (let i = 0; i <= 2; i++) {
     const d = new Date();
@@ -50,15 +49,25 @@ const getFechasDisponibles = () => {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface ModalResumenProps {
-  /** Todos los comprobantes actualmente visibles en la tabla */
   comprobantes: ComprobanteListado[];
   onClose: () => void;
-  /** Callback cuando se emitió el resumen con éxito (para refrescar estados) */
   onEmitido?: (resumenId: number, estadoSunat: string) => void;
+  isSuperAdmin: boolean;
+  /** Lista completa de sucursales — solo necesario si isSuperAdmin */
+  sucursales?: Sucursal[];
+  /** Sucursal del usuario logueado — solo necesario si !isSuperAdmin */
+  sucursalActual?: Sucursal;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenProps) {
+export function ModalResumen({
+  comprobantes,
+  onClose,
+  onEmitido,
+  isSuperAdmin,
+  sucursales = [],
+  sucursalActual,
+}: ModalResumenProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { loadingRegistrar, loadingEnviar, registrar, enviarSunat } =
@@ -66,10 +75,20 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
 
   // ── Estado ────────────────────────────────────────────────────────────────
   const fechasDisponibles = useMemo(() => getFechasDisponibles(), []);
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(fechasDisponibles[0]);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(
+    fechasDisponibles[0]
+  );
 
-  // Map de codigoCondicion editable por comprobante
-  const [condicionMap, setCondicionMap] = useState<Record<number, "1" | "3">>({});
+  // Sucursal seleccionada:
+  // - superadmin → empieza en null hasta que elige
+  // - rol normal → viene directo de sucursalActual
+  const [sucursalSeleccionada, setSucursalSeleccionada] =
+    useState<Sucursal | null>(isSuperAdmin ? null : (sucursalActual ?? null));
+
+  // Map condicion editable por comprobante
+  const [condicionMap, setCondicionMap] = useState<Record<number, "1" | "3">>(
+    {}
+  );
 
   // Resultado del envío
   const [resultado, setResultado] = useState<{
@@ -78,17 +97,21 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
     estadoSunat: string;
   } | null>(null);
 
-  // ── Filtrar comprobantes candidatos ──────────────────────────────────────
+  // ── Candidatos filtrados ──────────────────────────────────────────────────
   const candidatos = useMemo(() => {
+    if (!sucursalSeleccionada) return [];
     return comprobantes.filter((c) => {
       const esTipoPermitido = TIPOS_RESUMEN.includes(c.tipoComprobante);
       const esPendiente = c.estadoSunat === "PENDIENTE";
       const mismaFecha = c.fechaEmision?.startsWith(fechaSeleccionada);
-      return esTipoPermitido && esPendiente && mismaFecha;
+      const mismaSucursal =
+        c.company.establecimientoAnexo ===
+        sucursalSeleccionada.codEstablecimiento;
+      return esTipoPermitido && esPendiente && mismaFecha && mismaSucursal;
     });
-  }, [comprobantes, fechaSeleccionada]);
+  }, [comprobantes, fechaSeleccionada, sucursalSeleccionada]);
 
-  // Inicializar condicionMap cuando cambian candidatos
+  // Inicializar condicionMap al cambiar candidatos
   useEffect(() => {
     const mapa: Record<number, "1" | "3"> = {};
     candidatos.forEach((c) => {
@@ -97,20 +120,16 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
     setCondicionMap(mapa);
     setResultado(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidatos.length, fechaSeleccionada]);
-
-  // ── Empresa (del primer comprobante) ─────────────────────────────────────
-  const empresa = candidatos[0]?.company;
+  }, [candidatos.length, fechaSeleccionada, sucursalSeleccionada]);
 
   // ── Identificador ─────────────────────────────────────────────────────────
   const identificador = generarIdentificador(fechaSeleccionada);
 
-  // ── Totales ───────────────────────────────────────────────────────────────
+  // ── Totales dinámicos ────────────────────────────────────────────────────
   const totales = useMemo(() => {
     return candidatos.reduce(
       (acc, c) => {
-        const cond = condicionMap[c.comprobanteId] ?? "1";
-        if (cond !== "3") {
+        if ((condicionMap[c.comprobanteId] ?? "1") !== "3") {
           acc.importe += c.importeTotal ?? 0;
           acc.igv += c.totalIGV ?? 0;
         }
@@ -120,11 +139,19 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
     );
   }, [candidatos, condicionMap]);
 
+  const cantAnulaciones = Object.values(condicionMap).filter(
+    (v) => v === "3"
+  ).length;
+
   // ── Loading global ────────────────────────────────────────────────────────
   const loading = loadingRegistrar || loadingEnviar;
 
-  // ── Emitir resumen ────────────────────────────────────────────────────────
+  // ── Emitir ───────────────────────────────────────────────────────────────
   const handleEmitir = async () => {
+    if (!sucursalSeleccionada) {
+      showToast("Selecciona una sucursal antes de emitir", "error");
+      return;
+    }
     if (candidatos.length === 0) {
       showToast("No hay comprobantes para incluir en el resumen", "error");
       return;
@@ -134,14 +161,13 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
       candidatos,
       condicionMap,
       fechaSeleccionada,
-      user?.id ? Number(user.id) : null
+      user?.id ? Number(user.id) : null,
+      sucursalSeleccionada
     );
 
-    // 1. Registrar
     const resumenId = await registrar(dto);
     if (!resumenId) return;
 
-    // 2. Enviar a SUNAT
     const resp = await enviarSunat(resumenId);
     if (!resp) return;
 
@@ -159,7 +185,7 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -173,7 +199,7 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
         className="relative z-10 w-full max-w-5xl max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Header ──────────────────────────────────────────────────────── */}
+        {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 rounded-xl">
@@ -197,14 +223,68 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
           </button>
         </div>
 
-        {/* ── Cabecera del resumen ─────────────────────────────────────────── */}
+        {/* ── Cabecera del resumen ───────────────────────────────────────────── */}
         <div className="px-6 py-4 border-b border-gray-100 bg-white">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+            {/* Selector sucursal — solo superadmin */}
+            {isSuperAdmin && (
+              <div className="col-span-2 space-y-1">
+                <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  <Store size={11} />
+                  Sucursal
+                </label>
+                <div className="relative">
+                  <select
+                    value={sucursalSeleccionada?.sucursalId ?? ""}
+                    onChange={(e) => {
+                      const found = sucursales.find(
+                        (s) => s.sucursalId === Number(e.target.value)
+                      );
+                      setSucursalSeleccionada(found ?? null);
+                    }}
+                    disabled={loading}
+                    className="w-full pl-2.5 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-50 transition-all appearance-none disabled:opacity-50"
+                  >
+                    <option value="">Selecciona una sucursal...</option>
+                    {sucursales.map((s) => (
+                      <option key={s.sucursalId} value={s.sucursalId}>
+                        {s.codEstablecimiento} · {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={12}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Sucursal actual — solo rol normal */}
+            {!isSuperAdmin && sucursalSeleccionada && (
+              <div className="col-span-2 space-y-1">
+                <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  <Store size={11} />
+                  Sucursal
+                </label>
+                <div className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg text-gray-700 truncate">
+                  <span className="font-semibold">
+                    {sucursalSeleccionada.codEstablecimiento}
+                  </span>
+                  {" · "}
+                  <span className="text-gray-500">
+                    {sucursalSeleccionada.nombre}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Fecha emisión */}
             <div className="space-y-1">
               <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                 <Calendar size={11} />
-                Fecha emisión documentos
+                Fecha emisión docs
               </label>
               <div className="relative">
                 <select
@@ -213,13 +293,16 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
                   disabled={loading}
                   className="w-full pl-2.5 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-50 transition-all appearance-none disabled:opacity-50"
                 >
-                  {fechasDisponibles.map((f) => (
+                  {fechasDisponibles.map((f, i) => (
                     <option key={f} value={f}>
-                      {f === fechasDisponibles[0] ? `${f} (hoy)` : f}
+                      {i === 0 ? `${f} (hoy)` : f}
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <ChevronDown
+                  size={12}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
               </div>
             </div>
 
@@ -234,17 +317,23 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
               </div>
             </div>
 
-            {/* Empresa */}
-            {empresa && (
+            {/* Empresa emisora — de la sucursal */}
+            {sucursalSeleccionada && (
               <div className="col-span-2 space-y-1">
                 <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                   <Building2 size={11} />
                   Empresa emisora
                 </label>
                 <div className="px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg text-gray-700 truncate">
-                  <span className="font-semibold">{empresa.numeroDocumento}</span>
-                  {" · "}
-                  <span className="text-gray-500">{empresa.razonSocial}</span>
+                  <span className="font-semibold">
+                    {sucursalSeleccionada.empresaRuc}
+                  </span>
+                  {candidatos[0]?.company?.razonSocial && (
+                    <span className="text-gray-500">
+                      {" · "}
+                      {candidatos[0].company.razonSocial}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -255,8 +344,19 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
         <div className="flex-1 overflow-hidden flex flex-col px-6 py-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-gray-500">
-              Comprobantes pendientes de la fecha seleccionada:{" "}
-              <span className="font-semibold text-gray-800">{candidatos.length}</span>
+              {!sucursalSeleccionada && isSuperAdmin ? (
+                <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+                  <AlertCircle size={13} />
+                  Selecciona una sucursal para ver los comprobantes
+                </span>
+              ) : (
+                <>
+                  Comprobantes pendientes:{" "}
+                  <span className="font-semibold text-gray-800">
+                    {candidatos.length}
+                  </span>
+                </>
+              )}
             </p>
             {candidatos.length > 0 && (
               <p className="text-xs text-gray-400">
@@ -264,8 +364,7 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
                 <span className="font-semibold text-gray-700">
                   S/ {formatCurrency(totales.importe)}
                 </span>
-                {" · "}
-                IGV:{" "}
+                {" · "}IGV:{" "}
                 <span className="font-semibold text-gray-700">
                   S/ {formatCurrency(totales.igv)}
                 </span>
@@ -273,7 +372,15 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
             )}
           </div>
 
-          {candidatos.length === 0 ? (
+          {/* Tabla o estado vacío */}
+          {!sucursalSeleccionada && isSuperAdmin ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 py-10 text-gray-300">
+              <Store size={36} className="opacity-40" />
+              <p className="text-sm text-gray-400">
+                Selecciona una sucursal para continuar
+              </p>
+            </div>
+          ) : candidatos.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-2 py-10 text-gray-400">
               <FileText size={32} className="opacity-30" />
               <p className="text-sm">
@@ -373,7 +480,7 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
                           </span>
                         </td>
 
-                        {/* Condición (editable) */}
+                        {/* Condición editable */}
                         <td className="px-3 py-2.5 text-center">
                           <div className="relative inline-block">
                             <select
@@ -381,15 +488,16 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
                               onChange={(e) =>
                                 setCondicionMap((prev) => ({
                                   ...prev,
-                                  [c.comprobanteId]: e.target.value as "1" | "3",
+                                  [c.comprobanteId]: e.target
+                                    .value as "1" | "3",
                                 }))
                               }
                               disabled={loading}
                               className={cn(
                                 "pl-2 pr-6 py-1 text-[10px] font-semibold rounded-lg border outline-none appearance-none transition-all disabled:opacity-50",
                                 esAnulacion
-                                  ? "bg-red-50 border-red-200 text-red-700 focus:ring-red-100"
-                                  : "bg-emerald-50 border-emerald-200 text-emerald-700 focus:ring-emerald-100"
+                                  ? "bg-red-50 border-red-200 text-red-700 focus:ring-2 focus:ring-red-100"
+                                  : "bg-emerald-50 border-emerald-200 text-emerald-700 focus:ring-2 focus:ring-emerald-100"
                               )}
                             >
                               <option value="1">Alta (1)</option>
@@ -399,7 +507,9 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
                               size={10}
                               className={cn(
                                 "absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none",
-                                esAnulacion ? "text-red-400" : "text-emerald-400"
+                                esAnulacion
+                                  ? "text-red-400"
+                                  : "text-emerald-400"
                               )}
                             />
                           </div>
@@ -413,31 +523,35 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
           )}
         </div>
 
-        {/* ── Resultado del envío ─────────────────────────────────────────────── */}
+        {/* ── Resultado del envío ────────────────────────────────────────────── */}
         {resultado && (
           <div
             className={cn(
-              "mx-6 mb-3 px-4 py-3 rounded-xl flex items-start gap-3 text-sm",
+              "mx-6 mb-3 px-4 py-3 rounded-xl flex items-start gap-3",
               resultado.exitoso
                 ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                 : "bg-red-50 border border-red-200 text-red-800"
             )}
           >
             {resultado.exitoso ? (
-              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+              <CheckCircle2
+                size={16}
+                className="mt-0.5 shrink-0 text-emerald-600"
+              />
             ) : (
-              <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-500" />
+              <AlertCircle
+                size={16}
+                className="mt-0.5 shrink-0 text-red-500"
+              />
             )}
             <div>
-              <p className="font-semibold text-xs">
-                {resultado.estadoSunat}
-              </p>
+              <p className="font-semibold text-xs">{resultado.estadoSunat}</p>
               <p className="text-xs mt-0.5 opacity-80">{resultado.mensaje}</p>
             </div>
           </div>
         )}
 
-        {/* ── Footer ─────────────────────────────────────────────────────────── */}
+        {/* ── Footer ────────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50">
           <div className="text-xs text-gray-400">
             {candidatos.length > 0 && (
@@ -447,9 +561,9 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
                 </span>{" "}
                 comprobante{candidatos.length !== 1 ? "s" : ""} ·{" "}
                 <span className="font-semibold text-gray-600">
-                  {Object.values(condicionMap).filter((v) => v === "3").length}
+                  {cantAnulaciones}
                 </span>{" "}
-                anulación{Object.values(condicionMap).filter((v) => v === "3").length !== 1 ? "es" : ""}
+                anulación{cantAnulaciones !== 1 ? "es" : ""}
               </>
             )}
           </div>
@@ -465,10 +579,18 @@ export function ModalResumen({ comprobantes, onClose, onEmitido }: ModalResumenP
 
             <button
               onClick={handleEmitir}
-              disabled={loading || candidatos.length === 0 || !!resultado?.exitoso}
+              disabled={
+                loading ||
+                candidatos.length === 0 ||
+                !!resultado?.exitoso ||
+                !sucursalSeleccionada
+              }
               className={cn(
                 "flex items-center gap-2 px-5 py-2 text-xs font-semibold rounded-xl transition-all",
-                loading || candidatos.length === 0 || resultado?.exitoso
+                loading ||
+                  candidatos.length === 0 ||
+                  resultado?.exitoso ||
+                  !sucursalSeleccionada
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md"
               )}

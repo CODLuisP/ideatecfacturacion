@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/app/components/ui/Toast";
 import { ComprobanteListado } from "../gestionComprobantes/Comprobante";
+import { Sucursal } from "../../operaciones/boleta/gestionBoletas/Boleta";
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 export interface AgregarResumenDetalleDTO {
@@ -85,11 +86,11 @@ export const buildResumenDTO = (
   comprobantes: ComprobanteListado[],
   codigoCondicionMap: Record<number, "1" | "3">,
   fechaEmision: string,
-  usuarioId: number | null
+  usuarioId: number | null,
+  sucursal: Sucursal  // ← agregar este parámetro
 ): AgregarResumenComprobanteDTO => {
   const hoy = formatFechaISO(new Date());
   const primero = comprobantes[0];
-
   const identificador = generarIdentificador(fechaEmision);
 
   const detalles: AgregarResumenDetalleDTO[] = comprobantes.map((c, idx) => ({
@@ -106,43 +107,31 @@ export const buildResumenDTO = (
     codigoCondicion: codigoCondicionMap[c.comprobanteId] ?? "1",
     moneda: c.tipoMoneda ?? "PEN",
     montoTotalVenta:
-      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3"
-        ? 0
-        : c.importeTotal,
+      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.importeTotal,
     totalGravado:
-      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3"
-        ? 0
-        : c.totalOperacionesGravadas,
+      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.totalOperacionesGravadas,
     totalExonerado:
-      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3"
-        ? 0
-        : c.totalOperacionesExoneradas,
+      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.totalOperacionesExoneradas,
     totalInafecto:
-      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3"
-        ? 0
-        : c.totalOperacionesInafectas,
+      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.totalOperacionesInafectas,
     totalGratuito:
-      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3"
-        ? 0
-        : c.totalOperacionesGratuitas,
+      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.totalOperacionesGratuitas,
     totalIGV:
       (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.totalIGV,
     igvReferencial:
-      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3"
-        ? 0
-        : c.totalIgvGratuitas,
+      (codigoCondicionMap[c.comprobanteId] ?? "1") === "3" ? 0 : c.totalIgvGratuitas,
   }));
 
   return {
     empresaId: primero.company.empresaId,
-    empresaRuc: primero.company.numeroDocumento,
+    empresaRuc: sucursal.empresaRuc,           // ← de la sucursal
     empresaRazonSocial: primero.company.razonSocial,
-    empresaDireccion: primero.company.direccionLineal,
+    empresaDireccion: sucursal.direccion,       // ← de la sucursal
     empresaProvincia: primero.company.provincia,
     empresaDepartamento: primero.company.departamento,
     empresaDistrito: primero.company.distrito,
     empresaUbigeo: primero.company.ubigeo,
-    establecimientoAnexo: primero.company.establecimientoAnexo,
+    establecimientoAnexo: sucursal.codEstablecimiento, // ← de la sucursal
     numeroEnvio: 1,
     fechaEmisionDocumentos: fechaEmision,
     fechaGeneracion: hoy,

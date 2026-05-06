@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   X,
   Eye,
-  Check,
   Filter,
   Search,
   MoreHorizontal,
@@ -34,28 +33,21 @@ import { useComprobantesEmpresaClienteListado } from "./gestionComprobantes/gest
 import { useComprobantesEmpresaUsuarioListado } from "./gestionComprobantes/gestionComprobantesLista/UseComprobantesEmpresaUsuarioListado";
 import { useComprobantesSucursalListado } from "./gestionComprobantes/gestionComprobantesLista/UseComprobantesSucursalListado";
 import { useComprobanteDetalles } from "./gestionComprobantes/gestionComprobantesLista/UseComprobanteDetalles";
-import {
-  ComprobanteListado,
-  ComprobanteDetalles,
-} from "./gestionComprobantes/Comprobante";
+import { ComprobanteListado, ComprobanteDetalles,} from "./gestionComprobantes/Comprobante";
 
 import { useComprobanteUnico } from "./gestionComprobantes/UseComprobanteUnico";
 import { useComprobantesClienteSucursalListado } from "./gestionComprobantes/gestionComprobantesLista/UseComprobantesClienteSucursalListado";
 
 import { ModalDetalle } from "@/app/components/modalVerComprobantes/ModalDetalle";
 import { ModalEnvioCorreoWhatsapp } from "@/app/components/modalVerComprobantes/ModalEnvioCorreoWhatsapp";
-import {
-  tipoLabel,
-  formatFecha,
-  formatFechaHora,
-  COLORS,
-} from "./gestionComprobantes/helpers";
+import { tipoLabel, formatFecha, formatFechaHora, COLORS} from "./gestionComprobantes/helpers";
 import { useRouter } from "next/navigation";
 import { Card } from "@/app/components/ui/Card";
 import { createPortal } from "react-dom";
 import { Button } from "@/app/components/ui/Button";
 import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
 import { ModalResumen } from "@/app/components/modalGenerarResumen/ModalResumen";
+import { useSucursal } from "../operaciones/boleta/gestionBoletas/useSucursal";
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = [
@@ -85,6 +77,7 @@ export default function VerComprobantesPage() {
   // ── Hooks de datos ──
   const hookEmpresa = useComprobantesEmpresaListado();
   const hookSucursal = useComprobantesSucursalListado();
+  const { sucursal: sucursalUsuario, loadingSucursal } = useSucursal();
   const hookCliente = useComprobantesEmpresaClienteListado();
   const hookClienteSucursal = useComprobantesClienteSucursalListado();
   const hookUsuario = useComprobantesEmpresaUsuarioListado();
@@ -306,10 +299,13 @@ export default function VerComprobantesPage() {
         (c.numeroCompleto ?? "").toLowerCase().includes(search.toLowerCase());
       const matchTipo = filtroTipo === "Todos" || tipo === filtroTipo;
       const estadoLabel =
-        c.estadoSunat === "ACEPTADO" ? "Aceptado" :
-        c.estadoSunat === "RECHAZADO" ? "Rechazado" :
-        c.estadoSunat === "ANULADO" ? "Anulado" :
-        "Pendiente";
+        c.estadoSunat === "ACEPTADO"
+          ? "Aceptado"
+          : c.estadoSunat === "RECHAZADO"
+            ? "Rechazado"
+            : c.estadoSunat === "ANULADO"
+              ? "Anulado"
+              : "Pendiente";
       const matchEstado =
         filtroEstado === "Todos" || estadoLabel === filtroEstado;
       return matchSearch && matchTipo && matchEstado;
@@ -409,20 +405,22 @@ export default function VerComprobantesPage() {
         <ModalResumen
           comprobantes={comprobantes}
           onClose={() => setShowModalResumen(false)}
+          isSuperAdmin={isSuperAdmin}
+          sucursales={isSuperAdmin ? sucursales : undefined}
+          sucursalActual={!isSuperAdmin ? sucursalUsuario ?? undefined : undefined}
           onEmitido={(resumenId, estadoSunat) => {
-            // Actualizar estado de los comprobantes que fueron aceptados
-            if (estadoSunat === "ACEPTADO" || estadoSunat === "ACEPTADO_CON_OBSERVACIONES") {
+            setShowModalResumen(false);
+            if (
+              estadoSunat === "ACEPTADO" ||
+              estadoSunat === "ACEPTADO_CON_OBSERVACIONES"
+            ) {
               setComprobantes((prev) =>
-                prev.map((c) => {
-                  const esBoleta = c.tipoComprobante === "03";
-                  const mismaFecha = c.fechaEmision?.startsWith(
-                    new Date().toISOString().split("T")[0]
-                  );
-                  if (esBoleta && mismaFecha && c.estadoSunat === "PENDIENTE") {
-                    return { ...c, estadoSunat: "ACEPTADO_MEDIANTE_RESUMEN", enviadoEnResumen: true };
-                  }
-                  return c;
-                })
+                prev.map((c) =>
+                  c.estadoSunat === "PENDIENTE" &&
+                  ["03", "07", "08"].includes(c.tipoComprobante)
+                    ? { ...c, estadoSunat: "ACEPTADO_MEDIANTE_RESUMEN", enviadoEnResumen: true }
+                    : c
+                )
               );
             }
           }}
@@ -556,14 +554,20 @@ export default function VerComprobantesPage() {
                   label="Todas las sucursales"
                   value={
                     sucursalFiltro
-                      ? (sucursales.find((s: any) => s.sucursalId === sucursalFiltro)?.nombre ??
-                        sucursales.find((s: any) => s.sucursalId === sucursalFiltro)?.codEstablecimiento ??
+                      ? (sucursales.find(
+                          (s: any) => s.sucursalId === sucursalFiltro,
+                        )?.nombre ??
+                        sucursales.find(
+                          (s: any) => s.sucursalId === sucursalFiltro,
+                        )?.codEstablecimiento ??
                         "Todos")
                       : "Todos"
                   }
                   options={[
                     "Todos",
-                    ...sucursales.map((s: any) => s.nombre ?? s.codEstablecimiento),
+                    ...sucursales.map(
+                      (s: any) => s.nombre ?? s.codEstablecimiento,
+                    ),
                   ]}
                   onChange={(v) => {
                     if (v === "Todos") {
@@ -577,7 +581,6 @@ export default function VerComprobantesPage() {
                   }}
                 />
               )}
-
             </div>
 
             {/* Div 2: Nuevo Comprobante */}
@@ -589,7 +592,10 @@ export default function VerComprobantesPage() {
               >
                 <FileText className="w-3.5 h-3.5" /> Generar Resumen
               </Button>
-              <Button className="py-2.5 px-3 text-xs rounded-md h-auto" onClick={() => router.push("/factunet/operaciones")}>
+              <Button
+                className="py-2.5 px-3 text-xs rounded-md h-auto"
+                onClick={() => router.push("/factunet/operaciones")}
+              >
                 <Plus className="w-3.5 h-3.5" /> Nuevo Comprobante
               </Button>
             </div>
@@ -601,11 +607,29 @@ export default function VerComprobantesPage() {
               <div className="flex border-b border-gray-100">
                 {(
                   [
-                    { key: "fechas", label: "Por fechas", icon: <Calendar size={14} /> },
-                    { key: "unico", label: "Comprobante único", icon: <Hash size={14} /> },
-                    { key: "cliente", label: "Por cliente", icon: <UserRound size={14} /> },
+                    {
+                      key: "fechas",
+                      label: "Por fechas",
+                      icon: <Calendar size={14} />,
+                    },
+                    {
+                      key: "unico",
+                      label: "Comprobante único",
+                      icon: <Hash size={14} />,
+                    },
+                    {
+                      key: "cliente",
+                      label: "Por cliente",
+                      icon: <UserRound size={14} />,
+                    },
                     ...(isSuperAdmin
-                      ? [{ key: "usuario", label: "Por usuario", icon: <UserCog size={14} /> }]
+                      ? [
+                          {
+                            key: "usuario",
+                            label: "Por usuario",
+                            icon: <UserCog size={14} />,
+                          },
+                        ]
                       : []),
                   ] as const
                 ).map((tab) => (
@@ -1094,26 +1118,39 @@ export default function VerComprobantesPage() {
   );
 }
 
-
-  // ─── BadgeSunat ───────────────────────────────────────────────────────────────
-  const BadgeSunat = ({ estado }: { estado: string }) => {
-    const cfg = COLORS.sunat[estado as keyof typeof COLORS.sunat] ?? COLORS.sunat.PENDIENTE;
-    const icon =
-      estado === "ACEPTADO" ? <CheckCircle2 size={11} /> :
-      estado === "RECHAZADO" ? <X size={11} /> :
-      estado === "ANULADO" ? <Ban size={11} /> :
-      <RefreshCw size={11} />;
-    const label =
-      estado === "ACEPTADO" ? "Aceptado" :
-      estado === "RECHAZADO" ? "Rechazado" :
-      estado === "ANULADO" ? "Anulado" :
-      "Pendiente";
-    return (
-      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap", cfg.badge)}>
-        {icon} {label}
-      </span>
+// ─── BadgeSunat ───────────────────────────────────────────────────────────────
+const BadgeSunat = ({ estado }: { estado: string }) => {
+  const cfg =
+    COLORS.sunat[estado as keyof typeof COLORS.sunat] ?? COLORS.sunat.PENDIENTE;
+  const icon =
+    estado === "ACEPTADO" ? (
+      <CheckCircle2 size={11} />
+    ) : estado === "RECHAZADO" ? (
+      <X size={11} />
+    ) : estado === "ANULADO" ? (
+      <Ban size={11} />
+    ) : (
+      <RefreshCw size={11} />
     );
-  };
+  const label =
+    estado === "ACEPTADO"
+      ? "Aceptado"
+      : estado === "RECHAZADO"
+        ? "Rechazado"
+        : estado === "ANULADO"
+          ? "Anulado"
+          : "Pendiente";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap",
+        cfg.badge,
+      )}
+    >
+      {icon} {label}
+    </span>
+  );
+};
 
 // ─── BtnEnvio ─────────────────────────────────────────────────────────────────
 const BtnEnvio = ({
