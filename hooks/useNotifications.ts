@@ -74,7 +74,27 @@ export function useNotifications({
 
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
-        if (msg.type === "dashboard") setData(msg.data);
+        if (msg.type === "dashboard") {
+          const { evento, ...newData } = msg.data;
+          if (evento === "pending") {
+            // Solo actualiza pendientes
+            setData((prev) => ({
+              ...prev,
+              pendingDocs: newData.pendingDocs,
+              totalPending: newData.totalPending,
+            }));
+          } else if (evento === "status") {
+            // Solo actualiza aceptado/rechazado
+            setData((prev) => ({
+              ...prev,
+              lastAccepted: newData.lastAccepted,
+              lastRejected: newData.lastRejected,
+            }));
+          } else {
+            // Reemplaza todo
+            setData(newData);
+          }
+        }
       };
 
       ws.onclose = () => {
