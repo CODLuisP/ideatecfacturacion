@@ -441,14 +441,7 @@ export default function VerComprobantesPage() {
               estadoSunat === "ACEPTADO" ||
               estadoSunat === "ACEPTADO_CON_OBSERVACIONES"
             ) {
-              setComprobantes((prev) =>
-                prev.map((c) =>
-                  c.estadoSunat === "PENDIENTE" &&
-                  ["03", "07", "08"].includes(c.tipoComprobante)
-                    ? { ...c, estadoSunat: "ACEPTADO_MEDIANTE_RESUMEN", enviadoEnResumen: true }
-                    : c
-                )
-              );
+              cargarComprobantes(offset);
             }
           }}
         />
@@ -610,7 +603,6 @@ export default function VerComprobantesPage() {
               )}
             </div>
 
-            {/* Div 2: Nuevo Comprobante */}
             {/* Div 2: Botones acción */}
             <div className="shrink-0 flex items-center gap-2">
               <Button
