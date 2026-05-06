@@ -89,6 +89,9 @@ export default function VerComprobantesPage() {
   //Modal Resumen
   const [showModalResumen, setShowModalResumen] = useState(false);
 
+  //loading enviar a asunat
+  const [loadingSunatMap, setLoadingSunatMap] = useState<Record<string, boolean>>({});
+
   // ── Estado local ──
   const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([]);
   const [detalle, setDetalle] = useState<ComprobanteListado | null>(null);
@@ -343,6 +346,7 @@ export default function VerComprobantesPage() {
   const paginated = filtered;
   // ── Evnviar SUNAT ──
   const enviarSunat = async (c: ComprobanteListado) => {
+      setLoadingSunatMap((prev) => ({ ...prev, [c.comprobanteId]: true }));
     try {
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${c.comprobanteId}/enviar-sunat`,
@@ -377,6 +381,8 @@ export default function VerComprobantesPage() {
       }
     } catch {
       showToast("Error al enviar a SUNAT", "error");
+    } finally {
+      setLoadingSunatMap((prev) => ({ ...prev, [c.comprobanteId]: false })); 
     }
   };
 
@@ -605,12 +611,14 @@ export default function VerComprobantesPage() {
 
             {/* Div 2: Botones acción */}
             <div className="shrink-0 flex items-center gap-2">
+              {/*
               <Button
                 className="py-2.5 px-3 text-xs rounded-md h-auto bg-white border border-gray-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 shadow-sm"
                 onClick={() => setShowModalResumen(true)}
               >
                 <FileText className="w-3.5 h-3.5" /> Generar Resumen
               </Button>
+              */}
               <Button
                 className="py-2.5 px-3 text-xs rounded-md h-auto"
                 onClick={() => router.push("/factunet/operaciones")}
@@ -1028,7 +1036,7 @@ export default function VerComprobantesPage() {
                     </td>
                     <td className="px-5 py-3 text-center w-32">
                       <div className="flex justify-center">
-                        <BadgeSunat estado={doc.estadoSunat} />
+                        <BadgeSunat estado={doc.estadoSunat} loading={loadingSunatMap[doc.comprobanteId]} />
                       </div>
                     </td>
                     <td className="px-5 py-3 text-center w-24">
@@ -1140,7 +1148,15 @@ export default function VerComprobantesPage() {
 }
 
 // ─── BadgeSunat ───────────────────────────────────────────────────────────────
-const BadgeSunat = ({ estado }: { estado: string }) => {
+const BadgeSunat = ({ estado, loading }: { estado: string; loading?: boolean }) => {
+  if (loading) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-blue-50 text-blue-600 border-blue-200">
+        <RefreshCw size={11} className="animate-spin" /> Enviando...
+      </span>
+    );
+  }
+
   const cfg =
     COLORS.sunat[estado as keyof typeof COLORS.sunat] ?? COLORS.sunat.PENDIENTE;
   const icon =
@@ -1161,6 +1177,7 @@ const BadgeSunat = ({ estado }: { estado: string }) => {
         : estado === "ANULADO"
           ? "Anulado"
           : "Pendiente";
+
   return (
     <span
       className={cn(
@@ -1365,6 +1382,7 @@ const DropdownOpciones = ({
                 Enviar a SUNAT
               </button>
             )}
+            {/*
             {comprobante.tipoComprobante === "03" && esPendiente && (
               <button
                 onClick={() => {
@@ -1377,6 +1395,7 @@ const DropdownOpciones = ({
                 Agregar a envío por resumen
               </button>
             )}
+            */}
             {esRechazado && (
               <button
                 onClick={() => {

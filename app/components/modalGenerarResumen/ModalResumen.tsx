@@ -491,7 +491,7 @@ export function ModalResumen({
                                     | "3",
                                 }))
                               }
-                              disabled={loading}
+                              disabled
                               className={cn(
                                 "pl-2 pr-6 py-1 text-[10px] font-semibold rounded-lg border outline-none appearance-none transition-all disabled:opacity-50",
                                 esAnulacion
