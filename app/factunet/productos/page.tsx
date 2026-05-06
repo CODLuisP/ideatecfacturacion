@@ -548,7 +548,7 @@ export default function ProductosPage() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                   {prod.codigo}
                 </p>
-                <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors line-clamp-2 min-h-10">
+                <h4 className="font-bold text-gray-900 group-hover:text-brand-blue transition-colors line-clamp-2">
                   {prod.nomProducto}
                 </h4>
                 <p className="text-[10px] font-medium text-gray-400 bg-gray-100 w-fit px-1.5 py-0.5 rounded uppercase">

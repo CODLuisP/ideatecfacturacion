@@ -12,7 +12,6 @@ import {
   Search,
   MoreHorizontal,
   RotateCcw,
-  Layers,
   Ban,
   FileText,
   Plus,
@@ -48,6 +47,7 @@ import { Button } from "@/app/components/ui/Button";
 import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
 import { ModalResumen } from "@/app/components/modalGenerarResumen/ModalResumen";
 import { useSucursal } from "../operaciones/boleta/gestionBoletas/useSucursal";
+import { ModalEnvioMasivo } from "@/app/components/modalVerComprobantes/Modalenviomasivo";
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = [
@@ -91,6 +91,7 @@ export default function VerComprobantesPage() {
 
   //loading enviar a asunat
   const [loadingSunatMap, setLoadingSunatMap] = useState<Record<string, boolean>>({});
+  const [showModalEnvioMasivo, setShowModalEnvioMasivo] = useState(false);
 
   // ── Estado local ──
   const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([]);
@@ -155,6 +156,10 @@ export default function VerComprobantesPage() {
     return isSuperAdmin ? (sucursalFiltro ? hookSucursal.hasMore : hookEmpresa.hasMore) : hookSucursal.hasMore;
   }, [showAvanzado, modoAvanzado, isSuperAdmin, sucursalFiltro, hookSucursal.hasMore, hookEmpresa.hasMore, hookCliente.hasMore, hookClienteSucursal.hasMore, hookUsuario.hasMore]);
 
+  const pendientes = useMemo(
+    () => comprobantes.filter((c) => c.estadoSunat === "PENDIENTE"),
+    [comprobantes]
+  );
 
   // ── Refs estables para evitar loop en useEffect ──
   const fetchEmpresa = hookEmpresa.fetchComprobantes;
@@ -386,6 +391,13 @@ export default function VerComprobantesPage() {
     }
   };
 
+  const enviarTodosEnBackground = useCallback(
+    (lista: ComprobanteListado[]) => {
+      Promise.all(lista.map((c) => enviarSunat(c)));
+    },
+    [enviarSunat]
+  );
+
   const editarenviarSunat = (c: ComprobanteListado) => {
     switch (c.tipoComprobante) {
       case "01":
@@ -434,6 +446,13 @@ export default function VerComprobantesPage() {
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
       {/* Modales */}
+      {showModalEnvioMasivo && (
+        <ModalEnvioMasivo
+          pendientes={pendientes}
+          onClose={() => setShowModalEnvioMasivo(false)}
+          onEnviarTodos={enviarTodosEnBackground}
+        />
+      )}
       {showModalResumen && (
         <ModalResumen
           comprobantes={comprobantes}
@@ -619,6 +638,15 @@ export default function VerComprobantesPage() {
                 <FileText className="w-3.5 h-3.5" /> Generar Resumen
               </Button>
               */}
+              {pendientes.length >= 2 && (
+                <Button
+                  className="py-2.5 px-3 text-xs rounded-md h-auto bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 shadow-sm"
+                  onClick={() => setShowModalEnvioMasivo(true)}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Enviar pendientes ({pendientes.length})
+                </Button>
+              )}
               <Button
                 className="py-2.5 px-3 text-xs rounded-md h-auto"
                 onClick={() => router.push("/factunet/operaciones")}
