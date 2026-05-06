@@ -441,14 +441,7 @@ export default function VerComprobantesPage() {
               estadoSunat === "ACEPTADO" ||
               estadoSunat === "ACEPTADO_CON_OBSERVACIONES"
             ) {
-              setComprobantes((prev) =>
-                prev.map((c) =>
-                  c.estadoSunat === "PENDIENTE" &&
-                  ["03", "07", "08"].includes(c.tipoComprobante)
-                    ? { ...c, estadoSunat: "ACEPTADO_MEDIANTE_RESUMEN", enviadoEnResumen: true }
-                    : c
-                )
-              );
+              cargarComprobantes(offset);
             }
           }}
         />
@@ -610,7 +603,6 @@ export default function VerComprobantesPage() {
               )}
             </div>
 
-            {/* Div 2: Nuevo Comprobante */}
             {/* Div 2: Botones acción */}
             <div className="shrink-0 flex items-center gap-2">
               <Button
@@ -896,13 +888,11 @@ export default function VerComprobantesPage() {
                 .comp-table tbody {
                     display: block;
                     overflow-y: auto;
-                    max-height: calc(100vh - 355px);
+                    max-height: calc(100vh - ${offset > 0 || hasMore ? 355 : 295}px);
                     scrollbar-width: thin;
                     scrollbar-color: #CBD5E1 transparent;
                 }
-                .comp-table-avanzado tbody {
-                    max-height: calc(100vh - 425px);
-                }
+             
                 .comp-table thead tr,
                 .comp-table tbody tr {
                     display: table;
@@ -918,8 +908,7 @@ export default function VerComprobantesPage() {
         <div className="overflow-x-auto">
           <table
             className={cn(
-              "w-full text-left border-collapse comp-table",
-              showAvanzado && "comp-table-avanzado",
+              "w-full text-left border-collapse comp-table"
             )}
           >
             <thead >
@@ -994,12 +983,12 @@ export default function VerComprobantesPage() {
                 paginated.map((doc) => (
                   <tr
                     key={doc.comprobanteId}
-                    className="hover:bg-gray-50/50 transition-colors"
+                    className="hover:bg-gray-50/50 transition-colors "
                   >
-                    <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap w-32">
+                    <td className="px-5 py-3 text-sm text-gray-900 font-medium whitespace-nowrap w-32 ">
                       {formatFecha(doc.fechaCreacion)}
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap w-52">
+                    <td className="px-5 py-3 whitespace-nowrap w-52">
                       <p className="text-sm font-medium text-gray-900">
                         {doc.numeroCompleto}
                       </p>
@@ -1007,7 +996,7 @@ export default function VerComprobantesPage() {
                         {tipoLabel(doc.tipoComprobante)}
                       </p>
                     </td>
-                    <td className="px-5 py-4 w-60">
+                    <td className="px-5 py-3 w-60">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">
                           {doc.cliente.numeroDocumento}
@@ -1017,7 +1006,7 @@ export default function VerComprobantesPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-16">
+                    <td className="px-5 py-3 text-center w-16">
                       <div className="flex justify-center">
                         <StatusIcon
                           type="pdf"
@@ -1027,22 +1016,22 @@ export default function VerComprobantesPage() {
                         />
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-16">
+                    <td className="px-5 py-3 text-center w-16">
                       <div className="flex justify-center">
                         <StatusIcon type="xml" status="available" />
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-16">
+                    <td className="px-5 py-3 text-center w-16">
                       <div className="flex justify-center">
                         <StatusIcon type="cdr" status="available" />
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-32">
+                    <td className="px-5 py-3 text-center w-32">
                       <div className="flex justify-center">
                         <BadgeSunat estado={doc.estadoSunat} />
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-24">
+                    <td className="px-5 py-3 text-center w-24">
                       <div className="flex justify-center">
                         <BtnEnvio
                           tipo="email"
@@ -1054,7 +1043,7 @@ export default function VerComprobantesPage() {
                         />
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-24">
+                    <td className="px-5 py-3 text-center w-24">
                       <div className="flex justify-center">
                         <BtnEnvio
                           tipo="whatsapp"
@@ -1069,7 +1058,7 @@ export default function VerComprobantesPage() {
                         />
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-center w-20">
+                    <td className="px-5 py-3 text-center w-20">
                       <button
                         onClick={() => abrirDetalle(doc)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -1077,7 +1066,7 @@ export default function VerComprobantesPage() {
                         <Eye size={13} /> Ver
                       </button>
                     </td>
-                    <td className="px-5 py-4 text-center w-24">
+                    <td className="px-5 py-3 text-center w-24">
                       <div className="flex justify-center">
                         <DropdownOpciones
                           comprobante={doc}
