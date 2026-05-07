@@ -201,6 +201,8 @@ export interface ComprobanteListado {
   fechaCreacion: string
   usuarioModificacion: number | null
   fechaModificacion: string
+  xmlGenerado: string | null
+  xmlRespuestaSunat: string | null
 }
 
 // Interface para detalles por id
