@@ -72,3 +72,63 @@ export interface ReportesSucursalParams {
   limite?: number
   usuarioId?: number | null
 }
+
+// ── Medios de pago ─────────────────────────────────────────────────────────────
+export interface MedioPagoTop {
+  medioPago: string
+  vecesUsado: number
+  montoTotal: number
+  promedioMonto: number
+}
+
+// ── Productos top ──────────────────────────────────────────────────────────────
+export interface ProductoTop {
+  codigo: string
+  descripcion: string
+  totalCantidad: number
+  totalMonto: number
+  totalIGV: number
+  vecesVendido: number
+  precioPromedio: number
+}
+
+// ── Listado comprobante ────────────────────────────────────────────────────────
+export interface ListadoReporte {
+  comprobanteId: number
+  numeroCompleto: string
+  tipoComprobante: string
+  fechaEmision: string
+  tipoMoneda: string
+  valorVenta: number
+  totalIGV: number
+  importeTotal: number
+  estadoSunat: string
+  cliente: {
+    razonSocial: string
+    numeroDocumento: string
+  }
+}
+
+// ── Params reportes avanzados ──────────────────────────────────────────────────
+export interface ReportesAvanzadosParams {
+  ruc: string
+  codEstablecimiento?: string | null
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+  usuarioCreacion?: number | null
+  clienteNumDoc?: string | null
+  limit?: number | null
+  orderBy?: 'monto' | 'cantidad' | 'veces'
+}
+
+// ── Modal filtros ──────────────────────────────────────────────────────────────
+export interface FiltrosReporteModal {
+  codEstablecimiento?: string | null
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+  usuarioCreacion?: number | null
+  clienteNumDoc?: string | null
+  limit?: number | null
+  orderBy?: 'monto' | 'cantidad' | 'veces'
+  tituloPersonalizado?: string | null
+}
