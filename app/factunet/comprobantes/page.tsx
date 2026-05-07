@@ -32,14 +32,22 @@ import { useComprobantesEmpresaClienteListado } from "./gestionComprobantes/gest
 import { useComprobantesEmpresaUsuarioListado } from "./gestionComprobantes/gestionComprobantesLista/UseComprobantesEmpresaUsuarioListado";
 import { useComprobantesSucursalListado } from "./gestionComprobantes/gestionComprobantesLista/UseComprobantesSucursalListado";
 import { useComprobanteDetalles } from "./gestionComprobantes/gestionComprobantesLista/UseComprobanteDetalles";
-import { ComprobanteListado, ComprobanteDetalles,} from "./gestionComprobantes/Comprobante";
+import {
+  ComprobanteListado,
+  ComprobanteDetalles,
+} from "./gestionComprobantes/Comprobante";
 
 import { useComprobanteUnico } from "./gestionComprobantes/UseComprobanteUnico";
 import { useComprobantesClienteSucursalListado } from "./gestionComprobantes/gestionComprobantesLista/UseComprobantesClienteSucursalListado";
 
 import { ModalDetalle } from "@/app/components/modalVerComprobantes/ModalDetalle";
 import { ModalEnvioCorreoWhatsapp } from "@/app/components/modalVerComprobantes/ModalEnvioCorreoWhatsapp";
-import { tipoLabel, formatFecha, formatFechaHora, COLORS} from "./gestionComprobantes/helpers";
+import {
+  tipoLabel,
+  formatFecha,
+  formatFechaHora,
+  COLORS,
+} from "./gestionComprobantes/helpers";
 import { useRouter } from "next/navigation";
 import { Card } from "@/app/components/ui/Card";
 import { createPortal } from "react-dom";
@@ -90,7 +98,9 @@ export default function VerComprobantesPage() {
   const [showModalResumen, setShowModalResumen] = useState(false);
 
   //loading enviar a asunat
-  const [loadingSunatMap, setLoadingSunatMap] = useState<Record<string, boolean>>({});
+  const [loadingSunatMap, setLoadingSunatMap] = useState<
+    Record<string, boolean>
+  >({});
   const [showModalEnvioMasivo, setShowModalEnvioMasivo] = useState(false);
 
   // ── Estado local ──
@@ -144,7 +154,11 @@ export default function VerComprobantesPage() {
     if (modoAvanzado === "unico") return false;
     if (showAvanzado) {
       if (modoAvanzado === "fechas") {
-        return isSuperAdmin ? (sucursalFiltro ? hookSucursal.hasMore : hookEmpresa.hasMore) : hookSucursal.hasMore;
+        return isSuperAdmin
+          ? sucursalFiltro
+            ? hookSucursal.hasMore
+            : hookEmpresa.hasMore
+          : hookSucursal.hasMore;
       }
       if (modoAvanzado === "cliente") {
         return isSuperAdmin ? hookCliente.hasMore : hookClienteSucursal.hasMore;
@@ -153,12 +167,26 @@ export default function VerComprobantesPage() {
         return hookUsuario.hasMore;
       }
     }
-    return isSuperAdmin ? (sucursalFiltro ? hookSucursal.hasMore : hookEmpresa.hasMore) : hookSucursal.hasMore;
-  }, [showAvanzado, modoAvanzado, isSuperAdmin, sucursalFiltro, hookSucursal.hasMore, hookEmpresa.hasMore, hookCliente.hasMore, hookClienteSucursal.hasMore, hookUsuario.hasMore]);
+    return isSuperAdmin
+      ? sucursalFiltro
+        ? hookSucursal.hasMore
+        : hookEmpresa.hasMore
+      : hookSucursal.hasMore;
+  }, [
+    showAvanzado,
+    modoAvanzado,
+    isSuperAdmin,
+    sucursalFiltro,
+    hookSucursal.hasMore,
+    hookEmpresa.hasMore,
+    hookCliente.hasMore,
+    hookClienteSucursal.hasMore,
+    hookUsuario.hasMore,
+  ]);
 
   const pendientes = useMemo(
     () => comprobantes.filter((c) => c.estadoSunat === "PENDIENTE"),
-    [comprobantes]
+    [comprobantes],
   );
 
   // ── Refs estables para evitar loop en useEffect ──
@@ -194,7 +222,6 @@ export default function VerComprobantesPage() {
     setOffset(0);
     cargarComprobantes(0);
   }, [user, accessToken, cargarComprobantes]);
-
 
   const obtenerPdf = useCallback(
     async (c: ComprobanteListado) => {
@@ -350,7 +377,7 @@ export default function VerComprobantesPage() {
   const paginated = filtered;
   // ── Evnviar SUNAT ──
   const enviarSunat = async (c: ComprobanteListado) => {
-      setLoadingSunatMap((prev) => ({ ...prev, [c.comprobanteId]: true }));
+    setLoadingSunatMap((prev) => ({ ...prev, [c.comprobanteId]: true }));
     try {
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${c.comprobanteId}/enviar-sunat`,
@@ -386,7 +413,7 @@ export default function VerComprobantesPage() {
     } catch {
       showToast("Error al enviar a SUNAT", "error");
     } finally {
-      setLoadingSunatMap((prev) => ({ ...prev, [c.comprobanteId]: false })); 
+      setLoadingSunatMap((prev) => ({ ...prev, [c.comprobanteId]: false }));
     }
   };
 
@@ -394,7 +421,7 @@ export default function VerComprobantesPage() {
     (lista: ComprobanteListado[]) => {
       Promise.all(lista.map((c) => enviarSunat(c)));
     },
-    [enviarSunat]
+    [enviarSunat],
   );
 
   const editarenviarSunat = (c: ComprobanteListado) => {
@@ -442,6 +469,15 @@ export default function VerComprobantesPage() {
     // TODO: implementar cuando esté el endpoint
   };
 
+  const descargarArchivo = async (ruta: string | null, nombre: string) => {
+    if (!ruta) return;
+    const url = `${process.env.NEXT_PUBLIC_STORAGE_URL}/files${ruta}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    a.click();
+  };
+
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
       {/* Modales */}
@@ -458,7 +494,9 @@ export default function VerComprobantesPage() {
           onClose={() => setShowModalResumen(false)}
           isSuperAdmin={isSuperAdmin}
           sucursales={isSuperAdmin ? sucursales : undefined}
-          sucursalActual={!isSuperAdmin ? sucursalUsuario ?? undefined : undefined}
+          sucursalActual={
+            !isSuperAdmin ? (sucursalUsuario ?? undefined) : undefined
+          }
           onEmitido={(resumenId, estadoSunat) => {
             setShowModalResumen(false);
             if (
@@ -889,7 +927,6 @@ export default function VerComprobantesPage() {
                         setOffset(0);
                         cargarComprobantes(0);
                       }}
-
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-md transition-all"
                     >
                       <X size={12} /> Limpiar
@@ -941,12 +978,8 @@ export default function VerComprobantesPage() {
 
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table
-            className={cn(
-              "w-full text-left border-collapse comp-table"
-            )}
-          >
-            <thead >
+          <table className={cn("w-full text-left border-collapse comp-table")}>
+            <thead>
               <tr
                 className="bg-gray-100"
                 style={{
@@ -1053,17 +1086,40 @@ export default function VerComprobantesPage() {
                     </td>
                     <td className="px-5 py-3 text-center w-16">
                       <div className="flex justify-center">
-                        <StatusIcon type="xml" status="available" />
+                        <StatusIcon
+                          type="xml"
+                          status={doc.xmlGenerado ? "available" : "pending"}
+                          onClick={() =>
+                            descargarArchivo(
+                              doc.xmlGenerado,
+                              `${doc.numeroCompleto}.zip`,
+                            )
+                          }
+                        />
                       </div>
                     </td>
                     <td className="px-5 py-3 text-center w-16">
                       <div className="flex justify-center">
-                        <StatusIcon type="cdr" status="available" />
+                        <StatusIcon
+                          type="cdr"
+                          status={
+                            doc.xmlRespuestaSunat ? "available" : "pending"
+                          }
+                          onClick={() =>
+                            descargarArchivo(
+                              doc.xmlRespuestaSunat,
+                              `R-${doc.numeroCompleto}.zip`,
+                            )
+                          }
+                        />
                       </div>
                     </td>
                     <td className="px-5 py-3 text-center w-32">
                       <div className="flex justify-center">
-                        <BadgeSunat estado={doc.estadoSunat} loading={loadingSunatMap[doc.comprobanteId]} />
+                        <BadgeSunat
+                          estado={doc.estadoSunat}
+                          loading={loadingSunatMap[doc.comprobanteId]}
+                        />
                       </div>
                     </td>
                     <td className="px-5 py-3 text-center w-24">
@@ -1161,21 +1217,27 @@ export default function VerComprobantesPage() {
             </div>
             <span className="text-sm text-gray-500">
               Registros del{" "}
-              <span className="font-semibold text-gray-900">{offset + 1}</span> al{" "}
+              <span className="font-semibold text-gray-900">{offset + 1}</span>{" "}
+              al{" "}
               <span className="font-semibold text-gray-900">
                 {offset + comprobantes.length}
               </span>
             </span>
           </div>
         )}
-
       </Card>
     </div>
   );
 }
 
 // ─── BadgeSunat ───────────────────────────────────────────────────────────────
-const BadgeSunat = ({ estado, loading }: { estado: string; loading?: boolean }) => {
+const BadgeSunat = ({
+  estado,
+  loading,
+}: {
+  estado: string;
+  loading?: boolean;
+}) => {
   if (loading) {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap bg-blue-50 text-blue-600 border-blue-200">
@@ -1303,14 +1365,24 @@ const StatusIcon = ({
       </button>
     );
   }
+  const disponible = status === "available";
   return (
-    <button className={COLORS.pdf.btn}>
+    <button
+      onClick={onClick}
+      disabled={!disponible}
+      title={
+        disponible
+          ? `Descargar ${type.toUpperCase()}`
+          : `${type.toUpperCase()} no disponible`
+      }
+      className={cn(
+        COLORS.pdf.btn,
+        !disponible && "opacity-30 cursor-not-allowed",
+      )}
+    >
       <RefreshCw
         size={18}
-        className={cn(
-          "transition-colors",
-          status === "available" ? "text-emerald-500" : "text-gray-300",
-        )}
+        className={cn(disponible ? "text-emerald-500" : "text-gray-300")}
       />
     </button>
   );

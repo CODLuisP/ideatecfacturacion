@@ -14,6 +14,7 @@ import {
   MapPin,
   FlaskConical,
   Zap,
+  AlertTriangle,
 } from "lucide-react";
 import { View } from "@/app/types";
 import { signOut } from "next-auth/react";
@@ -38,6 +39,11 @@ export const Topbar = ({
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
+  const [lastSeenAt, setLastSeenAt] = useState<string>(
+    new Date().toISOString(),
+  );
+  const [unseenCount, setUnseenCount] = useState(0);
+
   const { user } = useAuth();
 
   const isSuperAdmin = user?.rol === "superadmin";
@@ -48,6 +54,7 @@ export const Topbar = ({
     totalPending,
     connected,
     certInfo,
+    generatedAt,
   } = useNotifications({
     sucursalId: isSuperAdmin
       ? null
@@ -78,6 +85,36 @@ export const Topbar = ({
     totalPending +
     (lastRejected ? 1 : 0) +
     (certInfo?.isExpiringSoon || certInfo?.isExpired ? 1 : 0);
+
+  // Reemplaza el useEffect por este:
+  const prevGeneratedAt = useRef<string>("");
+  const isFirstLoad = useRef<boolean>(true);
+
+  useEffect(() => {
+    if (!generatedAt) return;
+
+    if (isFirstLoad.current) {
+      // Al cargar por primera vez, muestra el unreadCount inicial
+      setUnseenCount(unreadCount);
+      isFirstLoad.current = false;
+    } else if (generatedAt !== prevGeneratedAt.current && !notifOpen) {
+      // Cada actualización posterior suma 1
+      setUnseenCount((prev) => prev + 1);
+    }
+
+    prevGeneratedAt.current = generatedAt;
+  }, [generatedAt, unreadCount, notifOpen]);
+
+  // Al abrir el panel, marca como leído:
+  const handleOpenNotif = () => {
+    const isOpening = !notifOpen;
+    setNotifOpen(isOpening);
+    setUserOpen(false);
+    if (isOpening) {
+      setLastSeenAt(new Date().toISOString());
+      setUnseenCount(0);
+    }
+  };
 
   return (
     <>
@@ -173,10 +210,7 @@ export const Topbar = ({
           {/* Campana de notificaciones */}
           <div className="relative" ref={notifRef}>
             <button
-              onClick={() => {
-                setNotifOpen((v) => !v);
-                setUserOpen(false);
-              }}
+              onClick={handleOpenNotif}
               className={`p-2.5 rounded-xl relative group transition-all ${
                 isBeta
                   ? "hover:bg-amber-100 text-amber-500"
@@ -190,8 +224,12 @@ export const Topbar = ({
                     : "group-hover:text-blue-600"
                 }`}
               />
-              {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+              {unseenCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-4.5 h-4.5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center px-1">
+                  <span className="text-[10px] font-bold text-white leading-none">
+                    {unseenCount}
+                  </span>
+                </span>
               )}
             </button>
 
@@ -205,9 +243,9 @@ export const Topbar = ({
                     <span
                       className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-gray-300"}`}
                     />
-                    {unreadCount > 0 && (
+                    {unseenCount > 0 && (
                       <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                        {unreadCount} nuevas
+                        {unseenCount} nuevas
                       </span>
                     )}
                   </div>
@@ -226,7 +264,9 @@ export const Topbar = ({
                           pendiente{totalPending > 1 ? "s" : ""}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Sin respuesta de SUNAT hoy
+                          {totalPending === 1
+                            ? pendingDocs[0]?.numeroCompleto
+                            : `Más reciente: ${pendingDocs[0]?.numeroCompleto}`}
                         </p>
                       </div>
                       <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
@@ -288,15 +328,15 @@ export const Topbar = ({
                         className={`flex items-start gap-3 px-4 py-3 ${certInfo.isExpired ? "bg-red-50/60" : "bg-amber-50/40"}`}
                       >
                         <div className="mt-0.5 p-1.5 bg-white rounded-lg border border-gray-100 shadow-sm shrink-0">
-                          <AlertCircle
+                          <AlertTriangle
                             className={`w-4 h-4 ${certInfo.isExpired ? "text-red-500" : "text-amber-500"}`}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-gray-800">
                             {certInfo.isExpired
-                              ? "❌ Certificado vencido"
-                              : "⚠️ Certificado por vencer"}
+                              ? "Certificado vencido"
+                              : "Certificado por vencer"}
                           </p>
                           <p className="text-xs text-gray-500 mt-0.5">
                             {certInfo.isExpired
