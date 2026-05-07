@@ -1625,23 +1625,30 @@ export default function BoletaPage() {
         const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
 
         if (enviarCorreo && correoCliente) {
-          try {
-            const formData = new FormData();
-            formData.append("toEmail", correoCliente);
-            formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
-            formData.append("subject", `Boleta Electrónica ${serieNum}`);
-            formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
-            formData.append("tipo", "3");
-            formData.append("comprobanteJson", JSON.stringify({
-              serieNumero: serieNum, estadoSunat: "ACEPTADO",
-              items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-              igv: totales.igv, total: totales.importeTotal,
-            }));
-            formData.append("adjunto", pdfFile);
-            const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-            if (!resCorreo.ok) throw new Error("Error correo");
-            showToast("Boleta enviada por correo", "success");
-          } catch { showToast("Error al enviar por correo", "error"); }
+          const correosLista = correoCliente.split(',').map(s => s.trim()).filter(Boolean);
+          const comprobanteJson = JSON.stringify({
+            serieNumero: serieNum, estadoSunat: "ACEPTADO",
+            items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
+            igv: totales.igv, total: totales.importeTotal,
+          });
+          const resultadosCorreo = await Promise.allSettled(
+            correosLista.map(correo => {
+              const formData = new FormData();
+              formData.append("toEmail", correo);
+              formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
+              formData.append("subject", `Boleta Electrónica ${serieNum}`);
+              formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
+              formData.append("tipo", "3");
+              formData.append("comprobanteJson", comprobanteJson);
+              formData.append("adjunto", pdfFile);
+              return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData })
+                .then(res => { if (!res.ok) throw new Error(`Error correo ${correo}`); });
+            })
+          );
+          const fallidosCorreo = resultadosCorreo.filter(r => r.status === 'rejected').length;
+          if (fallidosCorreo === correosLista.length) showToast("Error al enviar por correo", "error");
+          else if (fallidosCorreo > 0) showToast(`Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`, "error");
+          else showToast(correosLista.length > 1 ? `Boleta enviada a ${correosLista.length} correos` : "Boleta enviada por correo", "success");
         }
 
         if (enviarWhatsapp && telefonoCliente) {
@@ -1653,14 +1660,21 @@ export default function BoletaPage() {
             const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
             if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
             const fileUrl = (await resUpload.json()).datos.url;
-            const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-              body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
-            });
-            if (!resWsp.ok) throw new Error("Error WhatsApp");
-            showToast("Boleta enviada por WhatsApp", "success");
+            const telefonosLista = telefonoCliente.split(',').map(s => s.trim()).filter(Boolean);
+            const resultadosWsp = await Promise.allSettled(
+              telefonosLista.map(num => {
+                const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
+                return fetch(`${whatsappBase}/api/send/single`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
+                }).then(res => { if (!res.ok) throw new Error(`Error WhatsApp ${num}`); });
+              })
+            );
+            const fallidosWsp = resultadosWsp.filter(r => r.status === 'rejected').length;
+            if (fallidosWsp === telefonosLista.length) showToast("Error al enviar por WhatsApp", "error");
+            else if (fallidosWsp > 0) showToast(`WhatsApp enviado, pero falló ${fallidosWsp} número(s)`, "error");
+            else showToast(telefonosLista.length > 1 ? `Boleta enviada a ${telefonosLista.length} números` : "Boleta enviada por WhatsApp", "success");
           } catch { showToast("Error al enviar por WhatsApp", "error"); }
         }
       } catch { showToast("Error al procesar envíos", "error"); }
@@ -1904,7 +1918,7 @@ export default function BoletaPage() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 uppercase">Contacto</label>
                     <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                      <input type="email" value={correoCliente} placeholder="Correo del cliente"
+                      <input type="text" value={correoCliente} placeholder="correo@cliente.com, otro@email.com"
                         disabled={!boleta.cliente?.razonSocial || clienteVarios}
                         onChange={e => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
                         className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
@@ -1914,25 +1928,25 @@ export default function BoletaPage() {
                       </label>
                     </div>
                     <div className="space-y-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} placeholder="Teléfono / WhatsApp" maxLength={9}
+                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                        <input type="tel" value={telefonoCliente} placeholder="9XXXXXXXX, 9XXXXXXXX"
                           disabled={!boleta.cliente?.razonSocial || clienteVarios}
-                          onChange={e => { 
-                            const s = e.target.value.replace(/\D/g, ""); 
-                            setTelefonoCliente(s); 
-                            if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                          onChange={e => {
+                            const s = e.target.value.replace(/[^\d,]/g, '');
+                            setTelefonoCliente(s);
+                            const nums = s.split(',').map(x => x.trim()).filter(Boolean);
+                            if (!nums.length || !nums.every(n => n.startsWith('9') && n.length === 9)) setEnviarWhatsapp(false);
                           }}
                           className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
                         <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={e => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                          <input type="checkbox" checked={enviarWhatsapp}
+                            disabled={!telefonoCliente || !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9)}
+                            onChange={e => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
                           <span className="text-xs text-gray-500">Enviar</span>
                         </label>
                       </div>
-                      {telefonoCliente && !telefonoCliente.startsWith("9") && (
-                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
-                      )}
-                      {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
-                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                      {telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) && (
+                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Cada número debe empezar con 9 y tener 9 dígitos</p>
                       )}
                     </div>
                   </div>
