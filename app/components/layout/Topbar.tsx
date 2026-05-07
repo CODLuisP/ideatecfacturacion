@@ -318,7 +318,7 @@ export const Topbar = ({
                     !lastRejected &&
                     !certInfo?.isExpiringSoon && (
                       <li className="px-4 py-6 text-center text-sm text-gray-400">
-                        Sin actividad hoy 🎉
+                        Sin actividad hoy
                       </li>
                     )}
                 </ul>

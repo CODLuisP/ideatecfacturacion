@@ -84,9 +84,10 @@ export function useNotifications({
               totalPending: newData.totalPending,
             }));
           } else if (evento === "status") {
-            // Solo actualiza aceptado/rechazado
             setData((prev) => ({
               ...prev,
+              pendingDocs: newData.pendingDocs,
+              totalPending: newData.totalPending,
               lastAccepted: newData.lastAccepted,
               lastRejected: newData.lastRejected,
             }));
