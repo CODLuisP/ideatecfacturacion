@@ -321,7 +321,6 @@ export default function VerComprobantesPage() {
     }
   };
 
-
   // ── Filtrado local ──
   const filtered = useMemo(() => {
     return comprobantes.filter((c) => {
