@@ -67,6 +67,8 @@ interface GuiaDto {
   estadoSunat: string;
   codigoRespuestaSunat?: string;
   mensajeRespuestaSunat?: string;
+  xmlGenerado?: string | null;
+  xmlRespuestaSunat?: string | null;
 }
 
 // ─── Page Principal ───────────────────────────────────────────────────────────
@@ -105,6 +107,13 @@ export default function GuiasRemisionPage() {
   const [avSerie, setAvSerie] = useState("");
   const [avNumero, setAvNumero] = useState("");
   const hoy = new Date().toISOString().split("T")[0];
+
+  const [loadingXmlMap, setLoadingXmlMap] = useState<Record<number, boolean>>(
+    {},
+  );
+  const [loadingCdrMap, setLoadingCdrMap] = useState<Record<number, boolean>>(
+    {},
+  );
 
   // ── Carga inicial por tipo ──
   const cargarGuias = useCallback(
@@ -264,6 +273,32 @@ export default function GuiasRemisionPage() {
     cargarGuias(tipo);
   };
 
+  const descargarArchivo = async (
+    ruta: string | null | undefined,
+    nombre: string,
+    guiaId: number,
+    tipo: "xml" | "cdr",
+  ) => {
+    if (!ruta) return;
+    const setLoading = tipo === "xml" ? setLoadingXmlMap : setLoadingCdrMap;
+    setLoading((prev) => ({ ...prev, [guiaId]: true }));
+    try {
+      const url = `${process.env.NEXT_PUBLIC_STORAGE_URL}/files${ruta}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Error al descargar");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = nombre;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      showToast(`Error al descargar ${tipo.toUpperCase()}`, "error");
+    } finally {
+      setLoading((prev) => ({ ...prev, [guiaId]: false }));
+    }
+  };
+
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
       {guiaIdDetalle && (
@@ -370,7 +405,6 @@ export default function GuiasRemisionPage() {
                   )}
                 />
               </button>
-
             </div>
 
             {/* Botón nueva guía */}
@@ -393,8 +427,16 @@ export default function GuiasRemisionPage() {
               <div className="flex border-b border-gray-100">
                 {(
                   [
-                    { key: "fechas", label: "Por fechas", icon: <Calendar size={14} /> },
-                    { key: "unico", label: "Guía única", icon: <Hash size={14} /> },
+                    {
+                      key: "fechas",
+                      label: "Por fechas",
+                      icon: <Calendar size={14} />,
+                    },
+                    {
+                      key: "unico",
+                      label: "Guía única",
+                      icon: <Hash size={14} />,
+                    },
                   ] as const
                 ).map((tab) => (
                   <button
@@ -573,6 +615,9 @@ export default function GuiasRemisionPage() {
                   `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
                 )
               }
+              loadingXmlMap={loadingXmlMap}
+              loadingCdrMap={loadingCdrMap}
+              onDescargar={descargarArchivo}
             />
           ) : (
             <TablaTransportista
@@ -588,6 +633,9 @@ export default function GuiasRemisionPage() {
                   `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
                 )
               }
+              loadingXmlMap={loadingXmlMap}
+              loadingCdrMap={loadingCdrMap}
+              onDescargar={descargarArchivo}
             />
           )}
         </div>
@@ -618,6 +666,9 @@ function TablaRemitente({
   onEnviarSunat,
   loadingGuiaId,
   onEditar,
+  loadingXmlMap,
+  loadingCdrMap,
+  onDescargar,
 }: {
   guias: GuiaDto[];
   loading: boolean;
@@ -627,6 +678,14 @@ function TablaRemitente({
   onEnviarSunat: (guiaId: number) => void;
   loadingGuiaId: number | null;
   onEditar: (guiaId: number) => void;
+  loadingXmlMap: Record<number, boolean>;
+  loadingCdrMap: Record<number, boolean>;
+  onDescargar: (
+    ruta: string | null | undefined,
+    nombre: string,
+    guiaId: number,
+    tipo: "xml" | "cdr",
+  ) => void;
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
@@ -646,6 +705,12 @@ function TablaRemitente({
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             TRANSPORTISTA
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            XML
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            CDR
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             CORREO
@@ -725,6 +790,40 @@ function TablaRemitente({
               </td>
               <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlGenerado ? "available" : "pending"}
+                    loading={loadingXmlMap[g.guiaId]}
+                    label="XML"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlGenerado,
+                        `${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "xml",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-4 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlRespuestaSunat ? "available" : "pending"}
+                    loading={loadingCdrMap[g.guiaId]}
+                    label="CDR"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlRespuestaSunat,
+                        `R-${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "cdr",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-4 text-center">
+                <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
                     enviado={g.enviadoPorCorreo}
@@ -788,6 +887,9 @@ function TablaTransportista({
   onEnviarSunat,
   loadingGuiaId,
   onEditar,
+  loadingXmlMap,
+  loadingCdrMap,
+  onDescargar,
 }: {
   guias: GuiaDto[];
   loading: boolean;
@@ -797,6 +899,14 @@ function TablaTransportista({
   onEnviarSunat: (guiaId: number) => void;
   loadingGuiaId: number | null;
   onEditar: (guiaId: number) => void;
+  loadingXmlMap: Record<number, boolean>;
+  loadingCdrMap: Record<number, boolean>;
+  onDescargar: (
+    ruta: string | null | undefined,
+    nombre: string,
+    guiaId: number,
+    tipo: "xml" | "cdr",
+  ) => void;
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
@@ -819,6 +929,12 @@ function TablaTransportista({
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PLACA
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            XML
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            CDR
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             CORREO
@@ -899,6 +1015,40 @@ function TablaTransportista({
                   <Truck size={11} className="text-gray-500" />
                   {g.transportistaPlaca ?? "—"}
                 </span>
+              </td>
+              <td className="px-5 py-4 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlGenerado ? "available" : "pending"}
+                    loading={loadingXmlMap[g.guiaId]}
+                    label="XML"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlGenerado,
+                        `${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "xml",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-4 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlRespuestaSunat ? "available" : "pending"}
+                    loading={loadingCdrMap[g.guiaId]}
+                    label="CDR"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlRespuestaSunat,
+                        `R-${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "cdr",
+                      )
+                    }
+                  />
+                </div>
               </td>
               <td className="px-5 py-4 text-center">
                 <div className="flex justify-center">
@@ -1075,6 +1225,49 @@ const DropdownFiltro = ({
         </div>
       )}
     </div>
+  );
+};
+
+const GuiaFileIcon = ({
+  status,
+  loading,
+  label,
+  onClick,
+}: {
+  status: "available" | "pending";
+  loading?: boolean;
+  label: string;
+  onClick?: () => void;
+}) => {
+  const disponible = status === "available";
+  return (
+    <button
+      onClick={onClick}
+      disabled={!disponible || loading}
+      title={
+        loading
+          ? "Descargando..."
+          : disponible
+            ? `Descargar ${label}`
+            : `${label} no disponible`
+      }
+      className={cn(
+        "p-1.5 rounded-lg transition-colors",
+        !disponible && "opacity-30 cursor-not-allowed",
+      )}
+    >
+      <RefreshCw
+        size={18}
+        className={cn(
+          "transition-colors",
+          loading
+            ? "animate-spin text-blue-400"
+            : disponible
+              ? "text-emerald-500"
+              : "text-gray-300",
+        )}
+      />
+    </button>
   );
 };
 
