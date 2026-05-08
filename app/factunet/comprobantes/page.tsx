@@ -1054,7 +1054,7 @@ export default function VerComprobantesPage() {
                     className="hover:bg-gray-50/50 transition-colors "
                   >
                     <td className="px-5 py-3 text-sm text-gray-900 font-medium whitespace-nowrap w-32 ">
-                      {formatFecha(doc.fechaCreacion)}
+                      {formatFecha(doc.fechaEmision)}
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap w-52">
                       <p className="text-sm font-medium text-gray-900">

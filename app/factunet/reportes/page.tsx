@@ -83,7 +83,7 @@ export default function ReportesPage() {
 
   // Sucursales
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
-  const { sucursales, loadingSucursales } = useSucursalRuc(isSuperAdmin);
+  const { sucursales, loadingSucursales } = useSucursalRuc(true);
 
   const activeHook = isSuperAdmin && !sucursalSeleccionada ? hookEmpresa : hookSucursal;
   const { reportes, loading, loadingExport, fetchExport } = activeHook;
@@ -109,15 +109,11 @@ export default function ReportesPage() {
   // ── codEstablecimiento según rol ──────────────────────────────────────────
   const getCodEstablecimiento = (sId: number | null = sucursalSeleccionada): string | null => {
     if (!isSuperAdmin) {
-      // admin y facturador siempre envían su propio codEstablecimiento
-      return sucursales.find(s => s.sucursalId === Number(user?.sucursalID))?.codEstablecimiento ?? null;
+      return sucursales.find(s => s.sucursalId === Number(user?.sucursalID))?.codEstablecimiento ?? null
     }
-    // superadmin: solo si seleccionó una sucursal
-    if (sId) {
-      return sucursales.find(s => s.sucursalId === sId)?.codEstablecimiento ?? null;
-    }
-    return null;
-  };
+    if (sId) return sucursales.find(s => s.sucursalId === sId)?.codEstablecimiento ?? null
+    return null
+  }
 
   // ── Fetch reportes dashboard ──────────────────────────────────────────────
   const doFetch = (
@@ -171,13 +167,14 @@ export default function ReportesPage() {
   };
 
   const handleSucursal = (id: number | null) => {
-    setSucursalSeleccionada(id);
+    setSucursalSeleccionada(id)
+    setUsuarioId(null) // 👈 resetear usuario al cambiar sucursal
     if (periodo === 'personalizado' && customStart) {
-      doFetch(periodo, usuarioId, id, customStart, customEnd || customStart);
+      doFetch(periodo, null, id, customStart, customEnd || customStart)
     } else {
-      doFetch(periodo, usuarioId, id);
+      doFetch(periodo, null, id)
     }
-  };
+  }
 
   // ── Gráfico paginado ──────────────────────────────────────────────────────
   const graficoCompleto: GraficoBarra[] = reportes?.grafico ?? [];
@@ -235,11 +232,6 @@ export default function ReportesPage() {
     ruc: user!.ruc,
     codEstablecimiento: getCodEstablecimiento(sId),
   });
-
-  const getSucursalModalId = (): number | null => {
-    if (!isSuperAdmin) return Number(user?.sucursalID) || null;
-    return sucursalSeleccionada;
-  };
 
   // Obtener nombre de sucursal para el título automático
   const getNombreSucursal = (cod: string | null): string | undefined => {
@@ -340,10 +332,12 @@ export default function ReportesPage() {
         codEstablecimiento: s.codEstablecimiento,
       }))
     : [];
-
+  const handleCerrarModal = () => {
+    modal.cerrar()
+    modal.resetFiltros()
+  }
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
-
       {/* ── Header / Filtros ──────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="space-y-2">
@@ -376,7 +370,12 @@ export default function ReportesPage() {
 
             {puedeVerUsuarios && (
               <DropdownUsuario
-                usuarios={usuarios}
+                usuarios={isSuperAdmin && sucursalSeleccionada
+                  ? usuarios.filter(u =>
+                      String(u.sucursalID) === String(sucursalSeleccionada) || u.rol === 'superadmin'
+                    )
+                  : usuarios
+                }
                 seleccionado={usuarioId}
                 onSelect={handleUsuario}
               />
@@ -610,11 +609,16 @@ export default function ReportesPage() {
       {/* ── Modal Reportes Excel ───────────────────────────────────────────── */}
       <ModalReportes
         abierto={modal.abierto}
-        onCerrar={modal.cerrar}
+        onCerrar={handleCerrarModal}
         filtros={modal.filtros}
         onSetFiltro={modal.setFiltro}
         onResetFiltros={modal.resetFiltros}
-        usuarios={usuarios}
+          usuarios={isSuperAdmin && sucursalSeleccionada
+            ? usuarios.filter(u =>
+                String(u.sucursalID) === String(sucursalSeleccionada) || u.rol === 'superadmin'
+              )
+            : usuarios
+          }
         sucursales={sucursalesModal}
         isSuperAdmin={isSuperAdmin}
         puedeVerUsuarios={puedeVerUsuarios}
