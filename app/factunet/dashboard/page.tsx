@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   Eye,
   Plus,
+  TrendingDown,
+  TrendingUp,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -386,6 +389,156 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
+// ─── Card: Desglose de Notas ───────────────────────────────────────────────────
+
+const DesgloseNotasCard: React.FC<{
+  dashboard: import("./gestionDashboard/Dashboard").DashboardData | null;
+  loading: boolean;
+}> = ({ dashboard, loading }) => {
+  if (loading) {
+    return (
+      <Card>
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-3 w-64" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-4 rounded-xl border border-gray-100 space-y-2">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
+
+  const ncDia = dashboard?.totalNotasCreditoDelDia ?? 0;
+  const ncOtras = dashboard?.totalNotasCreditoOtrasFechas ?? 0;
+  const ndDia = dashboard?.totalNotasDebitoDelDia ?? 0;
+  const ndOtras = dashboard?.totalNotasDebitoOtrasFechas ?? 0;
+  const hayNotasOtrasFechas = ncOtras > 0 || ndOtras > 0;
+
+  return (
+    <Card
+      title="Desglose de Notas"
+      subtitle="Impacto de notas de crédito y débito según fecha del documento afectado"
+    >
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+        {/* NC del día */}
+        <div className="p-4 rounded-xl border border-rose-100 bg-rose-50/50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 rounded-lg bg-rose-100">
+              <TrendingDown size={14} className="text-rose-600" />
+            </div>
+            <p className="text-xs font-semibold text-rose-700 uppercase tracking-wide">
+              NC · Día actual
+            </p>
+          </div>
+          <p className="text-lg font-bold text-rose-700">{formatMoneda(ncDia)}</p>
+          <p className="text-[11px] text-rose-500 mt-1">
+            Afectan documentos emitidos hoy
+          </p>
+        </div>
+
+        {/* ND del día */}
+        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 rounded-lg bg-emerald-100">
+              <TrendingUp size={14} className="text-emerald-600" />
+            </div>
+            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
+              ND · Día actual
+            </p>
+          </div>
+          <p className="text-lg font-bold text-emerald-700">{formatMoneda(ndDia)}</p>
+          <p className="text-[11px] text-emerald-500 mt-1">
+            Afectan documentos emitidos hoy
+          </p>
+        </div>
+
+        {/* NC otras fechas */}
+        <div className={cn(
+          "p-4 rounded-xl border",
+          hayNotasOtrasFechas
+            ? "border-amber-100 bg-amber-50/50"
+            : "border-gray-100 bg-gray-50/50"
+        )}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className={cn("p-1.5 rounded-lg", hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100")}>
+              <ArrowLeftRight size={14} className={hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"} />
+            </div>
+            <p className={cn(
+              "text-xs font-semibold uppercase tracking-wide",
+              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400"
+            )}>
+              NC · Otras fechas
+            </p>
+          </div>
+          <p className={cn("text-lg font-bold", hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400")}>
+            {formatMoneda(ncOtras)}
+          </p>
+          <p className={cn("text-[11px] mt-1", hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400")}>
+            Afectan documentos de días anteriores
+          </p>
+        </div>
+
+        {/* ND otras fechas */}
+        <div className={cn(
+          "p-4 rounded-xl border",
+          hayNotasOtrasFechas
+            ? "border-amber-100 bg-amber-50/50"
+            : "border-gray-100 bg-gray-50/50"
+        )}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className={cn("p-1.5 rounded-lg", hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100")}>
+              <ArrowLeftRight size={14} className={hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"} />
+            </div>
+            <p className={cn(
+              "text-xs font-semibold uppercase tracking-wide",
+              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400"
+            )}>
+              ND · Otras fechas
+            </p>
+          </div>
+          <p className={cn("text-lg font-bold", hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400")}>
+            {formatMoneda(ndOtras)}
+          </p>
+          <p className={cn("text-[11px] mt-1", hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400")}>
+            Afectan documentos de días anteriores
+          </p>
+        </div>
+      </div>
+
+      {/* Resumen neto */}
+      <div className="mt-4 p-4 rounded-xl border border-blue-100 bg-blue-50/50 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+            Ventas Netas del Día
+          </p>
+          <p className="text-[11px] text-blue-500 mt-0.5">
+            Ventas brutas + ND del día − NC del día
+          </p>
+        </div>
+        <p className="text-xl font-bold text-blue-700">
+          {formatMoneda(dashboard?.ventasNetas ?? 0)}
+        </p>
+      </div>
+
+      {hayNotasOtrasFechas && (
+        <p className="text-[11px] text-amber-600 mt-3 flex items-center gap-1">
+          <AlertTriangle size={11} />
+          Existen notas que afectan documentos de días anteriores y no impactan las ventas netas de hoy.
+        </p>
+      )}
+    </Card>
+  );
+};
+
 // ─── Dashboard Page ────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -401,14 +554,12 @@ export default function DashboardPage() {
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
   const [fecha, setFecha] = useState<string>(getFechaHoy());
 
-  // ─── Dashboard activo según contexto ──────────────────────────────
   const { dashboard, loading, error } = useMemo(() => {
     if (isSuperAdmin && sucursalSeleccionada) return hookSucursal;
     if (isSuperAdmin) return hookEmpresa;
     return hookSucursal;
   }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
-  // ─── Fetch centralizado ────────────────────────────────────────────
   const fetchData = useCallback(
     (fechaParam: string, sucursalParam: number | null) => {
       if (!user) return;
@@ -425,12 +576,10 @@ export default function DashboardPage() {
     [user, isSuperAdmin],
   );
 
-  // ─── Carga inicial ─────────────────────────────────────────────────
   useEffect(() => {
     fetchData(fecha, sucursalSeleccionada);
   }, [user]);
 
-  // ─── Handler: cambio de sucursal ──────────────────────────────────
   const handleSucursalChange = (id: number | null) => {
     if (id === null) hookSucursal.reset();
     else hookEmpresa.reset();
@@ -438,13 +587,11 @@ export default function DashboardPage() {
     fetchData(fecha, id);
   };
 
-  // ─── Handler: cambio de fecha ─────────────────────────────────────
   const handleFechaChange = (nuevaFecha: string) => {
     setFecha(nuevaFecha);
     fetchData(nuevaFecha, sucursalSeleccionada);
   };
 
-  // ─── Chart data (7 días hacia atrás desde `fecha`) ────────────────
   const chartData = useMemo(() => {
     const dias: { name: string; sales: number }[] = [];
     const base = new Date(fecha + "T00:00:00");
@@ -462,6 +609,59 @@ export default function DashboardPage() {
     }
     return dias;
   }, [dashboard?.rendimientoVentas, fecha]);
+
+  // ─── KPIs ─────────────────────────────────────────────────────────
+  const kpis = [
+    {
+      label: "Ventas del Día",
+      value: formatMoneda(dashboard?.ventasDelDia ?? 0),
+      icon: BarChart3,
+      color: "text-brand-red",
+      bg: "bg-red-50",
+    },
+    {
+      label: "Ventas Netas",
+      value: formatMoneda(dashboard?.ventasNetas ?? 0),
+      icon: TrendingUp,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+    },
+    {
+      label: "Facturas Emitidas",
+      value: String(dashboard?.facturasEmitidas ?? 0),
+      icon: FileText,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
+      label: "Boletas Emitidas",
+      value: String(dashboard?.boletasEmitidas ?? 0),
+      icon: FileText,
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+    },
+    {
+      label: "Notas de Crédito",
+      value: String(dashboard?.notasCreditoEmitidas ?? 0),
+      icon: TrendingDown,
+      color: "text-rose-600",
+      bg: "bg-rose-50",
+    },
+    {
+      label: "Notas de Débito",
+      value: String(dashboard?.notasDebitoEmitidas ?? 0),
+      icon: FileText,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+    },
+    {
+      label: "Estado SUNAT",
+      value: "Conectado",
+      icon: Zap,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+  ];
 
   return (
     <>
@@ -519,10 +719,10 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-4 animate-in fade-in duration-500">
-        {/* ─── KPI Grid ───────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* ─── KPI Grid (7 cards) ─────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           {loading
-            ? Array.from({ length: 6 }).map((_, i) => (
+            ? Array.from({ length: 7 }).map((_, i) => (
                 <Card key={i} className="p-0">
                   <div className="p-3 flex items-center gap-3">
                     <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
@@ -533,50 +733,7 @@ export default function DashboardPage() {
                   </div>
                 </Card>
               ))
-            : [
-                {
-                  label: "Ventas del Día",
-                  value: formatMoneda(dashboard?.ventasDelDia ?? 0),
-                  icon: BarChart3,
-                  color: "text-brand-red",
-                  bg: "bg-red-50",
-                },
-                {
-                  label: "Facturas Emitidas",
-                  value: String(dashboard?.facturasEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-emerald-600",
-                  bg: "bg-emerald-50",
-                },
-                {
-                  label: "Boletas Emitidas",
-                  value: String(dashboard?.boletasEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-purple-600",
-                  bg: "bg-purple-50",
-                },
-                {
-                  label: "Notas de Crédito",
-                  value: String(dashboard?.notasCreditoEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-blue-600",
-                  bg: "bg-blue-50",
-                },
-                {
-                  label: "Notas de Débito",
-                  value: String(dashboard?.notasDebitoEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-orange-600",
-                  bg: "bg-orange-50",
-                },
-                {
-                  label: "Estado SUNAT",
-                  value: "Conectado",
-                  icon: Zap,
-                  color: "text-amber-600",
-                  bg: "bg-amber-50",
-                },
-              ].map((kpi, i) => (
+            : kpis.map((kpi, i) => (
                 <Card key={i} className="p-0">
                   <div className="p-3 flex items-center gap-3">
                     <div className={cn("p-2.5 rounded-xl shrink-0", kpi.bg)}>
@@ -594,6 +751,9 @@ export default function DashboardPage() {
                 </Card>
               ))}
         </div>
+
+        {/* ─── Desglose de Notas ──────────────────────────────────────── */}
+        <DesgloseNotasCard dashboard={dashboard} loading={loading} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ─── Gráfico de ventas ──────────────────────────────────────── */}

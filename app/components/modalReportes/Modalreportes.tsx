@@ -3,13 +3,12 @@
 import React, { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  X, Download, FileSpreadsheet, Filter,
+  X, Download, FileSpreadsheet,
   Calendar, User, Building2, Hash,
   SortAsc, FileText, Loader2, ChevronDown, Check
 } from "lucide-react";
 import { cn } from "@/app/utils/cn";
 import { Button } from "@/app/components/ui/Button";
-import { DropdownUsuario } from "@/app/components/ui/DropdownUsuario";
 import { FiltrosReporteModal } from "@/app/factunet/reportes/gestionReportes/Reportes";
 import { UsuarioReporte } from "@/app/factunet/reportes/gestionReportes/UseUsuariosReporte";
 
@@ -47,16 +46,17 @@ const getLunesString  = () => { const h = new Date(); const l = new Date(h); l.s
 const getPrimeroMes   = () => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, "0")}-01`; };
 const getPrimeroAnio  = () => `${new Date().getFullYear()}-01-01`;
 
-// ── Dropdown Sucursal inline ──────────────────────────────────────────────────
-function SucursalSelect({
-  sucursales, seleccionada, onSelect,
+// ── Dropdown genérico reutilizable (mismo estilo que SucursalSelect) ──────────
+function CustomSelect<T extends string | number>({
+  opciones, seleccionado, onSelect, placeholder,
 }: {
-  sucursales: Sucursal[];
-  seleccionada: string | null;
-  onSelect: (cod: string | null) => void;
+  opciones: { value: T | null; label: string }[];
+  seleccionado: T | null;
+  onSelect: (v: T | null) => void;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const actual = sucursales.find((s) => s.codEstablecimiento === seleccionada);
+  const actual = opciones.find((o) => o.value === seleccionado);
 
   return (
     <div className="relative">
@@ -68,10 +68,10 @@ function SucursalSelect({
           open && "border-blue-400 ring-2 ring-blue-50"
         )}
       >
-        <span className={cn("font-medium", actual ? "text-gray-800" : "text-gray-400")}>
-          {actual?.nombre || "Todas las sucursales"}
+        <span className={cn("font-medium truncate", actual && actual.value !== null ? "text-gray-800" : "text-gray-400")}>
+          {actual?.label || placeholder || "Seleccionar"}
         </span>
-        <ChevronDown size={14} className={cn("text-gray-400 transition-transform shrink-0", open && "rotate-180 text-blue-500")} />
+        <ChevronDown size={14} className={cn("text-gray-400 transition-transform shrink-0 ml-2", open && "rotate-180 text-blue-500")} />
       </button>
       <AnimatePresence>
         {open && (
@@ -81,19 +81,13 @@ function SucursalSelect({
             className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden"
           >
             <div className="p-1.5 max-h-48 overflow-y-auto">
-              <button type="button" onClick={() => { onSelect(null); setOpen(false); }}
-                className={cn("w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs font-bold transition-colors",
-                  seleccionada === null ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600")}>
-                Todas las sucursales
-                {seleccionada === null && <Check size={12} className="text-blue-600" />}
-              </button>
-              {sucursales.map((s) => (
-                <button key={s.sucursalId} type="button"
-                  onClick={() => { onSelect(s.codEstablecimiento); setOpen(false); }}
+              {opciones.map((o) => (
+                <button key={String(o.value)} type="button"
+                  onClick={() => { onSelect(o.value); setOpen(false); }}
                   className={cn("w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs font-bold transition-colors",
-                    seleccionada === s.codEstablecimiento ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600")}>
-                  {s.nombre}
-                  {seleccionada === s.codEstablecimiento && <Check size={12} className="text-blue-600" />}
+                    seleccionado === o.value ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600")}>
+                  {o.label}
+                  {seleccionado === o.value && <Check size={12} className="text-blue-600" />}
                 </button>
               ))}
             </div>
@@ -104,7 +98,7 @@ function SucursalSelect({
   );
 }
 
-// ── Botón de reporte (horizontal compacto) ────────────────────────────────────
+// ── Botón de reporte ──────────────────────────────────────────────────────────
 function ReporteBtn({ icon: Icon, label, descripcion, loading, onClick, color }: {
   icon: React.ElementType; label: string; descripcion: string;
   loading: boolean; onClick: () => void; color: string;
@@ -120,8 +114,8 @@ function ReporteBtn({ icon: Icon, label, descripcion, loading, onClick, color }:
         {loading ? <Loader2 size={16} className="animate-spin text-gray-400" /> : <Icon size={16} className="text-current" />}
       </div>
       <div>
-        <p className="text-[11px] font-black text-gray-800 leading-tight">{label}</p>
-        <p className="text-[9px] text-gray-400 mt-0.5 leading-tight">{descripcion}</p>
+        <p className="text-[12px] font-black text-gray-800 leading-tight">{label}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{descripcion}</p>
       </div>
       <Download size={11} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
     </button>
@@ -201,96 +195,77 @@ export function ModalReportes({
                 </button>
               </div>
 
-              <div className="px-6 py-5 space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Filter size={13} className="text-gray-400" />
-                    <span className="text-[11px] font-black text-gray-500 uppercase tracking-wider">Filtros</span>
-                    <span className="text-[10px] text-gray-400">(opcionales)</span>
-                  </div>
+              <div className="px-6 py-5 space-y-3">
 
-                  <div className="space-y-3">
-
-                    {/* ── Fila 1: Sucursal (ancho completo) ─────────────── */}
-                    {isSuperAdmin && sucursales.length > 0 && (
+                {/* ── FILA 1 ────────────────────────────────────────────────── */}
+                {isSuperAdmin && sucursales.length > 0 ? (
+                  /* superadmin: Sucursal | Usuario | Doc. Cliente */
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                        <Building2 size={11} className="text-gray-400" /> Sucursal
+                      </label>
+                      <CustomSelect
+                        opciones={[
+                          { value: null, label: "Todas las sucursales" },
+                          ...sucursales.map((s) => ({ value: s.codEstablecimiento, label: s.nombre })),
+                        ]}
+                        seleccionado={filtros.codEstablecimiento ?? null}
+                        onSelect={(cod) => {
+                          onSetFiltro("codEstablecimiento", cod);
+                          onSetFiltro("usuarioCreacion", null);
+                        }}
+                        placeholder="Todas las sucursales"
+                      />
+                    </div>
+                    {puedeVerUsuarios && (
                       <div>
                         <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
-                          <Building2 size={11} className="text-gray-400" /> Sucursal
+                          <User size={11} className="text-gray-400" /> Usuario
                         </label>
-                        <SucursalSelect
-                          sucursales={sucursales}
-                          seleccionada={filtros.codEstablecimiento ?? null}
-                          onSelect={(cod) => {
-                            onSetFiltro("codEstablecimiento", cod);
-                            onSetFiltro("usuarioCreacion", null);
-                          }}
+                        <CustomSelect
+                          opciones={[
+                            { value: null, label: "Todos los usuarios" },
+                            ...usuariosDelModal.map((u) => ({ value: u.usuarioID, label: u.username })),
+                          ]}
+                          seleccionado={filtros.usuarioCreacion ?? null}
+                          onSelect={(id) => onSetFiltro("usuarioCreacion", id)}
+                          placeholder="Todos los usuarios"
                         />
                       </div>
                     )}
-{/* ── Fila 2: Fechas + Usuario ──────────────── */}
-<div className="grid grid-cols-3 gap-2">
-  {/* Fechas — 2 columnas */}
-  <div className="col-span-2">
-    <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
-      <Calendar size={11} className="text-gray-400" /> Rango de Fechas
-    </label>
-    <div className="flex gap-2">
-      <div className="flex-1">
-        <p className="text-[10px] text-gray-400 mb-1">Desde</p>
-        <input type="date" value={filtros.fechaDesde ?? ""} max={hoy}
-          onChange={(e) => {
-            onSetFiltro("fechaDesde", e.target.value || null);
-            if (filtros.fechaHasta && e.target.value > filtros.fechaHasta)
-              onSetFiltro("fechaHasta", null);
-          }}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
-        />
-      </div>
-      <div className="flex-1">
-        <p className="text-[10px] text-gray-400 mb-1">Hasta</p>
-        <input type="date" value={filtros.fechaHasta ?? ""}
-          min={filtros.fechaDesde ?? undefined} max={hoy}
-          onChange={(e) => onSetFiltro("fechaHasta", e.target.value || null)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
-        />
-      </div>
-    </div>
-    <div className="flex gap-1.5 mt-2">
-      {shortcuts.map((s) => (
-        <button key={s.label} type="button" onClick={s.fn}
-          className={cn(
-            "text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all",
-            shortcutActivo === s.key
-              ? "bg-blue-500 text-white shadow-sm"
-              : "bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500"
-          )}
-        >
-          {s.label}
-        </button>
-      ))}
-    </div>
-  </div>
-
-  {/* Usuario — 1 columna */}
-{puedeVerUsuarios && (
-  <div className="col-span-1 flex justify-end">
-    <div className="w-full">
-      <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
-        <User size={11} className="text-gray-400" /> Usuario
-      </label>
-      <DropdownUsuario
-        usuarios={usuariosDelModal}
-        seleccionado={filtros.usuarioCreacion ?? null}
-        onSelect={(id) => onSetFiltro("usuarioCreacion", id)}
-      />
-    </div>
-  </div>
-)}
-</div>
-
-                    {/* ── Fila 3: Doc cliente + Límite + Ordenar (3 cols) ── */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
+                    <div>
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                        <Hash size={11} className="text-gray-400" /> Doc. Cliente
+                      </label>
+                      <input type="text" placeholder="RUC o DNI"
+                        value={filtros.clienteNumDoc ?? ""}
+                        onChange={(e) => onSetFiltro("clienteNumDoc", e.target.value || null)}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50 placeholder:text-gray-300"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* no superadmin: Usuario (inicio) | Doc. Cliente (final), responsive stack */
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {puedeVerUsuarios && (
+                      <div className="flex-1">
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                          <User size={11} className="text-gray-400" /> Usuario
+                        </label>
+                        <CustomSelect
+                          opciones={[
+                            { value: null, label: "Todos los usuarios" },
+                            ...usuariosDelModal.map((u) => ({ value: u.usuarioID, label: u.username })),
+                          ]}
+                          seleccionado={filtros.usuarioCreacion ?? null}
+                          onSelect={(id) => onSetFiltro("usuarioCreacion", id)}
+                          placeholder="Todos los usuarios"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 sm:flex sm:justify-end">
+                      <div className="w-full sm:max-w-xs">
                         <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
                           <Hash size={11} className="text-gray-400" /> Doc. Cliente
                         </label>
@@ -300,48 +275,95 @@ export function ModalReportes({
                           className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50 placeholder:text-gray-300"
                         />
                       </div>
-                      <div>
-                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
-                          <Hash size={11} className="text-gray-400" /> Límite
-                        </label>
-                        <input type="number" placeholder="Sin límite" min={1}
-                          value={filtros.limit ?? ""}
-                          onChange={(e) => onSetFiltro("limit", e.target.value ? Number(e.target.value) : null)}
-                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50 placeholder:text-gray-300"
-                        />
-                      </div>
-                      <div>
-                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
-                          <SortAsc size={11} className="text-gray-400" /> Ordenar por
-                        </label>
-                        <select value={filtros.orderBy ?? "monto"}
-                          onChange={(e) => onSetFiltro("orderBy", e.target.value as "monto" | "cantidad" | "veces")}
-                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
-                        >
-                          <option value="monto">Mayor monto</option>
-                          <option value="cantidad">Mayor cantidad</option>
-                          <option value="veces">Más vendido</option>
-                        </select>
-                      </div>
                     </div>
+                  </div>
+                )}
 
-                    {/* ── Fila 4: Nombre del archivo ─────────────────────── */}
-                    <div>
-                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
-                        <FileText size={11} className="text-gray-400" />
-                        Nombre del archivo
-                        <span className="text-[10px] text-gray-400 font-normal">(auto-generado si no lo completas)</span>
-                      </label>
-                      <input type="text" placeholder="Ej: ventas-mayo-2025"
-                        value={filtros.tituloPersonalizado ?? ""}
-                        onChange={(e) => onSetFiltro("tituloPersonalizado", e.target.value || null)}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50 placeholder:text-gray-300"
-                      />
-                    </div>
+                {/* ── FILA 2: Desde | Hasta | Límite | Ordenar por ──────────── */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                  {/* Desde */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                      <Calendar size={11} className="text-gray-400" /> Desde
+                    </label>
+                    <input type="date" value={filtros.fechaDesde ?? ""} max={hoy}
+                      onChange={(e) => {
+                        onSetFiltro("fechaDesde", e.target.value || null);
+                        if (filtros.fechaHasta && e.target.value > filtros.fechaHasta)
+                          onSetFiltro("fechaHasta", null);
+                      }}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
+                    />
+                  </div>
+                  {/* Hasta */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                      <Calendar size={11} className="text-gray-400" /> Hasta
+                    </label>
+                    <input type="date" value={filtros.fechaHasta ?? ""}
+                      min={filtros.fechaDesde ?? undefined} max={hoy}
+                      onChange={(e) => onSetFiltro("fechaHasta", e.target.value || null)}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
+                    />
+                  </div>
+                  {/* Límite */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                      <Hash size={11} className="text-gray-400" /> Límite
+                    </label>
+                    <input type="number" placeholder="Sin límite" min={1}
+                      value={filtros.limit ?? ""}
+                      onChange={(e) => onSetFiltro("limit", e.target.value ? Number(e.target.value) : null)}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50 placeholder:text-gray-300"
+                    />
+                  </div>
+                  {/* Ordenar por */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                      <SortAsc size={11} className="text-gray-400" /> Ordenar productos por
+                    </label>
+                    <select value={filtros.orderBy ?? "monto"}
+                      onChange={(e) => onSetFiltro("orderBy", e.target.value as "monto" | "cantidad" | "veces")}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
+                    >
+                      <option value="monto">Mayor monto</option>
+                      <option value="cantidad">Mayor cantidad</option>
+                      <option value="veces">Más vendido</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* ── Botones de descarga (una sola fila) ─────────────────── */}
+                {/* Shortcuts de fecha */}
+                <div className="flex gap-1.5 -mt-1">
+                  {shortcuts.map((s) => (
+                    <button key={s.label} type="button" onClick={s.fn}
+                      className={cn(
+                        "text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all",
+                        shortcutActivo === s.key
+                          ? "bg-blue-500 text-white shadow-sm"
+                          : "bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500"
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* ── FILA 3: Nombre del archivo (ancho completo) ───────────── */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mb-1.5">
+                    <FileText size={11} className="text-gray-400" />
+                    Nombre del archivo
+                    <span className="text-[10px] text-gray-400 font-normal">(auto-generado si no lo completas)</span>
+                  </label>
+                  <input type="text" placeholder="Ej: ventas-mayo-2025"
+                    value={filtros.tituloPersonalizado ?? ""}
+                    onChange={(e) => onSetFiltro("tituloPersonalizado", e.target.value || null)}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50 placeholder:text-gray-300"
+                  />
+                </div>
+
+                {/* ── Botones de descarga ──────────────────────────────────── */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <Download size={13} className="text-gray-400" />
