@@ -33,7 +33,7 @@ import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { ProductoSucursal } from "../../productos/gestioProductos/Producto";
 import { useProductosSucursal } from "../../productos/gestioProductos/useProductosSucursal";
 import axios from "axios";
-import { numeroALetras } from "@/app/components/ui/numeroALetras";
+import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import { useToast } from "@/app/components/ui/Toast";
 import { useClientesRuc } from "../../clientes/gestionClientes/useClientesRuc";
 import { useEmpresaEmisor } from "../boleta/gestionBoletas/useEmpresaEmisor";
@@ -1068,7 +1068,7 @@ export default function FacturaPage() {
     } else {
       legends.push({
         code: "1000",
-        value: numeroALetras(totales.importeTotal, moneda),
+        value: numeroAlertas(totales.importeTotal, moneda),
       });
     }
     if (aplicarDetraccion) {

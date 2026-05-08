@@ -33,7 +33,7 @@ import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { ProductoSucursal } from "../../productos/gestioProductos/Producto";
 import { useProductosSucursal } from "../../productos/gestioProductos/useProductosSucursal";
 import axios from "axios";
-import { numeroALetras } from "@/app/components/ui/numeroALetras";
+import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import { useToast } from "@/app/components/ui/Toast";
 import { useClientesRuc } from "../../clientes/gestionClientes/useClientesRuc";
 import { useSucursalRuc } from "./gestionBoletas/useSucursalRuc";
@@ -984,7 +984,7 @@ export default function BoletaPage() {
       valorVenta: totales.valorVenta,
       montoCredito,
       legends: [
-        { code: "1000", value: numeroALetras(totales.importeTotal, moneda) },
+        { code: "1000", value: numeroAlertas(totales.importeTotal, moneda) },
       ],
     }));
   }, [

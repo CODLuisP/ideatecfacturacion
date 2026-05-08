@@ -8,11 +8,14 @@ import BoletaPage from "../boleta/page";
 import FacturaPage from "../factura/page";
 import EmisionRapidaPage from "../../emision/page";
 import { sharedVentaStore } from "../sharedVentaStore";
+import { useAuth } from '@/context/AuthContext';
 
 export default function BoletaFacturaElectronicaPage() {
+  const { user } = useAuth();
+  
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
-  const [complejidad, setComplejidad] = useState<"simple" | "compleja">("simple");
+  const [complejidad, setComplejidad] = useState<"simple" | "compleja">(user?.tipoEmision ? "simple" : "compleja");
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {

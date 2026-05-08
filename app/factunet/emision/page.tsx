@@ -1,9 +1,9 @@
 "use client";
-import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Receipt, FileCheck, AlertTriangle, Building2, Hash } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Building2, Hash } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
-import { numeroALetras } from '@/app/components/ui/numeroALetras';
+import { numeroAlertas } from '@/app/components/ui/numeroAlertas';
 import { useToast } from '@/app/components/ui/Toast';
 import axios from 'axios';
 import { Cliente } from '../clientes/gestionClientes/typesCliente';
@@ -24,7 +24,7 @@ interface ItemRapido {
   id: string;
   descripcion: string;
   cantidad: number;
-  precioUnitario: number;   // base sin IGV
+  precioUnitario: number;
   precioVentaConIGV: number;
   porcentajeIGV: number;
   productoId: number | null;
@@ -702,7 +702,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         descuentoGlobal: 0, codigoTipoDescGlobal: '03',
         usuarioCreacion: user?.id ?? 0,
         enviadoEnResumen: tipo === 'factura' ? null : enviarEnResumen,
-        legends: [{ code: '1000', value: numeroALetras(totales.importeTotal, moneda) }],
+        legends: [{ code: '1000', value: numeroAlertas(totales.importeTotal, moneda) }],
       };
 
       // ── 1. Generar XML y guardar en BD ──────────────────────

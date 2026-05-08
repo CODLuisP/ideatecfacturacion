@@ -64,6 +64,7 @@ export const authOptions: AuthOptions = {
             nombreEmpresa: data.user.nombreEmpresa ?? null,
             environment: data.user.environment ?? null,
             igv: data.user.igv ?? 18,
+            tipoEmision: data.user.tipoEmision ?? true,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
           };
@@ -87,6 +88,7 @@ export const authOptions: AuthOptions = {
         token.nombreSucursal = user.nombreSucursal;
         token.nombreEmpresa = user.nombreEmpresa;
         token.igv = user.igv;
+        token.tipoEmision = user.tipoEmision;
         token.environment = user.environment;
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
@@ -103,6 +105,7 @@ export const authOptions: AuthOptions = {
         sucursalID: token.sucursalID as string | null,
         nombreSucursal: token.nombreSucursal as string | null,
         igv: token.igv as number,
+        tipoEmision: token.tipoEmision as boolean,
         nombreEmpresa: token.nombreEmpresa as string | null,
         environment: token.environment as string | null
       };

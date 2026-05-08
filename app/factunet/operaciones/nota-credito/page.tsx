@@ -15,7 +15,7 @@ import { useSucursalRuc } from "../boleta/gestionBoletas/useSucursalRuc";
 import { useEmpresaEmisor } from "../boleta/gestionBoletas/useEmpresaEmisor";
 import { Sucursal } from "../boleta/gestionBoletas/Boleta";
 import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
-import { numeroALetras } from "@/app/components/ui/numeroALetras";
+import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import { ComprobanteObtenido } from "./gestionNotaCredito/Obtenercomprobante";
 import { NotaCredito } from "./gestionNotaCredito/NotacreditoDebito";
 import { useComprobanteRucSerieCorrelativo } from "./gestionNotaCredito/Usecomprobanterucseriecorrelativo";
@@ -514,7 +514,7 @@ export default function NotaCreditoPage() {
         tipAfeIgv: d.tipAfeIgv, mtoPrecioUnitario: d.mtoPrecioUnitario,
         totalVentaItem: d.totalVentaItem, icbper: d.icbper, factorIcbper: d.factorIcbper,
       })),
-      legends: [{ code: "1000", value: numeroALetras(totales.mtoImpVenta, moneda) }],
+      legends: [{ code: "1000", value: numeroAlertas(totales.mtoImpVenta, moneda) }],
       usuarioCreacion: Number(user?.id ?? 0),
     };
   };

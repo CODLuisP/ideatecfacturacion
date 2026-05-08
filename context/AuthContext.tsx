@@ -22,6 +22,7 @@ export interface AuthUser {
   environment: string | null;
   logoBase64: string | null;
   igv: number;
+  tipoEmision: boolean;
 }
 
 interface AuthContextValue {
@@ -46,6 +47,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     null,
   );
   const [logoOverride, setLogoOverride] = useState<string | null>(null);
+  const [tipoEmisionOverride, setTipoEmisionOverride] = useState<boolean | null>(null);
 
   const fetchCompanyData = useCallback(
     async (ruc: string, token: string | null) => {
@@ -57,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         const data = await r.json();
         if (data?.environment) setEnvironmentOverride(data.environment);
         if (data?.igv !== undefined) setIgvOverride(data.igv);
+        if (data?.tipoEmision !== undefined) setTipoEmisionOverride(data.tipoEmision);
         setLogoOverride(data?.logoBase64 ?? null);
       } catch {
         // falla silenciosamente
@@ -92,7 +95,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       nombreEmpresa: session.user.nombreEmpresa ?? null,
       environment: environmentOverride ?? session.user.environment ?? null,
       logoBase64: logoOverride,
-      igv: igvOverride ?? session.user.igv ?? 18, // 👈 agregar
+      igv: igvOverride ?? session.user.igv ?? 18,
+      tipoEmision: tipoEmisionOverride ?? session.user.tipoEmision ?? true,
     };
   }, [
     session?.user?.id,
@@ -105,6 +109,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     environmentOverride,
     logoOverride,
     igvOverride,
+    tipoEmisionOverride,
   ]);
 
   const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);
