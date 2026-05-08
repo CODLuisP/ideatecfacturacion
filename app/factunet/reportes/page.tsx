@@ -244,7 +244,7 @@ export default function ReportesPage() {
     return usuarios.find(u => u.usuarioID === uid)?.username;
   };
 
-  const resolverTitulo = (tipoReporte: string): string => {
+  const resolverTitulo = (tipoReporte: string): string => {  
     return modal.filtros.tituloPersonalizado || modal.generarTituloAuto({
       tipoReporte,
       ruc: user!.ruc,
@@ -613,12 +613,7 @@ export default function ReportesPage() {
         filtros={modal.filtros}
         onSetFiltro={modal.setFiltro}
         onResetFiltros={modal.resetFiltros}
-          usuarios={isSuperAdmin && sucursalSeleccionada
-            ? usuarios.filter(u =>
-                String(u.sucursalID) === String(sucursalSeleccionada) || u.rol === 'superadmin'
-              )
-            : usuarios
-          }
+        usuarios={usuarios}
         sucursales={sucursalesModal}
         isSuperAdmin={isSuperAdmin}
         puedeVerUsuarios={puedeVerUsuarios}
