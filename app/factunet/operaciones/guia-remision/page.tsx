@@ -32,6 +32,8 @@ import ModalDocumentoRelacionado, {
 } from "@/app/components/guia/ModalDocumentoRelacionado";
 import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
 import { useSearchParams } from "next/navigation";
+import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
+import { consultaDni } from "@/app/components/apiConsultasJsonPe/consultaDni";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -558,6 +560,7 @@ export default function GuiaRemisionPage() {
     ? String(correlativoActual).padStart(7, "0")
     : "-------";
 
+  // handleDestinatarioSunat actualizado
   const handleDestinatarioSunat = async (val: string) => {
     setDestinatarioSunatResultado(null);
 
@@ -569,16 +572,11 @@ export default function GuiaRemisionPage() {
         color: "#185FA5",
       });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/dni/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
-        if (data.success) {
-          const nombre =
-            `${data.apellidoPaterno} ${data.apellidoMaterno} ${data.nombres}`.trim();
+        const data = await consultaDni(val);
+        if (data) {
           setDestinatarioSunatResultado({
             clienteId: 0,
-            razonSocialNombre: nombre,
+            razonSocialNombre: data.nombreCompleto,
             numeroDocumento: val,
             tipoDocumento: {
               tipoDocumentoId: "01",
@@ -586,7 +584,10 @@ export default function GuiaRemisionPage() {
             },
             direccion: [],
           });
-          setDestinatarioSunatHint({ text: `✓ ${nombre}`, color: "#15803d" });
+          setDestinatarioSunatHint({
+            text: `✓ ${data.nombreCompleto}`,
+            color: "#15803d",
+          });
         } else {
           setDestinatarioSunatHint({
             text: "DNI no encontrado",
@@ -609,11 +610,8 @@ export default function GuiaRemisionPage() {
         color: "#185FA5",
       });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/ruc/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
-        if (data.ruc) {
+        const data = await consultaRuc(val);
+        if (data) {
           setDestinatarioSunatResultado({
             clienteId: 0,
             razonSocialNombre: data.razonSocial,
@@ -622,11 +620,11 @@ export default function GuiaRemisionPage() {
               tipoDocumentoId: "06",
               tipoDocumentoNombre: "RUC",
             },
-            direccion: data.direccion
+            direccion: data.direccionLineal
               ? [
                   {
                     direccionId: 0,
-                    direccionLineal: data.direccion,
+                    direccionLineal: data.direccionLineal,
                     ubigeo: data.ubigeo ?? "",
                     departamento: data.departamento ?? "",
                     provincia: data.provincia ?? "",
@@ -1222,13 +1220,13 @@ export default function GuiaRemisionPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex items-center gap-4 ">
-   <Button
-            variant="ghost"
-            onClick={() => router.push("/factunet/operaciones")}
-            className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </Button>
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/factunet/operaciones")}
+          className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </Button>
         <div>
           <h3 className="text-xl font-bold text-gray-900">
             Nueva Guía de Remisión

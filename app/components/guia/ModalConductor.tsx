@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
+import { consultaDni } from "@/app/components/apiConsultasJsonPe/consultaDni";
 
 export interface ConductorData {
   licencia: string;
@@ -39,29 +40,25 @@ export default function ModalConductor({ onAgregar, onCerrar }: Props) {
   );
   const [loadingDni, setLoadingDni] = useState(false);
 
-  // — Autocompletar nombres con apisperu al ingresar DNI
+  // handleNumeroDoc actualizado
   const handleNumeroDoc = async (val: string) => {
     setNumeroDoc(val);
     setNombres("");
+    setApellidos("");
     setHint(null);
 
     if (tipoDoc === "01" && val.length === 8) {
       setLoadingDni(true);
       setHint({ text: "Consultando DNI...", color: "#185FA5" });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/dni/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
-        if (data.success) {
-          setApellidos(
-            `${data.apellidoPaterno} ${data.apellidoMaterno}`.trim(),
-          );
-          setNombres(data.nombres);
-          setHint({
-            text: `✓ ${data.apellidoPaterno} ${data.apellidoMaterno} ${data.nombres}`,
-            color: "#15803d",
-          });
+        const data = await consultaDni(val);
+        if (data) {
+          const partes = data.nombreCompleto.split(" ");
+          const apellidosStr = partes.slice(-2).join(" ");
+          const nombresStr = partes.slice(0, -2).join(" ");
+          setApellidos(apellidosStr);
+          setNombres(nombresStr);
+          setHint({ text: `✓ ${data.nombreCompleto}`, color: "#15803d" });
         } else {
           setHint({ text: "DNI no encontrado", color: "#DC2626" });
         }

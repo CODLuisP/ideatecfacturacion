@@ -15,6 +15,7 @@ import {
 import React, { useState } from "react";
 import axios from "axios";
 import { useToast } from "../components/ui/Toast";
+import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
 
 export default function Page() {
   const [ruc, setRuc] = useState("");
@@ -38,6 +39,7 @@ export default function Page() {
 
   const { showToast } = useToast();
 
+  // handleRUC actualizado
   const handleRUC = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
     setRuc(val);
@@ -46,12 +48,9 @@ export default function Page() {
       setLoadingRuc(true);
       setRucHint({ text: "Consultando RUC...", color: "#185FA5" });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/ruc/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
+        const data = await consultaRuc(val);
 
-        if (data.ruc) {
+        if (data) {
           setEmpresaData(data);
           setRucHint({ text: `✓ ${data.razonSocial}`, color: "#15803d" });
         } else {
@@ -111,15 +110,14 @@ export default function Page() {
           // Empresa
           ruc: ruc,
           razonSocial: empresaData.razonSocial ?? "",
-          nombreComercial: empresaData.nombreComercial ?? null,
-          direccion: empresaData.direccion ?? null,
+          direccion: empresaData.direccionLineal ?? null,
           ubigeo: empresaData.ubigeo ?? null,
-          urbanizacion: empresaData.urbanizacion ?? null,
-          provincia: empresaData.provincia ?? null,
           departamento: empresaData.departamento ?? null,
+          provincia: empresaData.provincia ?? null,
           distrito: empresaData.distrito ?? null,
-          telefono: empresaData.telefono ?? null,
-          // Usuario
+          nombreComercial: null,
+          urbanizacion: null,
+          telefono: null,
           username: usuario,
           email: email,
           password: password,
