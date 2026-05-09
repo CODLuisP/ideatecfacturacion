@@ -8,19 +8,28 @@ import BoletaPage from "../boleta/page";
 import FacturaPage from "../factura/page";
 import EmisionRapidaPage from "../../emision/page";
 import { sharedVentaStore } from "../sharedVentaStore";
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from "@/context/AuthContext";
 
 export default function BoletaFacturaElectronicaPage() {
   const { user } = useAuth();
-  
+
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
-  const [complejidad, setComplejidad] = useState<"simple" | "compleja">(user?.tipoEmision ? "simple" : "compleja");
+  const [complejidad, setComplejidad] = useState<"simple" | "compleja">(
+    "compleja",
+  );
+
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    if (user !== null && user !== undefined) {
+      setComplejidad(user.tipoEmision ? "simple" : "compleja");
+      setIsReady(true);
+    }
+  }, [user]);
+
+  useEffect(() => {
     sharedVentaStore.clear();
-    setIsReady(true);
     return () => {
       sharedVentaStore.clear();
     };
@@ -32,7 +41,6 @@ export default function BoletaFacturaElectronicaPage() {
     <div className="flex flex-col h-full space-y-4">
       {/* Cabecera Unificada */}
       <div className="flex items-center justify-between mb-2 animate-in fade-in duration-500 py-2 rounded-xl ">
-        
         <div className="flex items-center gap-4  ">
           <Button
             variant="ghost"
@@ -43,7 +51,9 @@ export default function BoletaFacturaElectronicaPage() {
           </Button>
           <div>
             <h3 className="text-xl font-bold text-gray-900">
-              {tipo === "boleta" ? "Nueva Boleta de Venta" : "Nueva Factura Electrónica"}
+              {tipo === "boleta"
+                ? "Nueva Boleta de Venta"
+                : "Nueva Factura Electrónica"}
             </h3>
             <p className="text-sm text-gray-500">
               Regresar a selección de comprobante
@@ -53,7 +63,10 @@ export default function BoletaFacturaElectronicaPage() {
 
         <div className="flex items-center gap-4">
           <div className="flex items-center">
-            <label htmlFor="complejidad-comprobante" className="mr-3 font-semibold text-gray-700">
+            <label
+              htmlFor="complejidad-comprobante"
+              className="mr-3 font-semibold text-gray-700"
+            >
               Modo:
             </label>
             <select
@@ -70,7 +83,10 @@ export default function BoletaFacturaElectronicaPage() {
           </div>
 
           <div className="flex items-center">
-            <label htmlFor="tipo-comprobante" className="mr-3 font-semibold text-gray-700">
+            <label
+              htmlFor="tipo-comprobante"
+              className="mr-3 font-semibold text-gray-700"
+            >
               Tipo:
             </label>
             <select
