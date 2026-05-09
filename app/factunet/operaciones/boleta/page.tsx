@@ -1802,7 +1802,7 @@ export default function BoletaPage() {
             title="Datos del Comprobante"
             subtitle="Completa la información requerida"
           >
-            <form className="space-y-6">
+            <form className="space-y-6 mx-3">
               {/* ── Serie y correlativo ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {isSuperAdmin ? (<>

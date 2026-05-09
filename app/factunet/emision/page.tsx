@@ -1037,12 +1037,12 @@ const imprimirPdf = () => {
         <div className="lg:col-span-2 space-y-4">
 
           {/* ── Datos del Cliente ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-            <div className="flex items-center gap-2">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+            <div className="flex items-center gap-2 ">
               <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-sm"><UserRound className="w-4 h-4 text-brand-blue" /></div>
               <h3 className="text-sm font-bold text-gray-800">Datos del Cliente</h3>
               {tipo === 'boleta' && (
-                <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none">
+                <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none ">
                   <input type="checkbox" checked={clienteVarios} onChange={e => setClienteVarios(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
                   <span className="text-xs text-gray-500">Clientes Varios</span>
                 </label>
@@ -1059,7 +1059,7 @@ const imprimirPdf = () => {
                   {tipo === 'boleta' ? (
                     <select value={tipoDoc} onChange={e => { setTipoDoc(e.target.value); setBusqueda(''); setClienteSeleccionado(null); setErrorVisible(false); }}
                       disabled={clienteVarios}
-                      className="w-1/3 py-2.5 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue disabled:opacity-50">
+                      className="w-1/3 py-2 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue disabled:opacity-50">
                       <option value="00" disabled hidden>—</option>
                       <option value="01">DNI</option>
                       <option value="06">RUC</option>
@@ -1067,7 +1067,7 @@ const imprimirPdf = () => {
                     </select>
                   ) : (
                     <select value={tipoDoc} onChange={e => { setTipoDoc(e.target.value); setBusqueda(''); setClienteSeleccionado(null); }}
-                      className="w-1/3 py-2.5 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
+                      className="w-1/3 py-2 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
                       <option value="06">RUC</option>
                       <option value="04">CE</option>
                     </select>
@@ -1090,14 +1090,14 @@ const imprimirPdf = () => {
                       onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                       maxLength={tipoDoc === '01' ? 8 : tipoDoc === '06' ? 11 : 12}
                       placeholder={tipoDoc === '06' ? '11 dígitos RUC' : tipoDoc === '01' ? '8 dígitos DNI' : 'Nº documento'}
-                      className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 transition-all disabled:opacity-50"
+                      className="w-full pl-4 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 transition-all disabled:opacity-50"
                     />
                     {loadingCli && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
                     {showDropdown && clientesFiltrados.length > 0 && !clienteVarios && (
                       <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {clientesFiltrados.map(c => (
                           <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
-                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0">
                             <span className="text-xs text-gray-800">{c.numeroDocumento} — {c.razonSocialNombre}</span>
                           </button>
                         ))}
@@ -1122,7 +1122,7 @@ const imprimirPdf = () => {
                       });
                     }}
                     placeholder="Nombre / Razón social"
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
+                    className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
                   />
                 {errorCli && errorVisible && <p className="text-xs text-red-500">{errorCli} Digitar nombre manualmente.</p>}
               </div>
@@ -1130,7 +1130,7 @@ const imprimirPdf = () => {
               {/* Correo y teléfono */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Contacto</label>
-                <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
+                <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2
                   ${enviarCorreo && !correoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
                   <input type="text" value={correoCliente}
                     onChange={e => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
@@ -1143,7 +1143,7 @@ const imprimirPdf = () => {
                   </label>
                 </div>
                 <div className="space-y-1">
-                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5 ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2 ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
                     <input type="tel" value={telefonoCliente} placeholder="9XXXXXXXX, 9XXXXXXXX"
                       disabled={!clienteSeleccionado || clienteVarios}
                       onChange={(e) => {
@@ -1343,7 +1343,7 @@ const imprimirPdf = () => {
             </div>
 
             {/* Bolsa ICBPER */}
-            <div className="border border-amber-100 rounded-xl p-3 bg-amber-50/60 space-y-3">
+            <div className="border border-amber-100 rounded-xl p-2 bg-amber-50/60 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-amber-800">¿Desea bolsa plástica?</span>
@@ -1457,10 +1457,14 @@ const imprimirPdf = () => {
     ? <span className="text-gray-300 animate-pulse text-xs">Cargando...</span>
     : !serie
     ? <span className="text-xs font-medium text-gray-400">Sin serie</span>
-    : <>
-        <Hash className="w-4 h-4 text-green-600 shrink-0" />
-        <span className="text-[14px] font-bold text-gray-700">{serie}-{String(correlativoActual ?? 1).padStart(8, '0')}</span>
-      </>
+    :  <>
+    <p className="text-xs font-bold text-gray-900 uppercase ">
+      {tipo === 'boleta' ? 'Boleta:' : 'Factura:'}
+    </p>
+    <span className="text-[13px] font-bold text-gray-700">
+      {serie}-{String(correlativoActual ?? 1).padStart(8, '0')}
+    </span>
+  </>
   }
 </div>
 
@@ -1479,7 +1483,7 @@ const imprimirPdf = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Medio de Pago</label>
                 <select value={medioPago} onChange={e => setMedioPago(e.target.value)}
-                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
+                  className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
                   {MEDIOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
@@ -1488,7 +1492,7 @@ const imprimirPdf = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Moneda</label>
                 <select value={tipoMoneda} onChange={e => setTipoMoneda(e.target.value)}
-                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
+                  className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
                   <option value="PEN">PEN — Soles</option>
                   <option value="USD">USD — Dólares ({tipoCambio.toFixed(2)})</option>
                 </select>
@@ -1546,7 +1550,7 @@ const imprimirPdf = () => {
             <button type="button"
               onClick={emitido ? () => resetForm() : emitirComprobante}
               disabled={emitiendo || (!emitido && !puedeEmitir)}
-              className={`w-full py-2.5 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
+              className={`w-full py-2 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
                 ${emitiendo || (!emitido && !puedeEmitir)
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-blue-700 hover:shadow-blue-200 cursor-pointer'}`}>

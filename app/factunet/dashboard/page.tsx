@@ -428,9 +428,9 @@ const DesgloseNotasCard: React.FC<{
       title="Desglose de Notas"
       subtitle="Impacto de notas de crédito y débito según fecha del documento afectado"
     >
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
         {/* NC del día */}
-        <div className="p-4 rounded-xl border border-rose-100 bg-rose-50/50">
+        <div className="p-2 rounded-xl border border-rose-100 bg-rose-50/50">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg bg-rose-100">
               <TrendingDown size={14} className="text-rose-600" />
@@ -446,7 +446,7 @@ const DesgloseNotasCard: React.FC<{
         </div>
 
         {/* ND del día */}
-        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/50">
+        <div className="p-2 rounded-xl border border-emerald-100 bg-emerald-50/50">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg bg-emerald-100">
               <TrendingUp size={14} className="text-emerald-600" />
@@ -463,7 +463,7 @@ const DesgloseNotasCard: React.FC<{
 
         {/* NC otras fechas */}
         <div className={cn(
-          "p-4 rounded-xl border",
+          "p-2 rounded-xl border",
           hayNotasOtrasFechas
             ? "border-amber-100 bg-amber-50/50"
             : "border-gray-100 bg-gray-50/50"
@@ -489,7 +489,7 @@ const DesgloseNotasCard: React.FC<{
 
         {/* ND otras fechas */}
         <div className={cn(
-          "p-4 rounded-xl border",
+          "p-2 rounded-xl border",
           hayNotasOtrasFechas
             ? "border-amber-100 bg-amber-50/50"
             : "border-gray-100 bg-gray-50/50"
@@ -515,7 +515,7 @@ const DesgloseNotasCard: React.FC<{
       </div>
 
       {/* Resumen neto */}
-      <div className="mt-4 p-4 rounded-xl border border-blue-100 bg-blue-50/50 flex items-center justify-between">
+      <div className="mt-4 p-2 rounded-xl border border-blue-100 bg-blue-50/50 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
             Ventas Netas del Día
@@ -543,7 +543,7 @@ const DesgloseNotasCard: React.FC<{
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
 
   const hookEmpresa = useDashboardEmpresa();
@@ -560,25 +560,31 @@ export default function DashboardPage() {
     return hookSucursal;
   }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
+  const userRuc = user?.ruc;
+  const userSucursalID = user?.sucursalID;
+
+  const fetchDashboardSucursal = hookSucursal.fetchDashboard;
+  const fetchDashboardEmpresa = hookEmpresa.fetchDashboard;
+
   const fetchData = useCallback(
     (fechaParam: string, sucursalParam: number | null) => {
-      if (!user) return;
+      if (!userRuc) return;
       if (isSuperAdmin) {
         if (sucursalParam) {
-          hookSucursal.fetchDashboard({ sucursalId: sucursalParam, fecha: fechaParam, limite: 10 });
+          fetchDashboardSucursal({ sucursalId: sucursalParam, fecha: fechaParam, limite: 10 });
         } else {
-          hookEmpresa.fetchDashboard({ ruc: user.ruc, fecha: fechaParam, limite: 10 });
+          fetchDashboardEmpresa({ ruc: userRuc, fecha: fechaParam, limite: 10 });
         }
       } else {
-        hookSucursal.fetchDashboard({ sucursalId: Number(user.sucursalID), fecha: fechaParam, limite: 10 });
+        fetchDashboardSucursal({ sucursalId: Number(userSucursalID), fecha: fechaParam, limite: 10 });
       }
     },
-    [user, isSuperAdmin],
+    [userRuc, userSucursalID, isSuperAdmin, fetchDashboardSucursal, fetchDashboardEmpresa],
   );
 
   useEffect(() => {
     fetchData(fecha, sucursalSeleccionada);
-  }, [user]);
+  }, [fetchData, fecha, sucursalSeleccionada]);
 
   const handleSucursalChange = (id: number | null) => {
     if (id === null) hookSucursal.reset();
@@ -641,14 +647,14 @@ export default function DashboardPage() {
       bg: "bg-purple-50",
     },
     {
-      label: "Notas de Crédito",
+      label: "N. de Crédito",
       value: String(dashboard?.notasCreditoEmitidas ?? 0),
       icon: TrendingDown,
       color: "text-rose-600",
       bg: "bg-rose-50",
     },
     {
-      label: "Notas de Débito",
+      label: "N. de Débito",
       value: String(dashboard?.notasDebitoEmitidas ?? 0),
       icon: FileText,
       color: "text-orange-600",
@@ -662,6 +668,8 @@ export default function DashboardPage() {
       bg: "bg-amber-50",
     },
   ];
+
+  const isPageLoading = loading || isAuthLoading || (!dashboard && !error);
 
   return (
     <>
@@ -681,7 +689,7 @@ export default function DashboardPage() {
           )}
           <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2.5 hover:border-gray-300 hover:shadow-md">
             <Calendar size={14} className="text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-500 font-medium">Fecha</span>
+            <span className="text-[14px] text-gray-800 font-medium">Fecha</span>
             <input
               type="date"
               value={fecha}
@@ -721,7 +729,7 @@ export default function DashboardPage() {
       <div className="space-y-4 animate-in fade-in duration-500">
         {/* ─── KPI Grid (7 cards) ─────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-          {loading
+          {isPageLoading
             ? Array.from({ length: 7 }).map((_, i) => (
                 <Card key={i} className="p-0">
                   <div className="p-3 flex items-center gap-3">
@@ -735,15 +743,15 @@ export default function DashboardPage() {
               ))
             : kpis.map((kpi, i) => (
                 <Card key={i} className="p-0">
-                  <div className="p-3 flex items-center gap-3">
-                    <div className={cn("p-2.5 rounded-xl shrink-0", kpi.bg)}>
+                  <div className="p-1 flex items-center gap-3">
+                    <div className={cn("p-2 rounded-xl shrink-0", kpi.bg)}>
                       <kpi.icon className={cn("w-5 h-5", kpi.color)} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-tight">
+                      <p className="text-[12px] font-medium text-gray-700 uppercase">
                         {kpi.label}
                       </p>
-                      <p className="text-lg font-bold text-gray-900 mt-0.5 truncate">
+                      <p className="text-[15px] font-bold text-gray-900 mt-0.5 truncate">
                         {kpi.value}
                       </p>
                     </div>
@@ -753,11 +761,11 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── Desglose de Notas ──────────────────────────────────────── */}
-        <DesgloseNotasCard dashboard={dashboard} loading={loading} />
+        <DesgloseNotasCard dashboard={dashboard} loading={isPageLoading} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ─── Gráfico de ventas ──────────────────────────────────────── */}
-          {loading ? (
+          {isPageLoading ? (
             <Card className="lg:col-span-2">
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
                 <div className="space-y-2">
