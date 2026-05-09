@@ -15,18 +15,25 @@ export default function BoletaFacturaElectronicaPage() {
 
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
-  const [complejidad, setComplejidad] = useState<"simple" | "compleja">(
-    "compleja",
-  );
+  const [complejidad, setComplejidad] = useState<"simple" | "compleja">(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("factunet_preferencia_complejidad");
+      if (stored === "simple" || stored === "compleja") return stored;
+    }
+    return "compleja"; // default
+  });
 
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (user !== null && user !== undefined) {
-      setComplejidad(user.tipoEmision ? "simple" : "compleja");
+    if (user !== null && user !== undefined && !isReady) {
+      const stored = localStorage.getItem("factunet_preferencia_complejidad");
+      if (!stored) {
+        setComplejidad(user.tipoEmision ? "simple" : "compleja");
+      }
       setIsReady(true);
     }
-  }, [user]);
+  }, [user, isReady]);
 
   useEffect(() => {
     sharedVentaStore.clear();
@@ -73,7 +80,9 @@ export default function BoletaFacturaElectronicaPage() {
               id="complejidad-comprobante"
               value={complejidad}
               onChange={(e) => {
-                setComplejidad(e.target.value as "simple" | "compleja");
+                const val = e.target.value as "simple" | "compleja";
+                setComplejidad(val);
+                localStorage.setItem("factunet_preferencia_complejidad", val);
               }}
               className="border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue bg-white shadow-sm"
             >

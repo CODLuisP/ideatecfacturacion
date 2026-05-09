@@ -134,13 +134,13 @@ function Input({
   ...props
 }: InputProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 mx-3">
       <FieldLabel required={required}>{label}</FieldLabel>
       <input
         required={required}
         disabled={disabled}
         className={cn(
-          "w-full px-4 py-2.5 border rounded-xl outline-none text-sm transition-colors",
+          "w-full px-4 py-2 border rounded-xl outline-none text-sm transition-colors",
           disabled
             ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed select-none"
             : "bg-white border-gray-200 focus:border-brand-blue",
@@ -168,7 +168,7 @@ function Select({
   ...props
 }: SelectProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 mx-3">
       <FieldLabel required={required}>{label}</FieldLabel>
       <div className="relative">
         <select
@@ -206,7 +206,7 @@ function SectionHeader({
   subtitle: string;
 }) {
   return (
-    <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-6">
+    <div className="flex items-center gap-3 border-b border-gray-100  bg-gray-100 rounded-2xl ">
       <div className="p-2 rounded-lg bg-blue-50 border border-blue-100">
         <Icon className="w-4 h-4 text-brand-blue" />
       </div>
@@ -395,7 +395,7 @@ function SucursalSerieRow({
         <FieldLabel>{label} — Serie</FieldLabel>
         <input
           className={cn(
-            "w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none text-sm transition-colors",
+            "w-full px-4 py-2 border border-gray-200 rounded-xl outline-none text-sm transition-colors",
             readOnly
               ? "bg-gray-100 text-gray-500 cursor-not-allowed"
               : "focus:border-brand-blue bg-white",
@@ -503,7 +503,7 @@ function SucursalCard({
       {/* Body */}
       {expanded && (
         <div className="animate-in slide-in-from-top-2 duration-300">
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-2">
             <SucursalSerieRow
               label="Factura"
               serie={sucursal.serieFactura}
@@ -924,7 +924,7 @@ export default function ConfiguracionPage() {
             <>
               {isFacturador && <ReadOnlyBanner />}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3" >
                 <LogoUploader
                   logoDataUrl={logoDataUrl}
                   uploading={uploadingLogo}
@@ -934,13 +934,14 @@ export default function ConfiguracionPage() {
                   onError={(msg) => showToast(msg, "error")}
                 />
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 mt-3 mx-3">
                   <SectionHeader
                     icon={Building2}
                     title="Identificación Tributaria"
                     subtitle="Datos registrados en SUNAT"
                   />
                 </div>
+                
 
                 <Input
                   label="RUC"
@@ -964,7 +965,7 @@ export default function ConfiguracionPage() {
                   disabled={!canEdit}
                 />
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 mt-3 mx-3">
                   <SectionHeader
                     icon={MapPin}
                     title="Ubicación y Domicilio Fiscal"
@@ -1018,7 +1019,7 @@ export default function ConfiguracionPage() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 mt-3 mx-3">
                   <SectionHeader
                     icon={Phone}
                     title="Datos de Contacto"
@@ -1048,7 +1049,7 @@ export default function ConfiguracionPage() {
                   hint="Se usará para notificaciones y envío de comprobantes"
                 />
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 mt-3 mx-3">
                   <SectionHeader
                     icon={FileText}
                     title="Tipo de Emisión"
@@ -1056,14 +1057,14 @@ export default function ConfiguracionPage() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 mx-3">
                   <div className="flex gap-3 mt-1.5">
                     <button
                       type="button"
                       disabled={!canEdit}
                       onClick={() => setTipoEmision(true)}
                       className={cn(
-                        "flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all",
+                        "flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-all",
                         tipoEmision
                           ? "border-brand-blue bg-blue-50 text-brand-blue"
                           : "border-gray-200 bg-white text-gray-500 hover:border-gray-300",
@@ -1080,7 +1081,7 @@ export default function ConfiguracionPage() {
                       disabled={!canEdit}
                       onClick={() => setTipoEmision(false)}
                       className={cn(
-                        "flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all",
+                        "flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-all",
                         !tipoEmision
                           ? "border-brand-blue bg-blue-50 text-brand-blue"
                           : "border-gray-200 bg-white text-gray-500 hover:border-gray-300",
@@ -1123,7 +1124,7 @@ export default function ConfiguracionPage() {
           ) : (
             <>
               {isFacturador && <ReadOnlyBanner />}
-              <div className="space-y-5">
+              <div className="space-y-5 mx-3">
                 {sucursales.map((sucursal, idx) => (
                   <SucursalCard
                     key={sucursal.sucursalId}

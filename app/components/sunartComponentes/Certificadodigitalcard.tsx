@@ -362,7 +362,7 @@ export function CertificadoDigitalCard({
   return (
     <>
       <Card title="Certificado Digital (.pfx o .p12)" subtitle="Validación y vigencia">
-        <div className="space-y-4">
+        <div className="space-y-2">
           {loadingCompany ? (
             <div className="space-y-4 animate-pulse">
               <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-3">
@@ -386,7 +386,7 @@ export function CertificadoDigitalCard({
           ) : (
             <>
               {/* Barra de vigencia */}
-              <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-3">
+              <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/60 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Vigencia</span>
                   <span className={cn("text-xs font-semibold", statusColor)}>{statusLabel}</span>
