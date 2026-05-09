@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   Truck,
   FileText,
+  X,
+  Check,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
@@ -173,6 +175,8 @@ export default function GuiaRemisionPage() {
   const [guiaEmitidaId, setGuiaEmitidaId] = useState<number | null>(null);
   const [telefonoEnvio, setTelefonoEnvio] = useState("");
   const [correoEnvio, setCorreoEnvio] = useState("");
+  const [errorWhatsApp, setErrorWhatsApp] = useState("");
+  const [errorCorreo, setErrorCorreo] = useState("");
 
   // — Estados nuevos para superadmin
   const [sucursales, setSucursales] = useState<any[]>([]);
@@ -526,6 +530,8 @@ export default function GuiaRemisionPage() {
     // checkboxes siempre inician desmarcados
     setEnviarWhatsapp(false);
     setEnviarCorreo(false);
+    setErrorWhatsApp("");
+    setErrorCorreo("");
   }, [destinatarioSeleccionado]);
 
   useEffect(() => {
@@ -755,6 +761,8 @@ export default function GuiaRemisionPage() {
     setTelefonoEnvio("");
     setCorreoEnvio("");
     setErrorEnvio(null);
+    setErrorWhatsApp("");
+    setErrorCorreo("");
     setEnvioExitoso(false);
     resetFormulario();
   };
@@ -1111,24 +1119,9 @@ export default function GuiaRemisionPage() {
     );
 
     if (enviarCorreo && correoEnvio.trim()) {
-      const formData = new FormData();
-      formData.append("toEmail", correoEnvio);
-      formData.append(
-        "toName",
-        destinatarioSeleccionado?.razonSocialNombre ?? "",
-      );
-      formData.append(
-        "subject",
-        `Guía de Remisión ${guiaData?.numeroCompleto ?? ""}`,
-      );
-      formData.append(
-        "body",
-        "Se emitió la guía de remisión para el traslado de los bienes indicados.",
-      );
-      formData.append("tipo", "9");
-      formData.append(
-        "guiaJson",
-        JSON.stringify({
+      const correos = correoEnvio.split(',').map(s => s.trim()).filter(Boolean);
+      if (correos.length > 0) {
+        const guiaJsonStr = JSON.stringify({
           serieNumero: guiaData?.numeroCompleto ?? "",
           estadoSunat: guiaData?.estadoSunat ?? "EMITIDO",
           motivoTraslado: guiaData?.desTraslado ?? "",
@@ -1143,75 +1136,179 @@ export default function GuiaRemisionPage() {
               cantidad: b.cantidad,
               unidad: b.unidad,
             })) ?? [],
-        }),
-      );
-      formData.append("adjunto", pdfFile);
+        });
 
-      const resCorreo = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: formData,
-        },
-      );
-      if (!resCorreo.ok) throw new Error("Error al enviar el correo");
+        const resultadosCorreo = await Promise.allSettled(
+          correos.map(correo => {
+            const formData = new FormData();
+            formData.append("toEmail", correo);
+            formData.append(
+              "toName",
+              destinatarioSeleccionado?.razonSocialNombre ?? "",
+            );
+            formData.append(
+              "subject",
+              `Guía de Remisión ${guiaData?.numeroCompleto ?? ""}`,
+            );
+            formData.append(
+              "body",
+              "Se emitió la guía de remisión para el traslado de los bienes indicados.",
+            );
+            formData.append("tipo", "9");
+            formData.append("guiaJson", guiaJsonStr);
+            formData.append("adjunto", pdfFile);
+
+            return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${accessToken}` },
+              body: formData,
+            }).then(res => { if (!res.ok) throw new Error(`Error al enviar a ${correo}`); });
+          })
+        );
+        
+        const fallidos = resultadosCorreo.filter(r => r.status === 'rejected');
+        if (fallidos.length === correos.length) throw new Error("Error al enviar el correo");
+      }
     }
 
     if (enviarWhatsapp && telefonoEnvio.trim()) {
-      const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-      const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+      const telefonos = telefonoEnvio.split(',').map(s => s.trim()).filter(Boolean);
+      if (telefonos.length > 0) {
+        const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+        const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
 
-      // ── Verificar estado de conexión WhatsApp ──────────────────────
-      const resEstado = await fetch(`${whatsappBase}/api/status`, {
-        headers: {
-          "x-api-key": whatsappApiKey,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!resEstado.ok)
-        throw new Error("No se pudo verificar el estado de WhatsApp");
+        // ── Verificar estado de conexión WhatsApp ──────────────────────
+        const resEstado = await fetch(`${whatsappBase}/api/status`, {
+          headers: {
+            "x-api-key": whatsappApiKey,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!resEstado.ok)
+          throw new Error("No se pudo verificar el estado de WhatsApp");
 
-      const estadoData = await resEstado.json();
-      if (!estadoData.exito || estadoData.datos?.estado !== "conectado") {
-        throw new Error(
-          estadoData.datos?.mensaje ?? "WhatsApp no está conectado",
+        const estadoData = await resEstado.json();
+        if (!estadoData.exito || estadoData.datos?.estado !== "conectado") {
+          throw new Error(
+            estadoData.datos?.mensaje ?? "WhatsApp no está conectado",
+          );
+        }
+
+        // ── Subir PDF ──────────────────────────────────────────────────
+        const uploadForm = new FormData();
+        uploadForm.append("file", pdfFile);
+        const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+          method: "POST",
+          headers: { "x-api-key": whatsappApiKey },
+          body: uploadForm,
+        });
+        if (!resUpload.ok) throw new Error("No se pudo subir el PDF a WhatsApp");
+        const uploadData = await resUpload.json();
+        const fileUrl = uploadData.datos.url;
+
+        // ── Enviar mensajes ─────────────────────────────────────────────
+        const resultadosWsp = await Promise.allSettled(
+          telefonos.map(num => {
+            const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
+            return fetch(`${whatsappBase}/api/send/single`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": whatsappApiKey,
+              },
+              body: JSON.stringify({
+                phone: numeroFormateado,
+                type: "documento",
+                file_url: fileUrl,
+                filename: `${guiaData?.numeroCompleto ?? idGuia}.pdf`,
+                mime_type: "application/pdf",
+                text: `Estimado(a) ${destinatarioSeleccionado?.razonSocialNombre ?? ""}, adjuntamos la guía de remisión electrónica ${guiaData?.numeroCompleto ?? ""}.`,
+              }),
+            }).then(res => { if (!res.ok) throw new Error(`Error al enviar a ${num}`); });
+          })
         );
+
+        const fallidos = resultadosWsp.filter(r => r.status === 'rejected');
+        if (fallidos.length === telefonos.length) throw new Error("Error al enviar por WhatsApp");
       }
+    }
+  };
 
-      // ── Subir PDF ──────────────────────────────────────────────────
-      const uploadForm = new FormData();
-      uploadForm.append("file", pdfFile);
-      const resUpload = await fetch(`${whatsappBase}/api/upload`, {
-        method: "POST",
-        headers: { "x-api-key": whatsappApiKey },
-        body: uploadForm,
-      });
-      if (!resUpload.ok) throw new Error("No se pudo subir el PDF a WhatsApp");
-      const uploadData = await resUpload.json();
-      const fileUrl = uploadData.datos.url;
+  const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9,\s]/g, '');
+    setTelefonoEnvio(val);
+    setEnviarWhatsapp(false);
 
-      // ── Enviar mensaje ─────────────────────────────────────────────
-      const numeroFormateado = telefonoEnvio.startsWith("51")
-        ? telefonoEnvio
-        : `51${telefonoEnvio}`;
+    if (!val.trim()) {
+      setErrorWhatsApp("");
+      return;
+    }
 
-      const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": whatsappApiKey,
-        },
-        body: JSON.stringify({
-          phone: numeroFormateado,
-          type: "documento",
-          file_url: fileUrl,
-          filename: `${guiaData?.numeroCompleto ?? idGuia}.pdf`,
-          mime_type: "application/pdf",
-          text: `Estimado(a) ${destinatarioSeleccionado?.razonSocialNombre ?? ""}, adjuntamos la guía de remisión electrónica ${guiaData?.numeroCompleto ?? ""}.`,
-        }),
-      });
-      if (!resWsp.ok) throw new Error("Error al enviar por WhatsApp");
+    const numbers = val.split(',').map(n => n.trim()).filter(Boolean);
+    let hasError = false;
+    for (const num of numbers) {
+      if (!/^[9]\d{8}$/.test(num)) {
+        setErrorWhatsApp(`El número ${num} no es válido. Debe empezar con 9 y tener 9 dígitos.`);
+        hasError = true;
+        break;
+      }
+    }
+    if (!hasError) setErrorWhatsApp("");
+  };
+
+  const handleCorreoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCorreoEnvio(val);
+    setEnviarCorreo(false);
+
+    if (!val.trim()) {
+      setErrorCorreo("");
+      return;
+    }
+
+    const emails = val.split(',').map(e => e.trim()).filter(Boolean);
+    let hasError = false;
+    for (const email of emails) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setErrorCorreo(`El correo ${email} no es válido.`);
+        hasError = true;
+        break;
+      }
+    }
+    if (!hasError) setErrorCorreo("");
+  };
+
+  const handleCheckWhatsapp = (checked: boolean) => {
+    if (checked) {
+      if (!telefonoEnvio.trim()) {
+        setErrorWhatsApp("Debes ingresar al menos un número");
+        setEnviarWhatsapp(false);
+        return;
+      }
+      if (errorWhatsApp) {
+        setEnviarWhatsapp(false);
+        return;
+      }
+      setEnviarWhatsapp(true);
+    } else {
+      setEnviarWhatsapp(false);
+    }
+  };
+
+  const handleCheckCorreo = (checked: boolean) => {
+    if (checked) {
+      if (!correoEnvio.trim()) {
+        setErrorCorreo("Debes ingresar al menos un correo");
+        setEnviarCorreo(false);
+        return;
+      }
+      if (errorCorreo) {
+        setEnviarCorreo(false);
+        return;
+      }
+      setEnviarCorreo(true);
+    } else {
+      setEnviarCorreo(false);
     }
   };
 
@@ -1898,50 +1995,54 @@ export default function GuiaRemisionPage() {
                   <label className={labelClass}>Enviar guía a</label>
 
                   {/* WhatsApp */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       id="chk-whatsapp"
                       checked={enviarWhatsapp}
-                      onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                      className="accent-brand-blue w-4 h-4 shrink-0"
+                      onChange={(e) => handleCheckWhatsapp(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4 shrink-0 mt-2"
                     />
-                    <div className="relative flex-1">
-                      <input
-                        type="tel"
-                        placeholder="WhatsApp: 987654321"
-                        value={telefonoEnvio}
-                        onChange={(e) => setTelefonoEnvio(e.target.value)}
-                        disabled={!enviarWhatsapp}
-                        className={`${inputClass} text-xs py-2 ${!enviarWhatsapp ? "opacity-40 cursor-not-allowed" : ""}`}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                        WhatsApp
-                      </span>
+                    <div className="flex-1 space-y-1">
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          placeholder="Ej. 987654321, 912345678"
+                          value={telefonoEnvio}
+                          onChange={handleTelefonoChange}
+                          className={`${inputClass} text-xs py-2 ${errorWhatsApp ? 'border-red-500 focus:ring-red-200' : ''}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          WhatsApp
+                        </span>
+                      </div>
+                      {errorWhatsApp && <p className="text-xs text-red-500">{errorWhatsApp}</p>}
                     </div>
                   </div>
 
                   {/* Correo */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       id="chk-correo"
                       checked={enviarCorreo}
-                      onChange={(e) => setEnviarCorreo(e.target.checked)}
-                      className="accent-brand-blue w-4 h-4 shrink-0"
+                      onChange={(e) => handleCheckCorreo(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4 shrink-0 mt-2"
                     />
-                    <div className="relative flex-1">
-                      <input
-                        type="email"
-                        placeholder="Correo: ejemplo@gmail.com"
-                        value={correoEnvio}
-                        onChange={(e) => setCorreoEnvio(e.target.value)}
-                        disabled={!enviarCorreo}
-                        className={`${inputClass} text-xs py-2 ${!enviarCorreo ? "opacity-40 cursor-not-allowed" : ""}`}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                        Email
-                      </span>
+                    <div className="flex-1 space-y-1">
+                      <div className="relative">
+                        <input
+                          type="email"
+                          placeholder="Ej. uno@correo.com, dos@correo.com"
+                          value={correoEnvio}
+                          onChange={handleCorreoChange}
+                          className={`${inputClass} text-xs py-2 ${errorCorreo ? 'border-red-500 focus:ring-red-200' : ''}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          Email
+                        </span>
+                      </div>
+                      {errorCorreo && <p className="text-xs text-red-500">{errorCorreo}</p>}
                     </div>
                   </div>
                 </div>

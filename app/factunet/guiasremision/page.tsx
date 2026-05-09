@@ -585,7 +585,7 @@ export default function GuiasRemisionPage() {
       <style>
         {` .guia-table-wrapper {
             overflow-y: auto;
-            max-height: calc(100vh - 330px);
+            max-height: calc(100vh - 290px);
             scrollbar-width: thin;
             scrollbar-color: #CBD5E1 transparent;
           }
@@ -754,13 +754,13 @@ function TablaRemitente({
               key={g.guiaId}
               className="hover:bg-gray-50/50 transition-colors"
             >
-              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
+              <td className="px-5 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
                 {fmtFecha(g.fechaEmision)}
               </td>
               <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
                 {g.numeroCompleto}
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">
                     {g.destinatarioNumDoc}
@@ -770,7 +770,7 @@ function TablaRemitente({
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 {g.transportistaPlaca ? (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-mono font-semibold text-gray-700">
                     <Truck size={11} className="text-gray-500" />
@@ -780,7 +780,7 @@ function TablaRemitente({
                   <span className="text-xs text-gray-400">—</span>
                 )}
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="text-xs text-gray-600 flex items-center gap-1">
                   <Truck size={12} className="text-gray-400 shrink-0" />
                   <span className="truncate max-w-36">
@@ -788,7 +788,7 @@ function TablaRemitente({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <GuiaFileIcon
                     status={g.xmlGenerado ? "available" : "pending"}
@@ -805,7 +805,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <GuiaFileIcon
                     status={g.xmlRespuestaSunat ? "available" : "pending"}
@@ -822,7 +822,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
@@ -831,7 +831,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="whatsapp"
@@ -840,7 +840,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   {loadingGuiaId === g.guiaId ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
@@ -852,7 +852,7 @@ function TablaRemitente({
                   )}
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <button
                   onClick={() => onVerDetalle(g.guiaId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -860,7 +860,7 @@ function TablaRemitente({
                   <Eye size={13} /> Ver
                 </button>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <DropdownOpcionesGuia
                     estado={g.estadoSunat}
@@ -978,13 +978,13 @@ function TablaTransportista({
               key={g.guiaId}
               className="hover:bg-gray-50/50 transition-colors"
             >
-              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
+              <td className="px-5 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
                 {fmtFecha(g.fechaEmision)}
               </td>
-              <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
+              <td className="px-5 py-3 text-sm text-gray-800 whitespace-nowrap">
                 {g.numeroCompleto}
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">
                     {g.destinatarioNumDoc}
@@ -994,7 +994,7 @@ function TablaTransportista({
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -1002,7 +1002,7 @@ function TablaTransportista({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-blue-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -1010,13 +1010,13 @@ function TablaTransportista({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-mono font-semibold text-gray-700">
                   <Truck size={11} className="text-gray-500" />
                   {g.transportistaPlaca ?? "—"}
                 </span>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <GuiaFileIcon
                     status={g.xmlGenerado ? "available" : "pending"}
@@ -1033,7 +1033,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <GuiaFileIcon
                     status={g.xmlRespuestaSunat ? "available" : "pending"}
@@ -1050,7 +1050,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
@@ -1059,7 +1059,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="whatsapp"
@@ -1068,7 +1068,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   {loadingGuiaId === g.guiaId ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
@@ -1080,7 +1080,7 @@ function TablaTransportista({
                   )}
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <button
                   onClick={() => onVerDetalle(g.guiaId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -1088,7 +1088,7 @@ function TablaTransportista({
                   <Eye size={13} /> Ver
                 </button>
               </td>
-              <td className="px-5 py-4 text-center ">
+              <td className="px-5 py-3 text-center ">
                 <div className="flex justify-center">
                   <DropdownOpcionesGuia
                     estado={g.estadoSunat}
