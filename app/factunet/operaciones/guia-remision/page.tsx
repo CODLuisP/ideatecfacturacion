@@ -36,6 +36,7 @@ import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
 import { useSearchParams } from "next/navigation";
 import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
 import { consultaDni } from "@/app/components/apiConsultasJsonPe/consultaDni";
+import { input } from "motion/react-client";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -195,6 +196,9 @@ export default function GuiaRemisionPage() {
   const searchParams = useSearchParams();
   const editarGuiaId = searchParams.get("editarGuiaId");
   const [placaM1L, setPlacaM1L] = useState("");
+  const [fechaTraslado, setFechaTraslado] = useState(
+    new Date().toISOString().split("T")[0],
+  );
 
   const isSuperAdmin = user?.rol === "superadmin";
 
@@ -243,6 +247,7 @@ export default function GuiaRemisionPage() {
     setSucursal(null);
     setRefreshSucursal((prev) => prev + 1);
     setPlacaM1L("");
+    setFechaTraslado(new Date().toISOString().split("T")[0]);
   };
 
   useEffect(() => {
@@ -884,7 +889,7 @@ export default function GuiaRemisionPage() {
             MOTIVOS_TRASLADO.find((m) => m.codigo === motivoCodigo)?.label ??
             "",
           modTraslado: modalidad,
-          fecTraslado: new Date().toISOString(),
+          fecTraslado: new Date(fechaTraslado).toISOString(),
           codPuerto: null,
           indTransbordo: transbordo,
           pesoTotal,
@@ -1119,7 +1124,10 @@ export default function GuiaRemisionPage() {
     );
 
     if (enviarCorreo && correoEnvio.trim()) {
-      const correos = correoEnvio.split(',').map(s => s.trim()).filter(Boolean);
+      const correos = correoEnvio
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (correos.length > 0) {
         const guiaJsonStr = JSON.stringify({
           serieNumero: guiaData?.numeroCompleto ?? "",
@@ -1139,7 +1147,7 @@ export default function GuiaRemisionPage() {
         });
 
         const resultadosCorreo = await Promise.allSettled(
-          correos.map(correo => {
+          correos.map((correo) => {
             const formData = new FormData();
             formData.append("toEmail", correo);
             formData.append(
@@ -1162,17 +1170,25 @@ export default function GuiaRemisionPage() {
               method: "POST",
               headers: { Authorization: `Bearer ${accessToken}` },
               body: formData,
-            }).then(res => { if (!res.ok) throw new Error(`Error al enviar a ${correo}`); });
-          })
+            }).then((res) => {
+              if (!res.ok) throw new Error(`Error al enviar a ${correo}`);
+            });
+          }),
         );
-        
-        const fallidos = resultadosCorreo.filter(r => r.status === 'rejected');
-        if (fallidos.length === correos.length) throw new Error("Error al enviar el correo");
+
+        const fallidos = resultadosCorreo.filter(
+          (r) => r.status === "rejected",
+        );
+        if (fallidos.length === correos.length)
+          throw new Error("Error al enviar el correo");
       }
     }
 
     if (enviarWhatsapp && telefonoEnvio.trim()) {
-      const telefonos = telefonoEnvio.split(',').map(s => s.trim()).filter(Boolean);
+      const telefonos = telefonoEnvio
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (telefonos.length > 0) {
         const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
         const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
@@ -1202,13 +1218,14 @@ export default function GuiaRemisionPage() {
           headers: { "x-api-key": whatsappApiKey },
           body: uploadForm,
         });
-        if (!resUpload.ok) throw new Error("No se pudo subir el PDF a WhatsApp");
+        if (!resUpload.ok)
+          throw new Error("No se pudo subir el PDF a WhatsApp");
         const uploadData = await resUpload.json();
         const fileUrl = uploadData.datos.url;
 
         // ── Enviar mensajes ─────────────────────────────────────────────
         const resultadosWsp = await Promise.allSettled(
-          telefonos.map(num => {
+          telefonos.map((num) => {
             const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
             return fetch(`${whatsappBase}/api/send/single`, {
               method: "POST",
@@ -1224,18 +1241,21 @@ export default function GuiaRemisionPage() {
                 mime_type: "application/pdf",
                 text: `Estimado(a) ${destinatarioSeleccionado?.razonSocialNombre ?? ""}, adjuntamos la guía de remisión electrónica ${guiaData?.numeroCompleto ?? ""}.`,
               }),
-            }).then(res => { if (!res.ok) throw new Error(`Error al enviar a ${num}`); });
-          })
+            }).then((res) => {
+              if (!res.ok) throw new Error(`Error al enviar a ${num}`);
+            });
+          }),
         );
 
-        const fallidos = resultadosWsp.filter(r => r.status === 'rejected');
-        if (fallidos.length === telefonos.length) throw new Error("Error al enviar por WhatsApp");
+        const fallidos = resultadosWsp.filter((r) => r.status === "rejected");
+        if (fallidos.length === telefonos.length)
+          throw new Error("Error al enviar por WhatsApp");
       }
     }
   };
 
   const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9,\s]/g, '');
+    const val = e.target.value.replace(/[^0-9,\s]/g, "");
     setTelefonoEnvio(val);
     setEnviarWhatsapp(false);
 
@@ -1244,11 +1264,16 @@ export default function GuiaRemisionPage() {
       return;
     }
 
-    const numbers = val.split(',').map(n => n.trim()).filter(Boolean);
+    const numbers = val
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
     let hasError = false;
     for (const num of numbers) {
       if (!/^[9]\d{8}$/.test(num)) {
-        setErrorWhatsApp(`El número ${num} no es válido. Debe empezar con 9 y tener 9 dígitos.`);
+        setErrorWhatsApp(
+          `El número ${num} no es válido. Debe empezar con 9 y tener 9 dígitos.`,
+        );
         hasError = true;
         break;
       }
@@ -1266,7 +1291,10 @@ export default function GuiaRemisionPage() {
       return;
     }
 
-    const emails = val.split(',').map(e => e.trim()).filter(Boolean);
+    const emails = val
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
     let hasError = false;
     for (const email of emails) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1494,7 +1522,8 @@ export default function GuiaRemisionPage() {
                   </label>
                   <input
                     type="date"
-                    defaultValue={new Date().toISOString().split("T")[0]}
+                    value={fechaTraslado}
+                    onChange={(e) => setFechaTraslado(e.target.value)}
                     className={inputClass}
                   />
                 </div>
@@ -2010,13 +2039,15 @@ export default function GuiaRemisionPage() {
                           placeholder="Ej. 987654321, 912345678"
                           value={telefonoEnvio}
                           onChange={handleTelefonoChange}
-                          className={`${inputClass} text-xs py-2 ${errorWhatsApp ? 'border-red-500 focus:ring-red-200' : ''}`}
+                          className={`${inputClass} text-xs py-2 ${errorWhatsApp ? "border-red-500 focus:ring-red-200" : ""}`}
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
                           WhatsApp
                         </span>
                       </div>
-                      {errorWhatsApp && <p className="text-xs text-red-500">{errorWhatsApp}</p>}
+                      {errorWhatsApp && (
+                        <p className="text-xs text-red-500">{errorWhatsApp}</p>
+                      )}
                     </div>
                   </div>
 
@@ -2036,13 +2067,15 @@ export default function GuiaRemisionPage() {
                           placeholder="Ej. uno@correo.com, dos@correo.com"
                           value={correoEnvio}
                           onChange={handleCorreoChange}
-                          className={`${inputClass} text-xs py-2 ${errorCorreo ? 'border-red-500 focus:ring-red-200' : ''}`}
+                          className={`${inputClass} text-xs py-2 ${errorCorreo ? "border-red-500 focus:ring-red-200" : ""}`}
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
                           Email
                         </span>
                       </div>
-                      {errorCorreo && <p className="text-xs text-red-500">{errorCorreo}</p>}
+                      {errorCorreo && (
+                        <p className="text-xs text-red-500">{errorCorreo}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2327,9 +2360,6 @@ export default function GuiaRemisionPage() {
                   onClick={handleEmitir}
                 >
                   {emitiendo ? "Emitiendo..." : "Emitir Guía de Remisión"}
-                </Button>
-                <Button type="button" variant="outline" className="w-full">
-                  Enviar
                 </Button>
               </div>
             )}
