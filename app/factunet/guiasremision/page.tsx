@@ -618,6 +618,7 @@ export default function GuiasRemisionPage() {
               loadingXmlMap={loadingXmlMap}
               loadingCdrMap={loadingCdrMap}
               onDescargar={descargarArchivo}
+              accessToken={accessToken ?? ""}
             />
           ) : (
             <TablaTransportista
@@ -636,6 +637,7 @@ export default function GuiasRemisionPage() {
               loadingXmlMap={loadingXmlMap}
               loadingCdrMap={loadingCdrMap}
               onDescargar={descargarArchivo}
+              accessToken={accessToken ?? ""}
             />
           )}
         </div>
@@ -669,6 +671,7 @@ function TablaRemitente({
   loadingXmlMap,
   loadingCdrMap,
   onDescargar,
+  accessToken,
 }: {
   guias: GuiaDto[];
   loading: boolean;
@@ -686,6 +689,7 @@ function TablaRemitente({
     guiaId: number,
     tipo: "xml" | "cdr",
   ) => void;
+  accessToken: string;
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
@@ -705,6 +709,9 @@ function TablaRemitente({
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             TRANSPORTISTA
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            PDF
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             XML
@@ -787,6 +794,48 @@ function TablaRemitente({
                     {g.transportistaRznSocial ?? "—"}
                   </span>
                 </span>
+              </td>
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <button
+                    onClick={async () => {
+                      const ventana = window.open("", "_blank");
+                      if (ventana) {
+                        ventana.document.write(`
+            <html><head><title>Cargando PDF...</title></head>
+            <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+              <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF...</p>
+            </body></html>
+          `);
+                      }
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${g.guiaId}/pdf`,
+                        { headers: { Authorization: `Bearer ${accessToken}` } },
+                      );
+                      if (!res.ok) {
+                        ventana?.close();
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(
+                        new Blob([blob], { type: "application/pdf" }),
+                      );
+                      if (ventana) ventana.location.href = url;
+                    }}
+                    title="Ver PDF"
+                    className="p-1.5 rounded-lg transition-colors"
+                  >
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                      className="w-5 h-5 opacity-90"
+                      alt="PDF"
+                    />
+                  </button>
+                </div>
               </td>
               <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
@@ -890,6 +939,7 @@ function TablaTransportista({
   loadingXmlMap,
   loadingCdrMap,
   onDescargar,
+  accessToken,
 }: {
   guias: GuiaDto[];
   loading: boolean;
@@ -907,6 +957,7 @@ function TablaTransportista({
     guiaId: number,
     tipo: "xml" | "cdr",
   ) => void;
+  accessToken: string;
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
@@ -929,6 +980,9 @@ function TablaTransportista({
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PLACA
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            PDF
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             XML
@@ -1015,6 +1069,48 @@ function TablaTransportista({
                   <Truck size={11} className="text-gray-500" />
                   {g.transportistaPlaca ?? "—"}
                 </span>
+              </td>
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <button
+                    onClick={async () => {
+                      const ventana = window.open("", "_blank");
+                      if (ventana) {
+                        ventana.document.write(`
+            <html><head><title>Cargando PDF...</title></head>
+            <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+              <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF...</p>
+            </body></html>
+          `);
+                      }
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${g.guiaId}/pdf`,
+                        { headers: { Authorization: `Bearer ${accessToken}` } },
+                      );
+                      if (!res.ok) {
+                        ventana?.close();
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(
+                        new Blob([blob], { type: "application/pdf" }),
+                      );
+                      if (ventana) ventana.location.href = url;
+                    }}
+                    title="Ver PDF"
+                    className="p-1.5 rounded-lg transition-colors"
+                  >
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                      className="w-5 h-5 opacity-90"
+                      alt="PDF"
+                    />
+                  </button>
+                </div>
               </td>
               <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
