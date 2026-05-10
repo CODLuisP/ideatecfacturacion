@@ -903,7 +903,7 @@ const actualizarStockDevolucion = async () => {
               {/* Admin normal */}
               {!isSuperAdmin && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo NC</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Serie y Correlativo NC</label>
                   <div
                     className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
                       loadingSucursal
