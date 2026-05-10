@@ -40,6 +40,7 @@ import { useDashboardSucursal } from "./gestionDashboard/UseDashboardSucursal";
 import { Skeleton } from "@/app/components/ui/Skeleton";
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { DropdownSucursal } from "@/app/components/ui/DropdownSucursal";
+import { NotificacionesSunatModal } from "@/app/components/modalnotificacionesSunat/NotificacionesSunatModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     time: "Hace 1 hora",
     type: "warning",
     detail:
-      "Las boletas B001-00853, B001-00851 y B001-00849 no han podido enviarse automáticamente.",
+      "Las boletas B001-00853, B001-00851 y B001-00849 no han podido enviarse automáticamente; intente reenviarlas desde el módulo de Comprobantes.",
     fecha: "15/01/2025 08:45",
   },
   {
@@ -89,16 +90,6 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     fecha: "15/01/2025 00:00",
   },
   {
-    id: 4,
-    title: "Sincronización OSE",
-    desc: "Sincronización completada con Digiflow.",
-    time: "Hace 2 horas",
-    type: "success",
-    detail:
-      "Se completó la sincronización masiva con el OSE Digiflow. 47 comprobantes enviados, 47 aceptados.",
-    fecha: "15/01/2025 07:00",
-  },
-  {
     id: 5,
     title: "Factura Rechazada",
     desc: "F001-00122 rechazada por SUNAT (2329).",
@@ -107,16 +98,7 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     detail: "La factura F001-00122 fue rechazada por SUNAT con error 2329.",
     fecha: "14/01/2025 22:15",
     comprobante: "F001-00122",
-  },
-  {
-    id: 6,
-    title: "Nuevo Periodo Contable",
-    desc: "Inicio de periodo Enero 2025.",
-    time: "Hace 1 día",
-    type: "info",
-    detail: "Se ha iniciado automáticamente el periodo contable Enero 2025.",
-    fecha: "01/01/2025 00:00",
-  },
+  }
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -217,177 +199,6 @@ const ModalHeader: React.FC<{
     </button>
   </div>
 );
-
-// ─── Modal: Todas las Alertas SUNAT ───────────────────────────────────────────
-
-const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [selected, setSelected] = useState<Notificacion | null>(
-    ALL_NOTIFICACIONES[0],
-  );
-
-  const iconConfig = {
-    success: {
-      icon: <CheckCircle2 size={16} />,
-      dot: "bg-emerald-500",
-      badge: "bg-emerald-50 text-emerald-700",
-      label: "Éxito",
-    },
-    warning: {
-      icon: <AlertTriangle size={16} />,
-      dot: "bg-amber-500",
-      badge: "bg-amber-50 text-amber-700",
-      label: "Advertencia",
-    },
-    error: {
-      icon: <XCircle size={16} />,
-      dot: "bg-rose-500",
-      badge: "bg-rose-50 text-rose-700",
-      label: "Error",
-    },
-    info: {
-      icon: <Bell size={16} />,
-      dot: "bg-blue-500",
-      badge: "bg-blue-50 text-blue-700",
-      label: "Info",
-    },
-  };
-
-  return (
-    <Modal open onClose={onClose} wide>
-      <ModalHeader
-        title="Notificaciones SUNAT"
-        subtitle="Historial completo de alertas y eventos"
-        onClose={onClose}
-        icon={<Bell size={18} />}
-        iconColor="bg-red-100 text-red-600"
-      />
-      <div
-        className="flex flex-1 overflow-hidden"
-        style={{ minHeight: 0, height: "520px" }}
-      >
-        <div className="w-[42%] border-r border-slate-100 overflow-y-auto shrink-0">
-          {ALL_NOTIFICACIONES.map((notif) => {
-            const cfg = iconConfig[notif.type];
-            return (
-              <button
-                key={notif.id}
-                onClick={() => setSelected(notif)}
-                className={cn(
-                  "w-full text-left flex gap-3 p-4 border-b border-slate-50 transition-colors",
-                  selected?.id === notif.id
-                    ? "bg-blue-50 border-l-2 border-l-blue-600"
-                    : "hover:bg-slate-50 border-l-2 border-l-transparent",
-                )}
-              >
-                <div className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", cfg.dot)} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-bold text-slate-900 leading-tight">
-                      {notif.title}
-                    </p>
-                    <span
-                      className={cn(
-                        "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                        cfg.badge,
-                      )}
-                    >
-                      {cfg.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
-                    {notif.desc}
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-1 uppercase font-medium">
-                    {notif.time}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {selected ? (
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
-            <div className="flex items-start gap-3">
-              <div
-                className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                  {
-                    "bg-emerald-100 text-emerald-600": selected.type === "success",
-                    "bg-amber-100 text-amber-600": selected.type === "warning",
-                    "bg-rose-100 text-rose-600": selected.type === "error",
-                    "bg-blue-100 text-blue-600": selected.type === "info",
-                  },
-                )}
-              >
-                {iconConfig[selected.type].icon}
-              </div>
-              <div>
-                <h4 className="text-base font-bold text-slate-900">{selected.title}</h4>
-                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                  <Calendar size={11} /> {selected.fecha}
-                </p>
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-sm text-slate-700 leading-relaxed">{selected.detail}</p>
-            </div>
-            {selected.comprobante && (
-              <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/50">
-                <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">
-                  Comprobante Relacionado
-                </p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-blue-600" />
-                    <span className="text-sm font-bold text-blue-800">
-                      {selected.comprobante}
-                    </span>
-                  </div>
-                  <button className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-200 px-2.5 py-1.5 rounded-lg transition-colors">
-                    <Eye size={12} /> Ver comprobante
-                  </button>
-                </div>
-              </div>
-            )}
-            {selected.type === "error" && (
-              <div>
-                <p className="text-xs font-bold text-slate-700 mb-2">
-                  Acciones recomendadas
-                </p>
-                <div className="space-y-2">
-                  {selected.id === 3 ? (
-                    <>
-                      <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-lg transition-colors">
-                        <ShieldCheck size={14} /> Renovar certificado digital
-                      </button>
-                      <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg transition-colors">
-                        <Send size={14} /> Contactar soporte técnico
-                      </button>
-                    </>
-                  ) : (
-                    <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-lg transition-colors">
-                      <RotateCcw size={14} /> Corregir y reemitir comprobante
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {selected.type === "warning" && (
-              <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors">
-                <Send size={14} /> Enviar comprobantes pendientes
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-            Selecciona una notificación
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-};
 
 // ─── Card: Desglose de Notas ───────────────────────────────────────────────────
 
@@ -666,8 +477,12 @@ export default function DashboardPage() {
   return (
     <>
       {showTodasAlertas && (
-        <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />
-      )}
+  <NotificacionesSunatModal
+    onClose={() => setShowTodasAlertas(false)}
+    sucursalId={sucursalSeleccionada}
+    empresaRuc={isSuperAdmin && !sucursalSeleccionada ? user?.ruc : undefined}
+  />
+)}
 
       {/* ─── Header ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center justify-between gap-4">
