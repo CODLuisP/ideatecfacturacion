@@ -72,14 +72,15 @@ export default function BoletaPage() {
   const { accessToken, user } = useAuth();
 
   //enviar mediante resumen
-  const [enviarEnResumen, setEnviarEnResumen] = useState(false)
+  const [enviarEnResumen, setEnviarEnResumen] = useState(false);
 
   // ── isSuperAdmin ─────────────────────────────────────────────
   const isSuperAdmin = user?.rol === "superadmin";
   const IGV_DEFAULT = user?.igv ?? 18;
 
   const { empresa } = useEmpresaEmisor();
-  const { cliente, loadingCliente, errorCliente, buscarCliente } = useClienteBoleta();
+  const { cliente, loadingCliente, errorCliente, buscarCliente } =
+    useClienteBoleta();
   const { clientes, loadingClientes, fetchClientes } = useClientesRuc();
 
   const { sucursal: sucursalDelHook, loadingSucursal } = useSucursal();
@@ -91,17 +92,19 @@ export default function BoletaPage() {
 
   //Editar y renvia por parametros url
   const searchParams = useSearchParams();
-  const { comprobante, fetchComprobante: fetchComprobanteById } = useComprobanteUnicoId();
-  const cargandoComprobante = !!searchParams.get('comprobanteId') && !comprobante;
+  const { comprobante, fetchComprobante: fetchComprobanteById } =
+    useComprobanteUnicoId();
+  const cargandoComprobante =
+    !!searchParams.get("comprobanteId") && !comprobante;
 
   useEffect(() => {
-    const comprobanteId = searchParams.get('comprobanteId');
-    const establecimiento = searchParams.get('establecimiento');
+    const comprobanteId = searchParams.get("comprobanteId");
+    const establecimiento = searchParams.get("establecimiento");
     if (!comprobanteId) return;
     fetchComprobanteById(Number(comprobanteId));
     if (isSuperAdmin && establecimiento && sucursales.length > 0) {
       const sucursalEncontrada = sucursales.find(
-        (s: Sucursal) => s.codEstablecimiento === establecimiento
+        (s: Sucursal) => s.codEstablecimiento === establecimiento,
       );
       if (sucursalEncontrada) {
         setSucursal(sucursalEncontrada);
@@ -112,101 +115,110 @@ export default function BoletaPage() {
   useEffect(() => {
     if (!comprobante) return;
 
-    setBoleta(prev => ({
+    setBoleta((prev) => ({
       ...prev,
-      tipoMoneda: comprobante.tipoMoneda ?? 'PEN',
-      tipoPago: comprobante.tipoPago ?? 'Contado',
-      tipoOperacion: comprobante.tipoOperacion ?? '0101',
+      tipoMoneda: comprobante.tipoMoneda ?? "PEN",
+      tipoPago: comprobante.tipoPago ?? "Contado",
+      tipoOperacion: comprobante.tipoOperacion ?? "0101",
       fechaVencimiento: comprobante.fechaVencimiento?.slice(0, 10) ?? fecha,
-      cliente: comprobante.cliente ? {
-        clienteId: comprobante.cliente.clienteId ?? null,
-        tipoDocumento: comprobante.cliente.tipoDocumento,
-        numeroDocumento: comprobante.cliente.numeroDocumento,
-        razonSocial: comprobante.cliente.razonSocial,
-        ubigeo: comprobante.cliente.ubigeo ?? '',
-        direccionLineal: comprobante.cliente.direccionLineal ?? '',
-        departamento: comprobante.cliente.departamento ?? '',
-        provincia: comprobante.cliente.provincia ?? '',
-        distrito: comprobante.cliente.distrito ?? '',
-      } : undefined,
+      cliente: comprobante.cliente
+        ? {
+            clienteId: comprobante.cliente.clienteId ?? null,
+            tipoDocumento: comprobante.cliente.tipoDocumento,
+            numeroDocumento: comprobante.cliente.numeroDocumento,
+            razonSocial: comprobante.cliente.razonSocial,
+            ubigeo: comprobante.cliente.ubigeo ?? "",
+            direccionLineal: comprobante.cliente.direccionLineal ?? "",
+            departamento: comprobante.cliente.departamento ?? "",
+            provincia: comprobante.cliente.provincia ?? "",
+            distrito: comprobante.cliente.distrito ?? "",
+          }
+        : undefined,
     }));
 
     // Cliente búsqueda
-    setBusqueda(comprobante.cliente?.numeroDocumento ?? '');
-    setTipoDoc(comprobante.cliente?.tipoDocumento ?? '01');
-    setCorreoCliente(comprobante.cliente?.correo ?? '');
-    setTelefonoCliente(comprobante.cliente?.whatsApp ?? '');
+    setBusqueda(comprobante.cliente?.numeroDocumento ?? "");
+    setTipoDoc(comprobante.cliente?.tipoDocumento ?? "01");
+    setCorreoCliente(comprobante.cliente?.correo ?? "");
+    setTelefonoCliente(comprobante.cliente?.whatsApp ?? "");
 
     // Detalles
     if (comprobante.details && comprobante.details.length > 0) {
-      const nuevosDetalles: DetalleLocal[] = comprobante.details.map((d, idx) => ({
-        item: idx + 1,
-        productoId: d.productoId ?? null,
-        codigo: d.codigo ?? null,
-        descripcion: d.descripcion,
-        cantidad: d.cantidad,
-        unidadMedida: d.unidadMedida,
-        precioUnitario: d.precioUnitario,
-        tipoAfectacionIGV: d.tipoAfectacionIGV,
-        porcentajeIGV: d.porcentajeIGV,
-        montoIGV: d.montoIGV,
-        baseIgv: d.baseIgv,
-        codigoTipoDescuento: d.codigoTipoDescuento ?? '00',
-        descuentoUnitario: d.descuentoUnitario ?? 0,
-        descuentoTotal: d.descuentoTotal ?? 0,
-        valorVenta: d.valorVenta,
-        precioVenta: d.precioVenta,
-        totalVentaItem: d.totalVentaItem,
-        icbper: d.icbper ?? 0,
-        factorIcbper: d.factorIcbper ?? 0,
-        _precioBase: d.precioUnitario,
-        _precioBaseOriginal: d.precioUnitario,
-        _precioVentaConIGV: d.precioVenta,
-        _incluirIGV: false,
-      }));
+      const nuevosDetalles: DetalleLocal[] = comprobante.details.map(
+        (d, idx) => ({
+          item: idx + 1,
+          productoId: d.productoId ?? null,
+          codigo: d.codigo ?? null,
+          descripcion: d.descripcion,
+          cantidad: d.cantidad,
+          unidadMedida: d.unidadMedida,
+          precioUnitario: d.precioUnitario,
+          tipoAfectacionIGV: d.tipoAfectacionIGV,
+          porcentajeIGV: d.porcentajeIGV,
+          montoIGV: d.montoIGV,
+          baseIgv: d.baseIgv,
+          codigoTipoDescuento: d.codigoTipoDescuento ?? "00",
+          descuentoUnitario: d.descuentoUnitario ?? 0,
+          descuentoTotal: d.descuentoTotal ?? 0,
+          valorVenta: d.valorVenta,
+          precioVenta: d.precioVenta,
+          totalVentaItem: d.totalVentaItem,
+          icbper: d.icbper ?? 0,
+          factorIcbper: d.factorIcbper ?? 0,
+          _precioBase: d.precioUnitario,
+          _precioBaseOriginal: d.precioUnitario,
+          _precioVentaConIGV: d.precioVenta,
+          _incluirIGV: false,
+        }),
+      );
       setDetalles(nuevosDetalles);
-      setBusquedaProducto(nuevosDetalles.map(d => d.descripcion ?? ''));
+      setBusquedaProducto(nuevosDetalles.map((d) => d.descripcion ?? ""));
       setShowDropdownProducto(nuevosDetalles.map(() => false));
       inputRefs.current = nuevosDetalles.map(() => null);
     }
 
     // Pagos
     if (comprobante.pagos && comprobante.pagos.length > 0) {
-      setPagos(comprobante.pagos.map(p => ({
-        medioPago: p.medioPago,
-        monto: String(p.monto),
-        numeroOperacion: p.numeroOperacion ?? '',
-        entidadFinanciera: p.entidadFinanciera ?? '',
-        observaciones: p.observaciones ?? '',
-      })));
+      setPagos(
+        comprobante.pagos.map((p) => ({
+          medioPago: p.medioPago,
+          monto: String(p.monto),
+          numeroOperacion: p.numeroOperacion ?? "",
+          entidadFinanciera: p.entidadFinanciera ?? "",
+          observaciones: p.observaciones ?? "",
+        })),
+      );
     }
 
     // Cuotas
     if (comprobante.cuotas && comprobante.cuotas.length > 0) {
       setNumeroCuotas(comprobante.cuotas.length);
-      setCuotas(comprobante.cuotas.map(c => ({
-        numeroCuota: c.numeroCuota,
-        monto: String(c.monto),
-        fechaVencimiento: c.fechaVencimiento?.slice(0, 10) ?? '',
-      })));
+      setCuotas(
+        comprobante.cuotas.map((c) => ({
+          numeroCuota: c.numeroCuota,
+          monto: String(c.monto),
+          fechaVencimiento: c.fechaVencimiento?.slice(0, 10) ?? "",
+        })),
+      );
     }
 
     // Guías
     if (comprobante.guias && comprobante.guias.length > 0) {
-      setGuias(comprobante.guias.map(g => {
-        const partes = g.guiaNumeroCompleto?.split('-') ?? [];
-        return {
-          serie: partes[0] ?? '',
-          numero: partes[1] ?? '',
-          tipoDoc: g.guiaTipoDoc ?? '09',
-        };
-      }));
+      setGuias(
+        comprobante.guias.map((g) => {
+          const partes = g.guiaNumeroCompleto?.split("-") ?? [];
+          return {
+            serie: partes[0] ?? "",
+            numero: partes[1] ?? "",
+            tipoDoc: g.guiaTipoDoc ?? "09",
+          };
+        }),
+      );
     }
 
     // Descuento global
     setDescuentoGlobal(comprobante.descuentoGlobal ?? 0);
-    setCodigoTipoDescGlobal(comprobante.codigoTipoDescGlobal ?? '02');
-
+    setCodigoTipoDescGlobal(comprobante.codigoTipoDescGlobal ?? "02");
   }, [comprobante]);
 
   // Productos según sucursal
@@ -541,7 +553,7 @@ export default function BoletaPage() {
     setBusquedaProducto((prev) => {
       // For now, let's just assume we want to filter out anything that looks like a bolsa
       // if we are clearing or updating.
-      const sinBolsa = prev.filter(s => !s.startsWith("BOLSA PLASTICA"));
+      const sinBolsa = prev.filter((s) => !s.startsWith("BOLSA PLASTICA"));
       if (cantidadBolsa === 0) return sinBolsa;
       return [...sinBolsa, `BOLSA PLASTICA (${tamañoBolsa})`];
     });
@@ -567,7 +579,9 @@ export default function BoletaPage() {
   });
 
   // ── PDF ──────────────────────────────────────────────────────
-  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
+  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<
+    number | null
+  >(null);
   const [tamanoPdf, setTamanoPdf] = useState<string>("A4");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [cargandoPdf, setCargandoPdf] = useState(false);
@@ -579,15 +593,21 @@ export default function BoletaPage() {
   // ── Effects de inicialización ────────────────────────────────
   useEffect(() => {
     const data = sharedVentaStore.get();
-    
+
     // Load extra UI state first
     if (data.extra) {
-      if (data.extra.porConsumo !== undefined) setPorConsumo(data.extra.porConsumo);
-      if (data.extra.cantidadBolsa !== undefined) setCantidadBolsa(data.extra.cantidadBolsa);
-      if (data.extra.tamañoBolsa !== undefined) setTamañoBolsa(data.extra.tamañoBolsa);
-      if (data.extra.aplicarIcbper !== undefined) setAplicarIcbper(data.extra.aplicarIcbper);
-      if (data.extra.descuentoGlobal !== undefined) setDescuentoGlobal(data.extra.descuentoGlobal);
-      if (data.extra.codigoTipoDescGlobal !== undefined) setCodigoTipoDescGlobal(data.extra.codigoTipoDescGlobal);
+      if (data.extra.porConsumo !== undefined)
+        setPorConsumo(data.extra.porConsumo);
+      if (data.extra.cantidadBolsa !== undefined)
+        setCantidadBolsa(data.extra.cantidadBolsa);
+      if (data.extra.tamañoBolsa !== undefined)
+        setTamañoBolsa(data.extra.tamañoBolsa);
+      if (data.extra.aplicarIcbper !== undefined)
+        setAplicarIcbper(data.extra.aplicarIcbper);
+      if (data.extra.descuentoGlobal !== undefined)
+        setDescuentoGlobal(data.extra.descuentoGlobal);
+      if (data.extra.codigoTipoDescGlobal !== undefined)
+        setCodigoTipoDescGlobal(data.extra.codigoTipoDescGlobal);
     }
 
     if (data.items && data.items.length > 0) {
@@ -596,20 +616,24 @@ export default function BoletaPage() {
         const porcentajeIGV = i.porcentajeIGV ?? 18;
         const precioUnitario = i.precioUnitario ?? i._precioBase ?? 0;
         // DetalleLocal uses 'precioVenta', ItemRapido uses 'precioVentaConIGV'
-        const precioVenta = i.precioVenta ?? i.precioVentaConIGV ?? i._precioVentaConIGV ?? precioUnitario;
-        
+        const precioVenta =
+          i.precioVenta ??
+          i.precioVentaConIGV ??
+          i._precioVentaConIGV ??
+          precioUnitario;
+
         let baseIgv = 0;
         let montoIGV = 0;
         let totalVentaItem = 0;
         let valorVenta = 0;
-        
+
         if (i._esIcbper) {
           baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
           montoIGV = 0;
           totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
           valorVenta = baseIgv;
         } else {
-          if (i.tipoAfectacionIGV === '10') {
+          if (i.tipoAfectacionIGV === "10") {
             baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
             montoIGV = parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2));
             totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
@@ -629,9 +653,9 @@ export default function BoletaPage() {
           codigo: i.codigo || null,
           descripcion: i.descripcion,
           cantidad,
-          unidadMedida: i.unidadMedida || 'NIU',
+          unidadMedida: i.unidadMedida || "NIU",
           precioUnitario,
-          tipoAfectacionIGV: i.tipoAfectacionIGV || '10',
+          tipoAfectacionIGV: i.tipoAfectacionIGV || "10",
           porcentajeIGV,
           montoIGV,
           baseIgv,
@@ -654,12 +678,13 @@ export default function BoletaPage() {
         };
       });
       setDetalles(mapped);
-      setBusquedaProducto(mapped.map((i: any) => i.descripcion || ''));
+      setBusquedaProducto(mapped.map((i: any) => i.descripcion || ""));
       setShowDropdownProducto(mapped.map(() => false));
     }
     if (data.cliente) {
-      setBoleta(prev => ({...prev, cliente: data.cliente}));
-      if (data.cliente.numeroDocumento) setBusqueda(data.cliente.numeroDocumento);
+      setBoleta((prev) => ({ ...prev, cliente: data.cliente }));
+      if (data.cliente.numeroDocumento)
+        setBusqueda(data.cliente.numeroDocumento);
     }
   }, []);
 
@@ -788,32 +813,34 @@ export default function BoletaPage() {
   }, [pagos, boleta.tipoPago]);
 
   useEffect(() => {
-      if (boleta.tipoPago !== "Credito" && boleta.tipoPago !== "CreditoInicial") return;
-      const cuotasFormateadas: BoletaCuota[] = cuotas.map((c) => ({
-        numeroCuota: c.numeroCuota,
-        monto: Number(c.monto) || 0,
-        fechaVencimiento: c.fechaVencimiento,
+    if (boleta.tipoPago !== "Credito" && boleta.tipoPago !== "CreditoInicial")
+      return;
+    const cuotasFormateadas: BoletaCuota[] = cuotas.map((c) => ({
+      numeroCuota: c.numeroCuota,
+      monto: Number(c.monto) || 0,
+      fechaVencimiento: c.fechaVencimiento,
+    }));
+
+    // ✅ Tomar fecha de vencimiento de la última cuota
+    const ultimaCuota = cuotas[cuotas.length - 1];
+    const fechaVencimientoFinal =
+      ultimaCuota?.fechaVencimiento ?? boleta.fechaVencimiento;
+
+    if (boleta.tipoPago === "Credito") {
+      setBoleta((prev) => ({
+        ...prev,
+        cuotas: cuotasFormateadas,
+        pagos: [],
+        fechaVencimiento: fechaVencimientoFinal,
       }));
-
-      // ✅ Tomar fecha de vencimiento de la última cuota
-      const ultimaCuota = cuotas[cuotas.length - 1];
-      const fechaVencimientoFinal = ultimaCuota?.fechaVencimiento ?? boleta.fechaVencimiento;
-
-      if (boleta.tipoPago === "Credito") {
-        setBoleta((prev) => ({ 
-          ...prev, 
-          cuotas: cuotasFormateadas, 
-          pagos: [],
-          fechaVencimiento: fechaVencimientoFinal,
-        }));
-      } else {
-        setBoleta((prev) => ({ 
-          ...prev, 
-          cuotas: cuotasFormateadas,
-          fechaVencimiento: fechaVencimientoFinal,
-        }));
-      }
-    }, [cuotas, boleta.tipoPago]);
+    } else {
+      setBoleta((prev) => ({
+        ...prev,
+        cuotas: cuotasFormateadas,
+        fechaVencimiento: fechaVencimientoFinal,
+      }));
+    }
+  }, [cuotas, boleta.tipoPago]);
 
   useEffect(() => {
     const detallesLimpios = detalles.map(
@@ -1047,39 +1074,71 @@ export default function BoletaPage() {
       descuentoUnitario: number,
     ) => {
       const precioUnitario = parseFloat(precioBase.toFixed(6));
-      let baseIgv = 0, montoIGV = 0, totalVentaItem = 0, valorVenta = 0;
+      let baseIgv = 0,
+        montoIGV = 0,
+        totalVentaItem = 0,
+        valorVenta = 0;
       let precioVenta = parseFloat(precioVentaConIGV.toFixed(2));
       let descuentoTotal = 0;
 
       if (tipoAfectacion === "10") {
         if (codigoDescuento === "00") {
           precioVenta = parseFloat(
-            ((precioBase - descuentoUnitario) * (1 + porcentajeIGV / 100)).toFixed(2),
+            (
+              (precioBase - descuentoUnitario) *
+              (1 + porcentajeIGV / 100)
+            ).toFixed(2),
           );
           totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
-          montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + porcentajeIGV / 100)).toFixed(2));
+          montoIGV = parseFloat(
+            (
+              totalVentaItem -
+              totalVentaItem / (1 + porcentajeIGV / 100)
+            ).toFixed(2),
+          );
           baseIgv = parseFloat((totalVentaItem - montoIGV).toFixed(2));
           valorVenta = baseIgv;
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         } else {
-          totalVentaItem = parseFloat((precioVentaConIGV * cantidad).toFixed(2));
-          montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + porcentajeIGV / 100)).toFixed(2));
+          totalVentaItem = parseFloat(
+            (precioVentaConIGV * cantidad).toFixed(2),
+          );
+          montoIGV = parseFloat(
+            (
+              totalVentaItem -
+              totalVentaItem / (1 + porcentajeIGV / 100)
+            ).toFixed(2),
+          );
           baseIgv = parseFloat((totalVentaItem - montoIGV).toFixed(2));
-          precioVenta = parseFloat((precioVentaConIGV - descuentoUnitario).toFixed(2));
+          precioVenta = parseFloat(
+            (precioVentaConIGV - descuentoUnitario).toFixed(2),
+          );
           valorVenta = baseIgv;
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         }
       } else {
         if (codigoDescuento === "00") {
-          baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2));
+          baseIgv = parseFloat(
+            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
+          );
           precioVenta = parseFloat((precioBase - descuentoUnitario).toFixed(2));
           totalVentaItem = parseFloat(baseIgv.toFixed(2));
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         } else {
           baseIgv = parseFloat((precioBase * cantidad).toFixed(2));
           precioVenta = parseFloat(precioBase.toFixed(2));
-          totalVentaItem = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2));
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          totalVentaItem = parseFloat(
+            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
+          );
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         }
         montoIGV = 0;
         valorVenta = baseIgv;
@@ -1441,7 +1500,7 @@ export default function BoletaPage() {
   }, [tamanoPdf, comprobanteIdEmitido]);
 
   const imprimirPdf = () => {
-    if (!pdfA4Url) return; 
+    if (!pdfA4Url) return;
     const iframe = document.createElement("iframe");
     iframe.style.display = "none";
     iframe.src = pdfA4Url;
@@ -1489,20 +1548,40 @@ export default function BoletaPage() {
   // ── Emitir ───────────────────────────────────────────────────
   const emitirComprobante = async () => {
     if (!boleta.cliente?.razonSocial && !boleta.cliente?.numeroDocumento) {
-      showToast("Debe seleccionar o ingresar un cliente", "error"); return;
+      showToast("Debe seleccionar o ingresar un cliente", "error");
+      return;
     }
-    const itemsReales = detalles.filter(d => !d._esIcbper);
-    if (!itemsReales.length) { showToast("Debe agregar al menos un ítem", "error"); return; }
-    const itemSinDesc = itemsReales.findIndex(d => !d.descripcion?.trim());
-    if (itemSinDesc !== -1) { showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error"); return; }
-    const itemSinPrecio = itemsReales.findIndex(d => {
+    const itemsReales = detalles.filter((d) => !d._esIcbper);
+    if (!itemsReales.length) {
+      showToast("Debe agregar al menos un ítem", "error");
+      return;
+    }
+    const itemSinDesc = itemsReales.findIndex((d) => !d.descripcion?.trim());
+    if (itemSinDesc !== -1) {
+      showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error");
+      return;
+    }
+    const itemSinPrecio = itemsReales.findIndex((d) => {
       const precioBase = d._precioBase ?? d.precioUnitario ?? 0;
-      const esGratuito = (d.descuentoUnitario ?? 0) >= precioBase && precioBase > 0;
+      const esGratuito =
+        (d.descuentoUnitario ?? 0) >= precioBase && precioBase > 0;
       return !esGratuito && (d.precioVenta ?? 0) <= 0;
     });
-    if (itemSinPrecio !== -1) { showToast(`El ítem ${itemSinPrecio + 1} debe tener un precio mayor a cero`, "error"); return; }
-    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return; }
+    if (itemSinPrecio !== -1) {
+      showToast(
+        `El ítem ${itemSinPrecio + 1} debe tener un precio mayor a cero`,
+        "error",
+      );
+      return;
+    }
+    if (enviarCorreo && !correoCliente.trim()) {
+      showToast("Ingrese el correo del cliente para enviar", "error");
+      return;
+    }
+    if (enviarWhatsapp && !telefonoCliente.trim()) {
+      showToast("Ingrese el teléfono para enviar por WhatsApp", "error");
+      return;
+    }
 
     setEmitiendo(true);
     setErrorEmision(null);
@@ -1513,7 +1592,7 @@ export default function BoletaPage() {
       const resBoleta = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
         boletaFinal,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const comprobanteId = resBoleta.data.comprobanteId;
 
@@ -1528,10 +1607,10 @@ export default function BoletaPage() {
         setEmitido(true);
         procesarSegundoPlano(comprobanteId);
       }
-
     } catch (err: any) {
       const data = err?.response?.data;
-      const mensaje = data?.mensaje ?? data?.message ?? "Error al generar el comprobante";
+      const mensaje =
+        data?.mensaje ?? data?.message ?? "Error al generar el comprobante";
       const detalle = data?.detalle;
       setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
       showToast("Error al generar el comprobante.", "error");
@@ -1546,18 +1625,23 @@ export default function BoletaPage() {
       const resSunat = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
         null,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
       if (resSunat.data.exitoso) {
         // SUNAT aceptó
-        showToast(resSunat.data.mensaje ?? "Boleta emitida correctamente.", "success");
+        showToast(
+          resSunat.data.mensaje ?? "Boleta emitida correctamente.",
+          "success",
+        );
         setEmitido(true);
         procesarSegundoPlano(comprobanteId);
       } else {
         // SUNAT rechazó
         const serieCorrelativo = `${boleta.serie}-${boleta.correlativo}`;
-        setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
+        setErrorEmision(
+          resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT",
+        );
         showToast(`La boleta ${serieCorrelativo} fue rechazada.`, "error");
         setEmitido(true);
         procesarSegundoPlano(comprobanteId);
@@ -1566,7 +1650,10 @@ export default function BoletaPage() {
       // SUNAT no responde / timeout — reintento silencioso
       const serieCorrelativo = `${boleta.serie}-${boleta.correlativo}`;
       setErrorEmision("No se pudo conectar con SUNAT.");
-      showToast(`La boleta ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+      showToast(
+        `La boleta ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`,
+        "error",
+      );
       setEmitido(true);
       procesarSegundoPlano(comprobanteId);
       reintentarEnSegundoPlano(comprobanteId); // ← sin await
@@ -1575,12 +1662,12 @@ export default function BoletaPage() {
 
   // ── Reintento silencioso — solo si SUNAT no responde ────────
   const reintentarEnSegundoPlano = async (comprobanteId: number) => {
-    await new Promise(res => setTimeout(res, 3000));
+    await new Promise((res) => setTimeout(res, 3000));
     try {
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
         null,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
     } catch {
       // silencioso
@@ -1592,63 +1679,113 @@ export default function BoletaPage() {
     try {
       const resA4 = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (resA4.ok) {
         const blob = await resA4.blob();
-        setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+        setPdfA4Url(
+          URL.createObjectURL(new Blob([blob], { type: "application/pdf" })),
+        );
       }
-    } catch { showToast("Error al cargar el PDF", "error"); }
-    finally { setCargandoPreview(false); }
+    } catch {
+      showToast("Error al cargar el PDF", "error");
+    } finally {
+      setCargandoPreview(false);
+    }
 
     try {
       const resTicket = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (resTicket.ok) {
         const blob = await resTicket.blob();
-        setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+        setPdfTicketUrl(
+          URL.createObjectURL(new Blob([blob], { type: "application/pdf" })),
+        );
       }
     } catch {}
 
-    if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+    if (
+      (enviarCorreo && correoCliente) ||
+      (enviarWhatsapp && telefonoCliente)
+    ) {
       try {
         const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
         const serieNum = `${boleta.serie}-${corrNum}`;
         const resPdf = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
+          { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
         const pdfBlob = await resPdf.blob();
-        const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, { type: "application/pdf" });
+        const pdfFile = new File(
+          [pdfBlob],
+          `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`,
+          { type: "application/pdf" },
+        );
 
         if (enviarCorreo && correoCliente) {
-          const correosLista = correoCliente.split(',').map(s => s.trim()).filter(Boolean);
+          const correosLista = correoCliente
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
           const comprobanteJson = JSON.stringify({
-            serieNumero: serieNum, estadoSunat: "ACEPTADO",
-            items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-            igv: totales.igv, total: totales.importeTotal,
+            serieNumero: serieNum,
+            estadoSunat: "ACEPTADO",
+            items: detalles.map((d) => ({
+              descripcion: d.descripcion ?? "",
+              cantidad: d.cantidad ?? 1,
+              precioUnitario: d.precioUnitario ?? 0,
+            })),
+            igv: totales.igv,
+            total: totales.importeTotal,
           });
           const resultadosCorreo = await Promise.allSettled(
-            correosLista.map(correo => {
+            correosLista.map((correo) => {
               const formData = new FormData();
               formData.append("toEmail", correo);
-              formData.append("toName", boleta.cliente?.razonSocial ?? "Cliente");
+              formData.append(
+                "toName",
+                boleta.cliente?.razonSocial ?? "Cliente",
+              );
               formData.append("subject", `Boleta Electrónica ${serieNum}`);
-              formData.append("body", "Se emitió la boleta electrónica por los productos/servicios indicados.");
+              formData.append(
+                "body",
+                "Se emitió la boleta electrónica por los productos/servicios indicados.",
+              );
               formData.append("tipo", "3");
               formData.append("comprobanteJson", comprobanteJson);
               formData.append("adjunto", pdfFile);
-              return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData })
-                .then(res => { if (!res.ok) throw new Error(`Error correo ${correo}`); });
-            })
+              return fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+                {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                  body: formData,
+                },
+              ).then((res) => {
+                if (!res.ok) throw new Error(`Error correo ${correo}`);
+              });
+            }),
           );
-          const fallidosCorreo = resultadosCorreo.filter(r => r.status === 'rejected').length;
-          if (fallidosCorreo === correosLista.length) showToast("Error al enviar por correo", "error");
-          else if (fallidosCorreo > 0) showToast(`Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`, "error");
-          else showToast(correosLista.length > 1 ? `Boleta enviada a ${correosLista.length} correos` : "Boleta enviada por correo", "success");
+          const fallidosCorreo = resultadosCorreo.filter(
+            (r) => r.status === "rejected",
+          ).length;
+          if (fallidosCorreo === correosLista.length)
+            showToast("Error al enviar por correo", "error");
+          else if (fallidosCorreo > 0)
+            showToast(
+              `Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`,
+              "error",
+            );
+          else
+            showToast(
+              correosLista.length > 1
+                ? `Boleta enviada a ${correosLista.length} correos`
+                : "Boleta enviada por correo",
+              "success",
+            );
         }
 
         if (enviarWhatsapp && telefonoCliente) {
@@ -1657,50 +1794,97 @@ export default function BoletaPage() {
             const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
             const uploadForm = new FormData();
             uploadForm.append("file", pdfFile);
-            const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+              method: "POST",
+              headers: { "x-api-key": whatsappApiKey },
+              body: uploadForm,
+            });
             if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
             const fileUrl = (await resUpload.json()).datos.url;
-            const telefonosLista = telefonoCliente.split(',').map(s => s.trim()).filter(Boolean);
+            const telefonosLista = telefonoCliente
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
             const resultadosWsp = await Promise.allSettled(
-              telefonosLista.map(num => {
-                const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
+              telefonosLista.map((num) => {
+                const numeroFormateado = num.startsWith("51")
+                  ? num
+                  : `51${num}`;
                 return fetch(`${whatsappBase}/api/send/single`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.` }),
-                }).then(res => { if (!res.ok) throw new Error(`Error WhatsApp ${num}`); });
-              })
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": whatsappApiKey,
+                  },
+                  body: JSON.stringify({
+                    phone: numeroFormateado,
+                    type: "documento",
+                    file_url: fileUrl,
+                    filename: `${empresa?.numeroDocumento}-Boleta-${serieNum}.pdf`,
+                    mime_type: "application/pdf",
+                    text: `Estimado(a) ${boleta.cliente?.razonSocial ?? ""}, adjuntamos su boleta electrónica ${serieNum}.`,
+                  }),
+                }).then((res) => {
+                  if (!res.ok) throw new Error(`Error WhatsApp ${num}`);
+                });
+              }),
             );
-            const fallidosWsp = resultadosWsp.filter(r => r.status === 'rejected').length;
-            if (fallidosWsp === telefonosLista.length) showToast("Error al enviar por WhatsApp", "error");
-            else if (fallidosWsp > 0) showToast(`WhatsApp enviado, pero falló ${fallidosWsp} número(s)`, "error");
-            else showToast(telefonosLista.length > 1 ? `Boleta enviada a ${telefonosLista.length} números` : "Boleta enviada por WhatsApp", "success");
-          } catch { showToast("Error al enviar por WhatsApp", "error"); }
+            const fallidosWsp = resultadosWsp.filter(
+              (r) => r.status === "rejected",
+            ).length;
+            if (fallidosWsp === telefonosLista.length)
+              showToast("Error al enviar por WhatsApp", "error");
+            else if (fallidosWsp > 0)
+              showToast(
+                `WhatsApp enviado, pero falló ${fallidosWsp} número(s)`,
+                "error",
+              );
+            else
+              showToast(
+                telefonosLista.length > 1
+                  ? `Boleta enviada a ${telefonosLista.length} números`
+                  : "Boleta enviada por WhatsApp",
+                "success",
+              );
+          } catch {
+            showToast("Error al enviar por WhatsApp", "error");
+          }
         }
-      } catch { showToast("Error al procesar envíos", "error"); }
+      } catch {
+        showToast("Error al procesar envíos", "error");
+      }
     }
 
-    const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
+    const itemsParaStock = detalles.filter(
+      (d) =>
+        d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN",
+    );
     if (itemsParaStock.length > 0) {
       try {
-        await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-          itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
-          { headers: { Authorization: `Bearer ${accessToken}` } }
+        await axios.put(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
+          itemsParaStock.map((d) => ({
+            sucursalProductoId: d._sucursalProductoId,
+            cantidad: d.cantidad ?? 1,
+          })),
+          { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         await fetchProductosSucursal();
-      } catch { console.error("Error al actualizar stock"); }
+      } catch {
+        console.error("Error al actualizar stock");
+      }
     }
 
     const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
     const resSucursal = await axios.get(
       `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     setCorrelativoActual(resSucursal.data.correlativoBoleta);
-    setBoleta(prev => ({
+    setBoleta((prev) => ({
       ...prev,
       serie: resSucursal.data.serieBoleta,
-      correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0")
+      correlativo: String(resSucursal.data.correlativoBoleta).padStart(8, "0"),
     }));
   };
 
@@ -1725,49 +1909,63 @@ export default function BoletaPage() {
     setPorConsumo(false);
 
     // Cliente
-    setBusqueda('');
+    setBusqueda("");
     setClienteVarios(false);
 
     // Contacto
-    setCorreoCliente('');
-    setTelefonoCliente('');
+    setCorreoCliente("");
+    setTelefonoCliente("");
     setEnviarCorreo(false);
     setEnviarWhatsapp(false);
 
     // Pagos y cuotas
-    setPagos([{ medioPago: 'Efectivo', monto: '', numeroOperacion: '', entidadFinanciera: '', observaciones: '' }]);
+    setPagos([
+      {
+        medioPago: "Efectivo",
+        monto: "",
+        numeroOperacion: "",
+        entidadFinanciera: "",
+        observaciones: "",
+      },
+    ]);
     setPagosEditados([false]);
     setNumeroCuotas(1);
     setCuotas([]);
 
     // Descuentos y guías
     setDescuentoGlobal(0);
-    setCodigoTipoDescGlobal('02');
+    setCodigoTipoDescGlobal("02");
     setGuias([]);
 
     // Bolsa ICBPER
     setCantidadBolsa(0);
     setShowBolsa(false);
     setAplicarIcbper(false);
-    setTamañoBolsa('mediana');
+    setTamañoBolsa("mediana");
 
     // Fecha emisión
     setFechaEmisionEditada(false);
 
     // Boleta base
-    setBoleta(prev => ({
-      ublVersion: '2.1', tipoOperacion: '0101', tipoComprobante: '03',
-      tipoMoneda: 'PEN', tipoPago: 'Contado',
+    setBoleta((prev) => ({
+      ublVersion: "2.1",
+      tipoOperacion: "0101",
+      tipoComprobante: "03",
+      tipoMoneda: "PEN",
+      tipoPago: "Contado",
       fechaEmision: formatoFechaActual().fechaHora,
       horaEmision: formatoFechaActual().fechaHora,
       fechaVencimiento: formatoFechaActual().fecha,
       serie: prev.serie,
-      correlativo: String(correlativoActual ?? '1').padStart(8, '0'),
+      correlativo: String(correlativoActual ?? "1").padStart(8, "0"),
       company: prev.company,
     }));
 
     // Superadmin
-    if (isSuperAdmin) { setSucursal(null); setCorrelativoActual(null); }
+    if (isSuperAdmin) {
+      setSucursal(null);
+      setCorrelativoActual(null);
+    }
   };
 
   const montoRestante = (index: number) => {
@@ -1784,63 +1982,29 @@ export default function BoletaPage() {
     correlativoActual ?? sucursal?.correlativoBoleta ?? "",
   ).padStart(8, "0");
 
-  const puedeEmitir = !emitiendo && !sinSucursal && !!boleta.cliente?.razonSocial && detalles.filter(d => !d._esIcbper).length > 0;
+  const puedeEmitir =
+    !emitiendo &&
+    !sinSucursal &&
+    !!boleta.cliente?.razonSocial &&
+    detalles.filter((d) => !d._esIcbper).length > 0;
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-2 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-
           {cargandoComprobante && (
             <div className="flex items-center pb-3 gap-2 text-xs text-brand-blue">
               <div className="w-4 h-4 shrink-0 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
               <span>Cargando datos del comprobante...</span>
             </div>
           )}
-          
-          <Card
-            title="Datos del Comprobante"
-            subtitle="Completa la información requerida"
-          >
-            <form className="space-y-6 mx-3">
-              {/* ── Serie y correlativo ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isSuperAdmin ? (<>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Sucursal</label>
-                    <select value={sucursal?.sucursalId ?? ""} disabled={loadingSucursales}
-                      onChange={async e => {
-                        if (!e.target.value) { setSucursal(null); setCorrelativoActual(null); setDetalles([]); setBusquedaProducto([]); setShowDropdownProducto([]); setCantidadBolsa(0); return; }
-                        const sel = sucursales.find((s: Sucursal) => s.sucursalId === Number(e.target.value));
-                        if (!sel) return;
-                        setSucursal(sel); setDetalles([]); setBusquedaProducto([]); setShowDropdownProducto([]); setCantidadBolsa(0);
-                        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-                        setCorrelativoActual(res.data.correlativoBoleta);
-                        setBoleta(prev => ({ ...prev, serie: sel.serieBoleta, correlativo: String(res.data.correlativoBoleta).padStart(8, "0") }));
-                      }}
-                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
-                      <option value="">Seleccionar sucursal</option>
-                      {sucursales.map((s: Sucursal) => (
-                        <option key={s.sucursalId} value={s.sucursalId}>{s.serieBoleta} — {s.nombre ?? s.codEstablecimiento}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo</label>
-                    <input type="text" disabled value={!sucursal ? "Selecciona una sucursal" : `${serieDisplay}-${correlativoDisplay}`}
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
-                  </div>
-                </>) : (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo</label>
-                    <input type="text" disabled value={loadingSucursal ? "Cargando..." : `${serieDisplay}-${correlativoDisplay}`}
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
-                  </div>
-                )}
-              </div>
+
+          <Card>
+            <form className="space-y-3 mx-3">
+             
 
               {/* ── Datos del Cliente ── */}
-              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-4">
+              <div className=" rounded-xl space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <UserRound className="w-4 h-4 text-brand-blue" />
@@ -1864,106 +2028,239 @@ export default function BoletaPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Tipo y Nº Documento</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">
+                      Tipo y Nº Documento
+                    </label>
                     <div className="flex gap-2">
-                      <select value={tipoDoc} disabled={clienteVarios}
-                        onChange={e => { setTipoDoc(e.target.value); setBusqueda(""); setShowDropdown(false); setBoleta(prev => ({ ...prev, cliente: undefined })); }}
-                        className="w-1/3 py-2.5 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm disabled:opacity-50">
+                      <select
+                        value={tipoDoc}
+                        disabled={clienteVarios}
+                        onChange={(e) => {
+                          setTipoDoc(e.target.value);
+                          setBusqueda("");
+                          setShowDropdown(false);
+                          setBoleta((prev) => ({
+                            ...prev,
+                            cliente: undefined,
+                          }));
+                        }}
+                        className="w-1/3 py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm disabled:opacity-50"
+                      >
                         <option value="01">DNI</option>
                         <option value="06">RUC</option>
                         <option value="04">CE</option>
                       </select>
                       <div className="relative w-2/3">
-                        <input type="text" value={clienteVarios ? "00000000" : busqueda} disabled={clienteVarios}
-                          onChange={e => {
-                            setBusqueda(e.target.value); setShowDropdown(true);
-                            if (e.target.value.length < busqueda.length || e.target.value === "") {
-                              setBoleta(prev => ({ ...prev, cliente: undefined }));
-                              setCorreoCliente(""); setTelefonoCliente("");
+                        <input
+                          type="text"
+                          value={clienteVarios ? "00000000" : busqueda}
+                          disabled={clienteVarios}
+                          onChange={(e) => {
+                            setBusqueda(e.target.value);
+                            setShowDropdown(true);
+                            if (
+                              e.target.value.length < busqueda.length ||
+                              e.target.value === ""
+                            ) {
+                              setBoleta((prev) => ({
+                                ...prev,
+                                cliente: undefined,
+                              }));
+                              setCorreoCliente("");
+                              setTelefonoCliente("");
                             }
                           }}
                           onFocus={() => setShowDropdown(true)}
-                          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                          maxLength={tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : 12}
+                          onBlur={() =>
+                            setTimeout(() => setShowDropdown(false), 150)
+                          }
+                          maxLength={
+                            tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : 12
+                          }
                           placeholder="Buscar por nº doc o nombre..."
-                          className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm disabled:opacity-50" />
-                        {loadingCliente && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
-                        {showDropdown && clientesFiltrados.length > 0 && !clienteVarios && (
-                          <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                            {loadingClientes ? <p className="text-xs text-gray-400 px-4 py-3">Cargando...</p> : (
-                              clientesFiltrados.map(c => (
-                                <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
-                                  className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
-                                  <span className="text-sm text-gray-800">{c.numeroDocumento} - {c.razonSocialNombre}</span>
-                                </button>
-                              ))
-                            )}
-                          </div>
+                          className="w-full pl-4 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm disabled:opacity-50"
+                        />
+                        {loadingCliente && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
                         )}
+                        {showDropdown &&
+                          clientesFiltrados.length > 0 &&
+                          !clienteVarios && (
+                            <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                              {loadingClientes ? (
+                                <p className="text-xs text-gray-400 px-4 py-3">
+                                  Cargando...
+                                </p>
+                              ) : (
+                                clientesFiltrados.map((c) => (
+                                  <button
+                                    key={c.clienteId}
+                                    type="button"
+                                    onMouseDown={() => seleccionarDeLista(c)}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                                  >
+                                    <span className="text-sm text-gray-800">
+                                      {c.numeroDocumento} -{" "}
+                                      {c.razonSocialNombre}
+                                    </span>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <input type="text" disabled value={clienteVarios ? "Clientes Varios" : (boleta.cliente?.razonSocial ?? "")}
+                      <input
+                        type="text"
+                        disabled
+                        value={
+                          clienteVarios
+                            ? "Clientes Varios"
+                            : (boleta.cliente?.razonSocial ?? "")
+                        }
                         placeholder="Nombre o razón social"
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm" />
-                      {!clienteVarios && boleta.cliente?.clienteId === null && boleta.cliente?.razonSocial && (
-                        <button type="button" onClick={() => setShowModalCliente(true)}
-                          className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
-                          title="Guardar cliente">+</button>
-                      )}
+                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
+                      />
+                      {!clienteVarios &&
+                        boleta.cliente?.clienteId === null &&
+                        boleta.cliente?.razonSocial && (
+                          <button
+                            type="button"
+                            onClick={() => setShowModalCliente(true)}
+                            className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                            title="Guardar cliente"
+                          >
+                            +
+                          </button>
+                        )}
                     </div>
-                    {errorCliente && <p className="text-xs text-red-500">{errorCliente}</p>}
+                    {errorCliente && (
+                      <p className="text-xs text-red-500">{errorCliente}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Contacto</label>
-                    <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                      <input type="text" value={correoCliente} placeholder="correo@cliente.com, otro@email.com"
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">
+                      Contacto
+                    </label>
+                    <div
+                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                    >
+                      <input
+                        type="text"
+                        value={correoCliente}
+                        placeholder="correo@cliente.com, otro@email.com"
                         disabled={!boleta.cliente?.razonSocial || clienteVarios}
-                        onChange={e => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
-                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
+                        onChange={(e) => {
+                          setCorreoCliente(e.target.value);
+                          if (!e.target.value) setEnviarCorreo(false);
+                        }}
+                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
+                      />
                       <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                        <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={e => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                        <input
+                          type="checkbox"
+                          checked={enviarCorreo}
+                          disabled={!correoCliente}
+                          onChange={(e) => setEnviarCorreo(e.target.checked)}
+                          className="w-3.5 h-3.5 accent-brand-blue"
+                        />
                         <span className="text-xs text-gray-500">Enviar</span>
                       </label>
                     </div>
                     <div className="space-y-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} placeholder="9XXXXXXXX, 9XXXXXXXX"
-                          disabled={!boleta.cliente?.razonSocial || clienteVarios}
-                          onChange={e => {
-                            const s = e.target.value.replace(/[^\d,]/g, '');
+                      <div
+                        className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${
+                          telefonoCliente &&
+                          !telefonoCliente
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean)
+                            .every((n) => n.startsWith("9") && n.length === 9)
+                            ? "border-red-300 bg-red-50"
+                            : "border-gray-200"
+                        }`}
+                      >
+                        <input
+                          type="tel"
+                          value={telefonoCliente}
+                          placeholder="9XXXXXXXX, 9XXXXXXXX"
+                          disabled={
+                            !boleta.cliente?.razonSocial || clienteVarios
+                          }
+                          onChange={(e) => {
+                            const s = e.target.value.replace(/[^\d,]/g, "");
                             setTelefonoCliente(s);
-                            const nums = s.split(',').map(x => x.trim()).filter(Boolean);
-                            if (!nums.length || !nums.every(n => n.startsWith('9') && n.length === 9)) setEnviarWhatsapp(false);
+                            const nums = s
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter(Boolean);
+                            if (
+                              !nums.length ||
+                              !nums.every(
+                                (n) => n.startsWith("9") && n.length === 9,
+                              )
+                            )
+                              setEnviarWhatsapp(false);
                           }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
+                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
+                        />
                         <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp}
-                            disabled={!telefonoCliente || !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9)}
-                            onChange={e => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                          <input
+                            type="checkbox"
+                            checked={enviarWhatsapp}
+                            disabled={
+                              !telefonoCliente ||
+                              !telefonoCliente
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .every(
+                                  (n) => n.startsWith("9") && n.length === 9,
+                                )
+                            }
+                            onChange={(e) =>
+                              setEnviarWhatsapp(e.target.checked)
+                            }
+                            className="w-3.5 h-3.5 accent-brand-blue"
+                          />
                           <span className="text-xs text-gray-500">Enviar</span>
                         </label>
                       </div>
-                      {telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) && (
-                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Cada número debe empezar con 9 y tener 9 dígitos</p>
-                      )}
+                      {telefonoCliente &&
+                        !telefonoCliente
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .every(
+                            (n) => n.startsWith("9") && n.length === 9,
+                          ) && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">
+                            Cada número debe empezar con 9 y tener 9 dígitos
+                          </p>
+                        )}
                     </div>
                   </div>
 
                   {boleta.cliente?.direccionLineal && !clienteVarios && (
                     <div className="md:col-span-2">
-                      <input type="text" disabled value={boleta.cliente?.direccionLineal ?? ""} placeholder="Dirección del cliente"
-                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500" />
+                      <input
+                        type="text"
+                        disabled
+                        value={boleta.cliente?.direccionLineal ?? ""}
+                        placeholder="Dirección del cliente"
+                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500"
+                      />
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* ── Fechas ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* ── Fechas y monedas ── */}
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Fecha y Hora de Emisión
                   </label>
                   <input
@@ -1987,7 +2284,7 @@ export default function BoletaPage() {
                         horaEmision: e.target.value + ":00",
                       }));
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
                   />
                   {fechaEmisionEditada && (
                     <button
@@ -2009,41 +2306,83 @@ export default function BoletaPage() {
                     }
                   />
                 </div>
-              </div>
 
-              {/* ── Moneda y Tipo Pago ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Moneda</label>
-                  <select value={boleta.tipoMoneda ?? "PEN"}
-                    onChange={e => {
-                      const nueva = e.target.value, anterior = boleta.tipoMoneda ?? "PEN";
-                      setBoleta(prev => ({ ...prev, tipoMoneda: nueva }));
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
+                    Moneda
+                  </label>
+                  <select
+                    value={boleta.tipoMoneda ?? "PEN"}
+                    onChange={(e) => {
+                      const nueva = e.target.value,
+                        anterior = boleta.tipoMoneda ?? "PEN";
+                      setBoleta((prev) => ({ ...prev, tipoMoneda: nueva }));
                       if (detalles.length > 0) {
-                        setDetalles(prev => prev.map(d => {
-                          const pb = d._precioBase ?? 0;
-                          const npb = nueva === "USD" && anterior === "PEN" ? parseFloat((pb / tipoCambio).toFixed(6))
-                            : nueva === "PEN" && anterior === "USD" ? parseFloat((pb * tipoCambio).toFixed(6)) : pb;
-                          const ta = d.tipoAfectacionIGV ?? "10", pct = d.porcentajeIGV ?? 18;
-                          const npv = ta === "10" ? parseFloat((npb * (1 + pct / 100)).toFixed(2)) : npb;
-                          return { ...d, _precioBase: npb, _precioVentaConIGV: npv, ...calcularDetalle(npb, npv, d.cantidad ?? 1, pct, ta, d.codigoTipoDescuento ?? "01", d.descuentoUnitario ?? 0) };
-                        }));
+                        setDetalles((prev) =>
+                          prev.map((d) => {
+                            const pb = d._precioBase ?? 0;
+                            const npb =
+                              nueva === "USD" && anterior === "PEN"
+                                ? parseFloat((pb / tipoCambio).toFixed(6))
+                                : nueva === "PEN" && anterior === "USD"
+                                  ? parseFloat((pb * tipoCambio).toFixed(6))
+                                  : pb;
+                            const ta = d.tipoAfectacionIGV ?? "10",
+                              pct = d.porcentajeIGV ?? 18;
+                            const npv =
+                              ta === "10"
+                                ? parseFloat((npb * (1 + pct / 100)).toFixed(2))
+                                : npb;
+                            return {
+                              ...d,
+                              _precioBase: npb,
+                              _precioVentaConIGV: npv,
+                              ...calcularDetalle(
+                                npb,
+                                npv,
+                                d.cantidad ?? 1,
+                                pct,
+                                ta,
+                                d.codigoTipoDescuento ?? "01",
+                                d.descuentoUnitario ?? 0,
+                              ),
+                            };
+                          }),
+                        );
                       }
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                  >
                     <option value="PEN">PEN - Soles</option>
-                    <option value="USD">USD - Dólares ({tipoCambio.toFixed(2)})</option>
+                    <option value="USD">
+                      USD - Dólares ({tipoCambio.toFixed(2)})
+                    </option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Tipo de Pago</label>
-                  <select value={boleta.tipoPago ?? "Contado"}
-                    onChange={e => {
-                      setBoleta(prev => ({ ...prev, tipoPago: e.target.value }));
-                      setPagos([{ medioPago: "Efectivo", monto: "", numeroOperacion: "", entidadFinanciera: "", observaciones: "" }]);
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
+                    Tipo de Pago
+                  </label>
+                  <select
+                    value={boleta.tipoPago ?? "Contado"}
+                    onChange={(e) => {
+                      setBoleta((prev) => ({
+                        ...prev,
+                        tipoPago: e.target.value,
+                      }));
+                      setPagos([
+                        {
+                          medioPago: "Efectivo",
+                          monto: "",
+                          numeroOperacion: "",
+                          entidadFinanciera: "",
+                          observaciones: "",
+                        },
+                      ]);
                       setPagosEditados([false]);
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                  >
                     <option value="Contado">Contado</option>
                     <option value="Credito">Crédito</option>
                     <option value="CreditoInicial">Crédito con Inicial</option>
@@ -2052,111 +2391,260 @@ export default function BoletaPage() {
               </div>
 
               {/* ── Pagos ── */}
-              {(boleta.tipoPago === "Contado" || boleta.tipoPago === "CreditoInicial") && (
-                <div className="border border-gray-100 rounded-xl p-4 space-y-4 bg-gray-50/50">
+              {(boleta.tipoPago === "Contado" ||
+                boleta.tipoPago === "CreditoInicial") && (
+                <div className="border border-gray-100 rounded-xl p-2 space-y-4 bg-gray-50/50">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      {boleta.tipoPago === "CreditoInicial" ? "Pago Inicial" : "Datos de Pago"}
+                    <label className="text-xs font-bold text-gray-700 uppercase">
+                      {boleta.tipoPago === "CreditoInicial"
+                        ? "Pago Inicial"
+                        : "Datos de Pago"}
                     </label>
                     {mediosUsados.length < todosMedios.length && (
-                      <button type="button" onClick={agregarPago} className="text-xs text-brand-blue hover:underline flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={agregarPago}
+                        className="text-xs text-brand-blue hover:underline flex items-center gap-1"
+                      >
                         <Plus className="w-3 h-3" /> Agregar medio de pago
                       </button>
                     )}
                   </div>
+
                   <div className="space-y-3">
                     {pagos.map((pago, i) => (
-                      <div key={i} className="space-y-3 pb-3 border-b border-gray-100 last:border-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="text-xs text-gray-500">Medio de Pago</label>
-                            <select value={pago.medioPago} onChange={e => actualizarPago(i, "medioPago", e.target.value)}
-                              className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm">
-                              {todosMedios.map(m => (
-                                <option key={m} value={m} disabled={mediosUsados.includes(m) && pago.medioPago !== m}>{m}</option>
-                              ))}
-                            </select>
+                      <div
+                        key={i}
+                        className="flex items-end gap-3 pb-3 border-b border-gray-100 last:border-0"
+                      >
+
+                        <div className="space-y-1.5 w-40 shrink-0">
+                          <label className="text-xs text-gray-500">
+                            Medio de Pago
+                          </label>
+                          <select
+                            value={pago.medioPago}
+                            onChange={(e) =>
+                              actualizarPago(i, "medioPago", e.target.value)
+                            }
+                            className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                          >
+                            {todosMedios.map((m) => (
+                              <option
+                                key={m}
+                                value={m}
+                                disabled={
+                                  mediosUsados.includes(m) &&
+                                  pago.medioPago !== m
+                                }
+                              >
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+
+                        <div className="space-y-1.5 w-36 shrink-0">
+                          <label className="text-xs text-gray-500">Monto</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={pago.monto}
+                              placeholder={montoRestante(i)}
+                              disabled={
+                                pago.medioPago === "Efectivo" &&
+                                pagos.length === 1 &&
+                                boleta.tipoPago !== "CreditoInicial"
+                              }
+                              onChange={(e) => {
+                                actualizarPago(i, "monto", e.target.value);
+                                setPagosEditados((prev) => {
+                                  const n = [...prev];
+                                  n[i] = e.target.value !== "";
+                                  return n;
+                                });
+                              }}
+                              onBlur={(e) => {
+                                if (!e.target.value || e.target.value === "0") {
+                                  setPagosEditados((prev) => {
+                                    const n = [...prev];
+                                    n[i] = false;
+                                    return n;
+                                  });
+                                  actualizarPago(i, "monto", "");
+                                }
+                              }}
+                              className={`w-full py-2 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
+              ${pago.medioPago === "Efectivo" && pagos.length === 1 && boleta.tipoPago !== "CreditoInicial" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+                            />
+                            {pagos.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => eliminarPago(i)}
+                                className="text-red-400 hover:text-red-600 px-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-xs text-gray-500">Monto</label>
-                            <div className="flex gap-2">
-                              <input type="number" value={pago.monto} placeholder={montoRestante(i)}
-                                disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && boleta.tipoPago !== 'CreditoInicial'}
-                                onChange={e => { actualizarPago(i, "monto", e.target.value); setPagosEditados(prev => { const n = [...prev]; n[i] = e.target.value !== ""; return n; }); }}
-                                onBlur={e => { if (!e.target.value || e.target.value === "0") { setPagosEditados(prev => { const n = [...prev]; n[i] = false; return n; }); actualizarPago(i, "monto", ""); } }}
-                                className={`w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
-                                    ${pago.medioPago === 'Efectivo' && pagos.length === 1 && boleta.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-                                />
-                              {pagos.length > 1 && (
-                                <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-2">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
+                        </div>
+
+                        {pago.medioPago !== "Efectivo" && (
+                          <>
+                            <div className="space-y-1.5 w-36 shrink-0">
+                              <label className="text-xs text-gray-500">
+                                Nº Operación
+                              </label>
+                              <input
+                                type="text"
+                                value={pago.numeroOperacion}
+                                onChange={(e) =>
+                                  actualizarPago(
+                                    i,
+                                    "numeroOperacion",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Nº operación"
+                                className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                              />
                             </div>
-                          </div>
-                          {pago.medioPago !== "Efectivo" && (<>
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500">Nº Operación</label>
-                              <input type="text" value={pago.numeroOperacion} onChange={e => actualizarPago(i, "numeroOperacion", e.target.value)} placeholder="Número de operación"
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
+                            <div className="space-y-1.5 w-40 shrink-0">
+                              <label className="text-xs text-gray-500">
+                                Entidad Financiera
+                              </label>
+                              <input
+                                type="text"
+                                value={pago.entidadFinanciera}
+                                onChange={(e) =>
+                                  actualizarPago(
+                                    i,
+                                    "entidadFinanciera",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Banco / entidad"
+                                className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                              />
                             </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500">Entidad Financiera</label>
-                              <input type="text" value={pago.entidadFinanciera} onChange={e => actualizarPago(i, "entidadFinanciera", e.target.value)} placeholder="Banco / entidad"
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
-                            </div>
-                          </>)}
-                          <div className="space-y-1.5 md:col-span-2">
-                            <label className="text-xs text-gray-500">Observaciones</label>
-                            <input type="text" value={pago.observaciones} onChange={e => actualizarPago(i, "observaciones", e.target.value)} placeholder="Observaciones (opcional)"
-                              className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm" />
-                          </div>
+                          </>
+                        )}
+
+                        <div className="space-y-1.5 flex-1">
+                          <label className="text-xs text-gray-500">
+                            Observaciones
+                          </label>
+                          <input
+                            type="text"
+                            value={pago.observaciones}
+                            onChange={(e) =>
+                              actualizarPago(i, "observaciones", e.target.value)
+                            }
+                            placeholder="Observaciones (opcional)"
+                            className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                          />
                         </div>
                       </div>
                     ))}
                   </div>
+
                   {boleta.tipoPago === "CreditoInicial" && (
                     <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
-                      <p className="text-gray-500">Total pagado: <span className="font-semibold text-gray-800">{simbolo} {totalPagado.toFixed(2)}</span></p>
-                      <p className="text-gray-500">Monto a crédito: <span className="font-semibold text-brand-blue">{simbolo} {Math.max(0, totales.total - totalPagado).toFixed(2)}</span></p>
+                      <p className="text-gray-500">
+                        Total pagado:{" "}
+                        <span className="font-semibold text-gray-800">
+                          {simbolo} {totalPagado.toFixed(2)}
+                        </span>
+                      </p>
+                      <p className="text-gray-500">
+                        Monto a crédito:{" "}
+                        <span className="font-semibold text-brand-blue">
+                          {simbolo}{" "}
+                          {Math.max(0, totales.total - totalPagado).toFixed(2)}
+                        </span>
+                      </p>
                     </div>
                   )}
                 </div>
               )}
 
               {/* ── Cuotas ── */}
-              {(boleta.tipoPago === "Credito" || boleta.tipoPago === "CreditoInicial") && (
+              {(boleta.tipoPago === "Credito" ||
+                boleta.tipoPago === "CreditoInicial") && (
                 <div className="border border-gray-100 rounded-xl p-4 space-y-4 bg-gray-50/50">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Cuotas de Pago</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">
+                      Cuotas de Pago
+                    </label>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">Nº cuotas:</span>
-                      <input type="number" min={1} max={24} value={numeroCuotas} onChange={e => setNumeroCuotas(Number(e.target.value))}
-                        className="w-16 py-1.5 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue text-center" />
+                      <input
+                        type="number"
+                        min={1}
+                        max={24}
+                        value={numeroCuotas}
+                        onChange={(e) =>
+                          setNumeroCuotas(Number(e.target.value))
+                        }
+                        className="w-16 py-1.5 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue text-center"
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     {cuotas.map((cuota, i) => (
                       <div key={i} className="grid grid-cols-3 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Cuota</label>
-                          <input type="text" disabled value={cuota.numeroCuota}
-                            className="w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500 font-mono" />
+                          <label className="text-[10px] text-gray-400">
+                            Cuota
+                          </label>
+                          <input
+                            type="text"
+                            disabled
+                            value={cuota.numeroCuota}
+                            className="w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500 font-mono"
+                          />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Monto</label>
-                          <input type="number" value={cuota.monto} placeholder="0.00"
-                            onChange={e => { const n = [...cuotas]; n[i].monto = e.target.value; setCuotas(n); }}
-                            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue" />
+                          <label className="text-[10px] text-gray-400">
+                            Monto
+                          </label>
+                          <input
+                            type="number"
+                            value={cuota.monto}
+                            placeholder="0.00"
+                            onChange={(e) => {
+                              const n = [...cuotas];
+                              n[i].monto = e.target.value;
+                              setCuotas(n);
+                            }}
+                            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-blue"
+                          />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Fecha Vencimiento</label>
-                          <DatePickerLimitado modo="cuota" fechaMinima={i > 0 ? cuotas[i - 1].fechaVencimiento : undefined}
+                          <label className="text-[10px] text-gray-400">
+                            Fecha Vencimiento
+                          </label>
+                          <DatePickerLimitado
+                            modo="cuota"
+                            fechaMinima={
+                              i > 0 ? cuotas[i - 1].fechaVencimiento : undefined
+                            }
                             value={cuota.fechaVencimiento}
-                            onChange={e => {
-                              const fs = calcularFechasCuotas(e, cuotas.length - i);
-                              setCuotas(prev => prev.map((c, idx) => idx < i ? c : { ...c, fechaVencimiento: fs[idx - i] }));
-                            }} />
+                            onChange={(e) => {
+                              const fs = calcularFechasCuotas(
+                                e,
+                                cuotas.length - i,
+                              );
+                              setCuotas((prev) =>
+                                prev.map((c, idx) =>
+                                  idx < i
+                                    ? c
+                                    : { ...c, fechaVencimiento: fs[idx - i] },
+                                ),
+                              );
+                            }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -2166,41 +2654,85 @@ export default function BoletaPage() {
 
               {/* ── Guías de Remisión ── */}
               <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <button type="button" onClick={() => setShowGuias(!showGuias)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <span className="text-xs font-bold text-gray-500 uppercase">Guías de Remisión (opcional)</span>
-                  {showGuias ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                <button
+                  type="button"
+                  onClick={() => setShowGuias(!showGuias)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-xs font-bold text-gray-500 uppercase">
+                    Guías de Remisión (opcional)
+                  </span>
+                  {showGuias ? (
+                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  )}
                 </button>
                 {showGuias && (
                   <div className="p-4 space-y-3">
                     {guias.map((g, i) => (
                       <div key={i} className="grid grid-cols-3 gap-3 items-end">
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Tipo Doc</label>
-                          <select value={g.tipoDoc} onChange={e => actualizarGuia(i, "tipoDoc", e.target.value)}
-                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                          <label className="text-[10px] text-gray-400">
+                            Tipo Doc
+                          </label>
+                          <select
+                            value={g.tipoDoc}
+                            onChange={(e) =>
+                              actualizarGuia(i, "tipoDoc", e.target.value)
+                            }
+                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                          >
                             <option value="09">Guía Remisión Remitente</option>
-                            <option value="31">Guía Remisión Transportista</option>
+                            <option value="31">
+                              Guía Remisión Transportista
+                            </option>
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Serie</label>
-                          <input type="text" value={g.serie} onChange={e => actualizarGuia(i, "serie", e.target.value)} placeholder="T001"
-                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
+                          <label className="text-[10px] text-gray-400">
+                            Serie
+                          </label>
+                          <input
+                            type="text"
+                            value={g.serie}
+                            onChange={(e) =>
+                              actualizarGuia(i, "serie", e.target.value)
+                            }
+                            placeholder="T001"
+                            className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                          />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gray-400">Número</label>
+                          <label className="text-[10px] text-gray-400">
+                            Número
+                          </label>
                           <div className="flex gap-2">
-                            <input type="text" value={g.numero} onChange={e => actualizarGuia(i, "numero", e.target.value)} placeholder="00000001"
-                              className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue" />
-                            <button type="button" onClick={() => eliminarGuia(i)} className="text-red-400 hover:text-red-600">
+                            <input
+                              type="text"
+                              value={g.numero}
+                              onChange={(e) =>
+                                actualizarGuia(i, "numero", e.target.value)
+                              }
+                              placeholder="00000001"
+                              className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => eliminarGuia(i)}
+                              className="text-red-400 hover:text-red-600"
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
                       </div>
                     ))}
-                    <button type="button" onClick={agregarGuia} className="text-xs text-brand-blue hover:underline flex items-center gap-1 pt-1">
+                    <button
+                      type="button"
+                      onClick={agregarGuia}
+                      className="text-xs text-brand-blue hover:underline flex items-center gap-1 pt-1"
+                    >
                       <Plus className="w-3 h-3" /> Agregar guía
                     </button>
                   </div>
@@ -2214,15 +2746,34 @@ export default function BoletaPage() {
                     <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                       <ClipboardList className="w-4 h-4 text-brand-blue" />
                     </div>
-                    <label className="text-sm font-bold text-gray-800">Detalle de Venta</label>
+                    <label className="text-sm font-bold text-gray-800">
+                      Detalle de Venta
+                    </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className={`flex items-center gap-1.5 select-none ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
-                      <input type="checkbox" checked={porConsumo} onChange={e => { if (sinSucursal) return; setPorConsumo(e.target.checked); }} disabled={sinSucursal} className="w-3.5 h-3.5 accent-brand-blue" />
+                    <label
+                      className={`flex items-center gap-1.5 select-none ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={porConsumo}
+                        onChange={(e) => {
+                          if (sinSucursal) return;
+                          setPorConsumo(e.target.checked);
+                        }}
+                        disabled={sinSucursal}
+                        className="w-3.5 h-3.5 accent-brand-blue"
+                      />
                       <span className="text-xs text-gray-500">Por Consumo</span>
                     </label>
                     {!porConsumo && (
-                      <Button type="button" variant="ghost" className={`h-8 text-xs text-brand-blue ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} `} disabled={sinSucursal} onClick={agregarFila}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className={`h-8 text-xs text-brand-blue ${sinSucursal ? "opacity-40 cursor-not-allowed" : "cursor-pointer"} `}
+                        disabled={sinSucursal}
+                        onClick={agregarFila}
+                      >
                         <Plus className="w-3 h-3 mr-1" /> Agregar ítem
                       </Button>
                     )}
@@ -2230,125 +2781,319 @@ export default function BoletaPage() {
                 </div>
 
                 <div className="border border-gray-100 rounded-xl overflow-x-auto">
-                  <table className="w-full text-xs" style={{ minWidth: "860px" }}>
+                  <table
+                    className="w-full text-xs"
+                    style={{ minWidth: "860px" }}
+                  >
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-2 py-2 text-left text-gray-500 w-6">#</th>
-                        <th className="px-2 py-2 text-left text-gray-500" style={{ minWidth: "180px" }}>Producto</th>
-                        <th className="px-2 py-2 text-left text-gray-500 w-14">Cód.</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">U.M.</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">Cant.</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-20">Afect. IGV</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-22">P.Venta c/IGV</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">%IGV</th>
-                        <th className="px-2 py-2 text-center text-gray-500 w-16">T.Desc</th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">Desc.Unit</th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">P.Final</th>
-                        <th className="px-2 py-2 text-right text-gray-500 w-18">Total</th>
+                        <th className="px-2 py-2 text-left text-gray-500 w-6">
+                          #
+                        </th>
+                        <th
+                          className="px-2 py-2 text-left text-gray-500"
+                          style={{ minWidth: "180px" }}
+                        >
+                          Producto
+                        </th>
+                        <th className="px-2 py-2 text-left text-gray-500 w-14">
+                          Cód.
+                        </th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">
+                          U.M.
+                        </th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">
+                          Cant.
+                        </th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-20">
+                          Afect. IGV
+                        </th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-22">
+                          P.Venta c/IGV
+                        </th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">
+                          %IGV
+                        </th>
+                        <th className="px-2 py-2 text-center text-gray-500 w-16">
+                          T.Desc
+                        </th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">
+                          Desc.Unit
+                        </th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">
+                          P.Final
+                        </th>
+                        <th className="px-2 py-2 text-right text-gray-500 w-18">
+                          Total
+                        </th>
                         <th className="px-2 py-2 w-6"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {detalles.length === 0 ? (
-                        <tr><td colSpan={13} className="px-4 py-8 text-center text-xs text-gray-400">Sin ítems. Haz clic en "Agregar ítem" para comenzar.</td></tr>
+                        <tr>
+                          <td
+                            colSpan={13}
+                            className="px-4 py-8 text-center text-xs text-gray-400"
+                          >
+                            Sin ítems. Haz clic en "Agregar ítem" para comenzar.
+                          </td>
+                        </tr>
                       ) : (
                         detalles.map((d, i) => {
                           const esPorConsumo = d._id === "por-consumo";
                           return (
                             <tr key={i} className="hover:bg-gray-50/50">
-                              <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
+                              <td className="px-2 py-1.5 text-gray-400">
+                                {i + 1}
+                              </td>
 
                               {/* Producto */}
-                              <td className="px-2 py-1.5" style={{ overflow: "visible", position: "relative", minWidth: "180px" }}>
-                                <input ref={el => { inputRefs.current[i] = el; }} type="text" value={busquedaProducto[i] ?? ""}
-                                  disabled={!!d._esIcbper || esPorConsumo}
-                                  onChange={e => {
-                                    const nb = [...busquedaProducto]; nb[i] = e.target.value; setBusquedaProducto(nb);
-                                    const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd);
-                                    if (!d.productoId) { const n = [...detalles]; n[i] = { ...n[i], descripcion: e.target.value }; setDetalles(n); }
+                              <td
+                                className="px-2 py-1.5"
+                                style={{
+                                  overflow: "visible",
+                                  position: "relative",
+                                  minWidth: "180px",
+                                }}
+                              >
+                                <input
+                                  ref={(el) => {
+                                    inputRefs.current[i] = el;
                                   }}
-                                  onFocus={() => { const nd = [...showDropdownProducto]; nd[i] = true; setShowDropdownProducto(nd); }}
+                                  type="text"
+                                  value={busquedaProducto[i] ?? ""}
+                                  disabled={!!d._esIcbper || esPorConsumo}
+                                  onChange={(e) => {
+                                    const nb = [...busquedaProducto];
+                                    nb[i] = e.target.value;
+                                    setBusquedaProducto(nb);
+                                    const nd = [...showDropdownProducto];
+                                    nd[i] = true;
+                                    setShowDropdownProducto(nd);
+                                    if (!d.productoId) {
+                                      const n = [...detalles];
+                                      n[i] = {
+                                        ...n[i],
+                                        descripcion: e.target.value,
+                                      };
+                                      setDetalles(n);
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    const nd = [...showDropdownProducto];
+                                    nd[i] = true;
+                                    setShowDropdownProducto(nd);
+                                  }}
                                   onBlur={() => {
-                                    setTimeout(() => { const nd = [...showDropdownProducto]; nd[i] = false; setShowDropdownProducto(nd); }, 150);
+                                    setTimeout(() => {
+                                      const nd = [...showDropdownProducto];
+                                      nd[i] = false;
+                                      setShowDropdownProducto(nd);
+                                    }, 150);
                                     const txt = busquedaProducto[i] ?? "";
-                                    if (txt && !detalles[i]?.productoId) { const n = [...detalles]; n[i] = { ...n[i], descripcion: txt, productoId: null, codigo: null }; setDetalles(n); }
+                                    if (txt && !detalles[i]?.productoId) {
+                                      const n = [...detalles];
+                                      n[i] = {
+                                        ...n[i],
+                                        descripcion: txt,
+                                        productoId: null,
+                                        codigo: null,
+                                      };
+                                      setDetalles(n);
+                                    }
                                   }}
                                   placeholder="Buscar o agregar producto..."
                                   className="w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
-                                {showDropdownProducto[i] && !d._esIcbper && !esPorConsumo && (() => {
-                                  const rect = inputRefs.current[i]?.getBoundingClientRect();
-                                  const filtrados = productosSucursal.filter((p: ProductoSucursal) =>
-                                    !(busquedaProducto[i] ?? "") ? true :
-                                      p.nomProducto.toLowerCase().includes((busquedaProducto[i] ?? "").toLowerCase()) ||
-                                      p.codigo.includes(busquedaProducto[i] ?? "")
-                                  );
-                                  if (!filtrados.length) return null;
-                                  return (
-                                    <div style={{ position: "fixed", zIndex: 9999, top: (rect?.bottom ?? 0) + window.scrollY + 4, left: rect?.left ?? 0, width: "280px" }}
-                                      className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                                      {filtrados.map((p: ProductoSucursal) => (
-                                        <button key={p.productoId} type="button"
-                                          disabled={p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0}
-                                          onMouseDown={() => { if (p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0) return; seleccionarProducto(p, i); }}
-                                          className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0 ? "opacity-50 cursor-not-allowed bg-gray-50" : "hover:bg-gray-50"}`}>
-                                          <p className="text-xs font-medium text-gray-800">{p.nomProducto}</p>
-                                          <p className="text-[10px] text-gray-400">
-                                            {p.codigo} · S/ {p.sucursalProducto.precioUnitario.toFixed(2)}
-                                            {p.tipoProducto === "BIEN" && (
-                                              <span className={p.sucursalProducto.stock === 0 ? " text-red-400" : " text-green-600"}>
-                                                {p.sucursalProducto.stock === 0 ? " · Sin stock" : ` · Stock: ${p.sucursalProducto.stock}`}
-                                              </span>
-                                            )}
-                                          </p>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  );
-                                })()}
+                                {showDropdownProducto[i] &&
+                                  !d._esIcbper &&
+                                  !esPorConsumo &&
+                                  (() => {
+                                    const rect =
+                                      inputRefs.current[
+                                        i
+                                      ]?.getBoundingClientRect();
+                                    const filtrados = productosSucursal.filter(
+                                      (p: ProductoSucursal) =>
+                                        !(busquedaProducto[i] ?? "")
+                                          ? true
+                                          : p.nomProducto
+                                              .toLowerCase()
+                                              .includes(
+                                                (
+                                                  busquedaProducto[i] ?? ""
+                                                ).toLowerCase(),
+                                              ) ||
+                                            p.codigo.includes(
+                                              busquedaProducto[i] ?? "",
+                                            ),
+                                    );
+                                    if (!filtrados.length) return null;
+                                    return (
+                                      <div
+                                        style={{
+                                          position: "fixed",
+                                          zIndex: 9999,
+                                          top:
+                                            (rect?.bottom ?? 0) +
+                                            window.scrollY +
+                                            4,
+                                          left: rect?.left ?? 0,
+                                          width: "280px",
+                                        }}
+                                        className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto"
+                                      >
+                                        {filtrados.map(
+                                          (p: ProductoSucursal) => (
+                                            <button
+                                              key={p.productoId}
+                                              type="button"
+                                              disabled={
+                                                p.tipoProducto === "BIEN" &&
+                                                p.sucursalProducto.stock === 0
+                                              }
+                                              onMouseDown={() => {
+                                                if (
+                                                  p.tipoProducto === "BIEN" &&
+                                                  p.sucursalProducto.stock === 0
+                                                )
+                                                  return;
+                                                seleccionarProducto(p, i);
+                                              }}
+                                              className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0 ? "opacity-50 cursor-not-allowed bg-gray-50" : "hover:bg-gray-50"}`}
+                                            >
+                                              <p className="text-xs font-medium text-gray-800">
+                                                {p.nomProducto}
+                                              </p>
+                                              <p className="text-[10px] text-gray-400">
+                                                {p.codigo} · S/{" "}
+                                                {p.sucursalProducto.precioUnitario.toFixed(
+                                                  2,
+                                                )}
+                                                {p.tipoProducto === "BIEN" && (
+                                                  <span
+                                                    className={
+                                                      p.sucursalProducto
+                                                        .stock === 0
+                                                        ? " text-red-400"
+                                                        : " text-green-600"
+                                                    }
+                                                  >
+                                                    {p.sucursalProducto
+                                                      .stock === 0
+                                                      ? " · Sin stock"
+                                                      : ` · Stock: ${p.sucursalProducto.stock}`}
+                                                  </span>
+                                                )}
+                                              </p>
+                                            </button>
+                                          ),
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                               </td>
 
-                              <td className="px-2 py-1.5 text-gray-500 font-mono text-[10px]">{d.codigo || "-"}</td>
+                              <td className="px-2 py-1.5 text-gray-500 font-mono text-[10px]">
+                                {d.codigo || "-"}
+                              </td>
 
                               {/* U.M. */}
                               <td className="px-2 py-1.5">
                                 {!d.productoId && !esPorConsumo ? (
-                                  <select value={d.unidadMedida ?? "NIU"} onChange={e => { const n = [...detalles]; n[i] = { ...n[i], unidadMedida: e.target.value }; setDetalles(n); }}
-                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                                  <select
+                                    value={d.unidadMedida ?? "NIU"}
+                                    onChange={(e) => {
+                                      const n = [...detalles];
+                                      n[i] = {
+                                        ...n[i],
+                                        unidadMedida: e.target.value,
+                                      };
+                                      setDetalles(n);
+                                    }}
+                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                                  >
                                     <option value="NIU">NIU</option>
                                     <option value="KGM">KGM</option>
                                     <option value="LTR">LTR</option>
                                     <option value="ZZ">ZZ</option>
                                   </select>
                                 ) : (
-                                  <span className="text-xs text-gray-500">{d.unidadMedida || "NIU"}</span>
+                                  <span className="text-xs text-gray-500">
+                                    {d.unidadMedida || "NIU"}
+                                  </span>
                                 )}
                               </td>
 
                               {/* Cantidad */}
                               <td className="px-2 py-1.5">
                                 {d._esIcbper || esPorConsumo ? (
-                                  <span className="text-xs text-gray-500 text-center block">{d.cantidad}</span>
+                                  <span className="text-xs text-gray-500 text-center block">
+                                    {d.cantidad}
+                                  </span>
                                 ) : (
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-1">
-                                      <button type="button" onClick={() => actualizarCantidad(i, Math.max(1, (d.cantidad ?? 1) - 1))} className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors">−</button>
-                                      <input type="number" min={1} value={d.cantidad ?? 1} onChange={e => actualizarCantidad(i, Number(e.target.value))} className="w-10 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
-                                      <button type="button" onClick={() => actualizarCantidad(i, (d.cantidad ?? 1) + 1)} className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors">+</button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          actualizarCantidad(
+                                            i,
+                                            Math.max(1, (d.cantidad ?? 1) - 1),
+                                          )
+                                        }
+                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors"
+                                      >
+                                        −
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={d.cantidad ?? 1}
+                                        onChange={(e) =>
+                                          actualizarCantidad(
+                                            i,
+                                            Number(e.target.value),
+                                          )
+                                        }
+                                        className="w-10 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          actualizarCantidad(
+                                            i,
+                                            (d.cantidad ?? 1) + 1,
+                                          )
+                                        }
+                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold transition-colors"
+                                      >
+                                        +
+                                      </button>
                                     </div>
-                                    {d._tipoProducto === "BIEN" && d._stockDisponible != null && (
-                                      <p className={`text-[9px] text-center ${d._stockDisponible === 0 ? "text-red-500" : (d.cantidad ?? 1) > d._stockDisponible ? "text-red-400" : "text-gray-400"}`}>
-                                        Stock: {d._stockDisponible}
-                                      </p>
-                                    )}
+                                    {d._tipoProducto === "BIEN" &&
+                                      d._stockDisponible != null && (
+                                        <p
+                                          className={`text-[9px] text-center ${d._stockDisponible === 0 ? "text-red-500" : (d.cantidad ?? 1) > d._stockDisponible ? "text-red-400" : "text-gray-400"}`}
+                                        >
+                                          Stock: {d._stockDisponible}
+                                        </p>
+                                      )}
                                   </div>
                                 )}
                               </td>
 
                               {/* Afect. IGV */}
                               <td className="px-2 py-1.5">
-                                <select value={d.tipoAfectacionIGV ?? "10"} disabled={!!d._esIcbper || esPorConsumo} onChange={e => actualizarTipoAfectacion(i, e.target.value)}
-                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                                <select
+                                  value={d.tipoAfectacionIGV ?? "10"}
+                                  disabled={!!d._esIcbper || esPorConsumo}
+                                  onChange={(e) =>
+                                    actualizarTipoAfectacion(i, e.target.value)
+                                  }
+                                  className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                                >
                                   <option value="10">Grav.</option>
                                   <option value="20">Exon.</option>
                                   <option value="30">Inaf.</option>
@@ -2357,21 +3102,45 @@ export default function BoletaPage() {
 
                               {/* P.Venta c/IGV */}
                               <td className="px-2 py-1.5">
-                                <input type="number" min={0} step="0.01" value={d._precioVentaConIGV ?? d.precioVenta ?? 0}
-                                  onChange={e => actualizarPrecioVenta(i, Number(e.target.value))} disabled={!!d._esIcbper}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`} />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={
+                                    d._precioVentaConIGV ?? d.precioVenta ?? 0
+                                  }
+                                  onChange={(e) =>
+                                    actualizarPrecioVenta(
+                                      i,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  disabled={!!d._esIcbper}
+                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
+                                />
                               </td>
 
                               {/* %IGV */}
                               <td className="px-2 py-1.5">
                                 {d.tipoAfectacionIGV === "10" ? (
-                                  <select value={d.porcentajeIGV ?? IGV_DEFAULT} disabled={!!d._esIcbper} onChange={e => actualizarPorcentajeIGV(i, Number(e.target.value))}
-                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
+                                  <select
+                                    value={d.porcentajeIGV ?? IGV_DEFAULT}
+                                    disabled={!!d._esIcbper}
+                                    onChange={(e) =>
+                                      actualizarPorcentajeIGV(
+                                        i,
+                                        Number(e.target.value),
+                                      )
+                                    }
+                                    className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
+                                  >
                                     <option value={18}>18</option>
                                     <option value={10.5}>10.5</option>
                                   </select>
                                 ) : (
-                                  <span className="block text-center text-gray-400 text-xs">N/A</span>
+                                  <span className="block text-center text-gray-400 text-xs">
+                                    N/A
+                                  </span>
                                 )}
                               </td>
 
@@ -2380,7 +3149,12 @@ export default function BoletaPage() {
                                 <div className="relative w-full">
                                   <select
                                     value={d.codigoTipoDescuento ?? "01"}
-                                    onChange={e => actualizarCodigoDescuento(i, e.target.value)}
+                                    onChange={(e) =>
+                                      actualizarCodigoDescuento(
+                                        i,
+                                        e.target.value,
+                                      )
+                                    }
                                     disabled={!!d._esIcbper || esPorConsumo}
                                     style={{ color: "transparent" }}
                                     className={`w-full py-1 pl-1 pr-4 border rounded-lg text-xs outline-none focus:border-brand-blue appearance-none ${
@@ -2389,8 +3163,18 @@ export default function BoletaPage() {
                                         : "bg-gray-50 border-gray-200"
                                     }`}
                                   >
-                                    <option style={{ color: "#374151" }} value="00">00 - Afecta base</option>
-                                    <option style={{ color: "#374151" }} value="01">01 - No afecta base</option>
+                                    <option
+                                      style={{ color: "#374151" }}
+                                      value="00"
+                                    >
+                                      00 - Afecta base
+                                    </option>
+                                    <option
+                                      style={{ color: "#374151" }}
+                                      value="01"
+                                    >
+                                      01 - No afecta base
+                                    </option>
                                   </select>
                                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-mono text-gray-700">
                                     {d.codigoTipoDescuento ?? "01"}
@@ -2400,14 +3184,36 @@ export default function BoletaPage() {
 
                               {/* Desc.Unit */}
                               <td className="px-2 py-1.5">
-                                <input type="number" min={0} step="0.01" value={d.descuentoUnitario ?? 0} onChange={e => actualizarDescuento(i, Number(e.target.value))} disabled={!!d._esIcbper || esPorConsumo}
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`} />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={d.descuentoUnitario ?? 0}
+                                  onChange={(e) =>
+                                    actualizarDescuento(
+                                      i,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  disabled={!!d._esIcbper || esPorConsumo}
+                                  className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
+                                />
                               </td>
 
-                              <td className="px-2 py-1.5 text-right font-mono text-gray-700 text-xs">{(d.precioVenta ?? 0).toFixed(2)}</td>
-                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 text-xs">{(d.totalVentaItem ?? 0).toFixed(2)}</td>
+                              <td className="px-2 py-1.5 text-right font-mono text-gray-700 text-xs">
+                                {(d.precioVenta ?? 0).toFixed(2)}
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 text-xs">
+                                {(d.totalVentaItem ?? 0).toFixed(2)}
+                              </td>
                               <td className="px-2 py-1.5">
-                                <button type="button" onClick={() => eliminarFila(i)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarFila(i)}
+                                  className="text-red-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -2419,7 +3225,7 @@ export default function BoletaPage() {
               </div>
 
               {/* ── Bolsa Plástica ── */}
-              <div className="border border-amber-100 rounded-xl p-3 bg-amber-50/50 space-y-3">
+              <div className="border border-amber-100 rounded-xl p-2 bg-amber-50/50 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-amber-800">
@@ -2585,9 +3391,133 @@ export default function BoletaPage() {
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="space-y-6">
-          <Card title="Vista Previa" subtitle="Representación gráfica del comprobante">
-              <div className="mb-3">
+        <div className="space-y-6 ">
+          <Card
+            title="Vista Previa"
+            subtitle="Representación gráfica del comprobante"
+          >
+{/* ── Serie y correlativo ── */}
+<div>
+  {isSuperAdmin ? (
+    <>
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-gray-500 uppercase">
+          Sucursal
+        </label>
+        <select
+          value={sucursal?.sucursalId ?? ""}
+          disabled={loadingSucursales}
+          onChange={async (e) => {
+            if (!e.target.value) {
+              setSucursal(null);
+              setCorrelativoActual(null);
+              setDetalles([]);
+              setBusquedaProducto([]);
+              setShowDropdownProducto([]);
+              setCantidadBolsa(0);
+              return;
+            }
+            const sel = sucursales.find(
+              (s: Sucursal) => s.sucursalId === Number(e.target.value),
+            );
+            if (!sel) return;
+            setSucursal(sel);
+            setDetalles([]);
+            setBusquedaProducto([]);
+            setShowDropdownProducto([]);
+            setCantidadBolsa(0);
+            const res = await axios.get(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
+              {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              },
+            );
+            setCorrelativoActual(res.data.correlativoBoleta);
+            setBoleta((prev) => ({
+              ...prev,
+              serie: sel.serieBoleta,
+              correlativo: String(res.data.correlativoBoleta).padStart(8, "0"),
+            }));
+          }}
+          className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+        >
+          <option value="">Seleccionar sucursal</option>
+          {sucursales.map((s: Sucursal) => (
+            <option key={s.sucursalId} value={s.sucursalId}>
+              {s.serieBoleta} — {s.nombre ?? s.codEstablecimiento}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Info serie con estilos compactos */}
+      <div
+        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+          !sucursal
+            ? "bg-amber-50 border-amber-200"
+            : serieDisplay
+              ? "bg-green-50 border-green-300"
+              : "bg-gray-50 border-gray-200"
+        }`}
+      >
+        {!sucursal ? (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3.5 h-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
+            </svg>
+            <span>Elige una sucursal</span>
+          </span>
+        ) : !serieDisplay ? (
+          <span className="text-xs text-gray-400">Sin serie</span>
+        ) : (
+          <>
+            <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+              Boleta:
+            </p>
+            <span className="text-xs font-mono font-semibold text-gray-800">
+              {serieDisplay}-{correlativoDisplay}
+            </span>
+          </>
+        )}
+      </div>
+    </>
+  ) : (
+    // Caso no superadmin (estilo compacto también)
+    <div
+      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+        serieDisplay
+          ? "bg-green-50 border-green-300"
+          : "bg-gray-50 border-gray-200"
+      }`}
+    >
+      {loadingSucursal ? (
+        <span className="text-gray-400 text-xs">Cargando...</span>
+      ) : !serieDisplay ? (
+        <span className="text-xs text-gray-400">Sin serie</span>
+      ) : (
+        <>
+          <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+            Boleta:
+          </p>
+          <span className="text-xs font-mono font-semibold text-gray-800">
+            {serieDisplay}-{correlativoDisplay}
+          </span>
+        </>
+      )}
+    </div>
+  )}
+</div>
+
+            <div className="mb-3 mt-3">
               <select
                 value={tamanoPdf}
                 onChange={async (e) => {
@@ -2598,14 +3528,21 @@ export default function BoletaPage() {
                   try {
                     const res = await fetch(
                       `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteIdEmitido}/pdf?tamano=${e.target.value}`,
-                      { headers: { Authorization: `Bearer ${accessToken}` } }
+                      { headers: { Authorization: `Bearer ${accessToken}` } },
                     );
                     if (res.ok) {
                       const blob = await res.blob();
-                      setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+                      setPdfA4Url(
+                        URL.createObjectURL(
+                          new Blob([blob], { type: "application/pdf" }),
+                        ),
+                      );
                     }
-                  } catch { showToast("Error al cargar el PDF", "error"); }
-                  finally { setCargandoPreview(false); }
+                  } catch {
+                    showToast("Error al cargar el PDF", "error");
+                  } finally {
+                    setCargandoPreview(false);
+                  }
                 }}
                 className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-brand-blue"
               >
@@ -2615,71 +3552,98 @@ export default function BoletaPage() {
                 <option value="Ticket58mm">Ticket 58mm</option>
                 <option value="MediaCarta">Media Carta</option>
               </select>
-              </div>
-              {pdfA4Url && !cargandoPreview ? (
-                <div className="space-y-3">
-                  <iframe
-                    src={pdfA4Url}
-                    className="w-full rounded-lg border border-gray-200"
-                    style={{ height: "400px" }}
-                  />
-                  <div className="flex gap-2">
-                    <button type="button"
-                      onClick={() => window.open(pdfA4Url, "_blank")}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-violet-500 hover:bg-violet-400 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
-                      <ExternalLink className="w-3.5 h-3.5" /> Abrir
-                    </button>
-                    <button type="button"
-                      disabled={descargando}
-                      onClick={async () => {
-                        setDescargando(true);
-                        try {
-                          const a = document.createElement("a");
-                          a.href = pdfA4Url;
-                          a.download = `${empresa?.numeroDocumento}-03-${boleta.serie}-${boleta.correlativo}.pdf`;
-                          a.click();
-                        } finally {
-                          setTimeout(() => setDescargando(false), 1000);
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-70">
-                      {descargando
-                        ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Descargando...</>
-                        : <><Download className="w-3.5 h-3.5" /> Descargar</>
+            </div>
+            {pdfA4Url && !cargandoPreview ? (
+              <div className="space-y-3">
+                <iframe
+                  src={pdfA4Url}
+                  className="w-full rounded-lg border border-gray-200"
+                  style={{ height: "400px" }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.open(pdfA4Url, "_blank")}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-violet-500 hover:bg-violet-400 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Abrir
+                  </button>
+                  <button
+                    type="button"
+                    disabled={descargando}
+                    onClick={async () => {
+                      setDescargando(true);
+                      try {
+                        const a = document.createElement("a");
+                        a.href = pdfA4Url;
+                        a.download = `${empresa?.numeroDocumento}-03-${boleta.serie}-${boleta.correlativo}.pdf`;
+                        a.click();
+                      } finally {
+                        setTimeout(() => setDescargando(false), 1000);
                       }
-                    </button>
-                    <button type="button"
-                      disabled={!pdfTicketUrl}
-                      onClick={imprimirPdf}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50">
-                      {!pdfTicketUrl
-                        ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
-                        : <><Printer className="w-3.5 h-3.5" /> Imprimir</>
-                      }
-                    </button>
-                  </div>
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-70"
+                  >
+                    {descargando ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                        Descargando...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5" /> Descargar
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!pdfTicketUrl}
+                    onClick={imprimirPdf}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50"
+                  >
+                    {!pdfTicketUrl ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="w-3.5 h-3.5" /> Imprimir
+                      </>
+                    )}
+                  </button>
                 </div>
-                ) : cargandoPreview ? (
-                  <div className="w-full flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200" style={{ height: "400px" }}>
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
-                      <p className="text-xs text-gray-400">Cargando PDF...</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                    <div className="p-4 rounded-full bg-white shadow-sm">
-                      <Printer className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
-                      <p className="text-xs text-gray-400 mt-1">Se generará automáticamente al emitir</p>
-                    </div>
-                  </div>
-                )}
+              </div>
+            ) : cargandoPreview ? (
+              <div
+                className="w-full flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200"
+                style={{ height: "400px" }}
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-gray-400">Cargando PDF...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <div className="p-4 rounded-full bg-white shadow-sm">
+                  <Printer className="w-8 h-8 text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">
+                    Previsualización del PDF
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Se generará automáticamente al emitir
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 space-y-3">
-              <Button className="w-full py-3 text-base" type="button"
+              <Button
+                className="w-full py-3 text-base"
+                type="button"
                 onClick={emitido ? nuevaBoleta : emitirComprobante}
                 disabled={emitiendo || (!emitido && !puedeEmitir)}
               >
@@ -2688,16 +3652,33 @@ export default function BoletaPage() {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Emitiendo...
                   </span>
-                ) : emitido ? "Nueva Boleta" : "Emitir Boleta"}
+                ) : emitido ? (
+                  "Nueva Boleta"
+                ) : (
+                  "Emitir Boleta"
+                )}
               </Button>
               <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" checked={enviarEnResumen}
-                  onChange={e => setEnviarEnResumen(e.target.checked)}
-                  className="w-3.5 h-3.5 accent-brand-blue" />
-                <span className="text-xs text-gray-500">Enviar mediante resumen (Guardar doc. en BD)</span>
+                <input
+                  type="checkbox"
+                  checked={enviarEnResumen}
+                  onChange={(e) => setEnviarEnResumen(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-brand-blue"
+                />
+                <span className="text-xs text-gray-500">
+                  Enviar mediante resumen (Guardar doc. en BD)
+                </span>
               </label>
-              {sinSucursal && <p className="text-xs text-amber-600 text-center">Selecciona una sucursal para emitir</p>}
-              {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
+              {sinSucursal && (
+                <p className="text-xs text-amber-600 text-center">
+                  Selecciona una sucursal para emitir
+                </p>
+              )}
+              {errorEmision && (
+                <p className="text-xs text-red-500 text-center">
+                  {errorEmision}
+                </p>
+              )}
             </div>
           </Card>
 

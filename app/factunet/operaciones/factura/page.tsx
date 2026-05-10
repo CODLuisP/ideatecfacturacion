@@ -1953,8 +1953,7 @@ export default function FacturaPage() {
         <div className="lg:col-span-2 space-y-6">
 
           <Card
-            title="Datos del Comprobante"
-            subtitle="Completa la información requerida"
+    
           >
             {cargandoComprobante && (
               <div className="flex items-center pb-3 gap-2 text-xs text-brand-blue">
@@ -1963,107 +1962,12 @@ export default function FacturaPage() {
               </div>
             )}
 
-            <form className="space-y-3">
+            <form className="space-y-3 mx-3">
               {/* ── 2. Serie y correlativo ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isSuperAdmin ? (
-                  <>
-                    {/* SuperAdmin col 1: selector sucursal */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Sucursal
-                      </label>
-                      <select
-                        value={sucursal?.sucursalId ?? ""}
-                        disabled={loadingSucursales}
-                        onChange={async (e) => {
-                          if (!e.target.value) {
-                            setSucursal(null);
-                            setCorrelativoActual(null);
-                            setDetalles([]);
-                            setBusquedaProducto([]);
-                            setShowDropdownProducto([]);
-                            setCantidadBolsa(0);
-                            return;
-                          }
-                          const seleccionada = sucursales.find(
-                            (s: Sucursal) =>
-                              s.sucursalId === Number(e.target.value),
-                          );
-                          if (!seleccionada) return;
-                          setSucursal(seleccionada);
-                          setDetalles([]);
-                          setBusquedaProducto([]);
-                          setShowDropdownProducto([]);
-                          setCantidadBolsa(0);
-                          const res = await axios.get(
-                            `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${seleccionada.sucursalId}`,
-                            {
-                              headers: {
-                                Authorization: `Bearer ${accessToken}`,
-                              },
-                            },
-                          );
-                          setCorrelativoActual(res.data.correlativoFactura);
-                          setFactura((prev) => ({
-                            ...prev,
-                            serie: seleccionada.serieFactura,
-                            correlativo: String(
-                              res.data.correlativoFactura,
-                            ).padStart(8, "0"),
-                          }));
-                        }}
-                        className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                      >
-                        <option value="">Seleccionar sucursal</option>
-                        {sucursales.map((s: Sucursal) => (
-                          <option key={s.sucursalId} value={s.sucursalId}>
-                            {s.serieFactura} —{" "}
-                            {s.nombre ?? s.codEstablecimiento}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* SuperAdmin col 2: serie-correlativo */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Serie y Correlativo
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={
-                          !sucursal
-                            ? "Selecciona una sucursal"
-                            : `${serieDisplay}-${correlativoDisplay}`
-                        }
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  // Admin: serie-correlativo en media columna
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Serie y Correlativo
-                    </label>
-                    <input
-                      type="text"
-                      disabled
-                      value={
-                        loadingSucursal
-                          ? "Cargando..."
-                          : `${serieDisplay}-${correlativoDisplay}`
-                      }
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm"
-                    />
-                  </div>
-                )}
-              </div>
+        
 
               {/* ── 3. Datos del Cliente ── */}
-              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-4">
+            <div className=" rounded-xl space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <UserRound className="w-4 h-4 text-brand-blue" />
@@ -2076,8 +1980,8 @@ export default function FacturaPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Columna izquierda: Tipo doc + Razón social */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Tipo y Nº Documento Cliente
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">
+                      Tipo y Nº Documento 
                     </label>
                     <div className="flex gap-2">
                       <select
@@ -2091,7 +1995,7 @@ export default function FacturaPage() {
                             cliente: undefined,
                           }));
                         }}
-                        className="w-1/3 py-2.5 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                        className="w-1/3 py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                       >
                         <option value="06">RUC</option>
                         <option value="04">CE</option>
@@ -2121,7 +2025,7 @@ export default function FacturaPage() {
                           }
                           maxLength={tipoDoc === "06" ? 11 : 12}
                           placeholder="Buscar por RUC o nombre..."
-                          className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+                          className="w-full pl-4 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
                         />
                         {loadingCliente && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
@@ -2158,7 +2062,7 @@ export default function FacturaPage() {
                         disabled
                         value={factura.cliente?.razonSocial ?? ""}
                         placeholder="Razón social"
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
+                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
                       />
                       {factura.cliente?.clienteId === null &&
                         factura.cliente?.razonSocial && (
@@ -2179,11 +2083,11 @@ export default function FacturaPage() {
 
                   {/* Columna derecha: Correo y Teléfono */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">
                       Contacto
                     </label>
                     <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
+                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2
                       ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
                     >
                       <input
@@ -2210,7 +2114,7 @@ export default function FacturaPage() {
                     </div>
                     <div className="space-y-1">
                       <div
-                        className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
+                        className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2
                         ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}
                       >
                         <input
@@ -2259,9 +2163,9 @@ export default function FacturaPage() {
               </div>
 
               {/* ── Fechas ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Fecha y Hora de Emisión
                   </label>
                   <input
@@ -2285,7 +2189,7 @@ export default function FacturaPage() {
                         horaEmision: e.target.value + ":00",
                       }));
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
                   />
                   {fechaEmisionEditada && (
                     <button
@@ -2307,12 +2211,9 @@ export default function FacturaPage() {
                     }
                   />
                 </div>
-              </div>
 
-              {/* ── Moneda y Tipo Pago ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Moneda
                   </label>
                   <select
@@ -2370,7 +2271,7 @@ export default function FacturaPage() {
                         );
                       }
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="PEN">PEN - Soles</option>
                     <option value="USD">
@@ -2379,7 +2280,7 @@ export default function FacturaPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Tipo de Pago
                   </label>
                   <select
@@ -2400,22 +2301,28 @@ export default function FacturaPage() {
                       ]);
                       setPagosEditados([false]);
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="Contado">Contado</option>
                     <option value="Credito">Crédito</option>
                     <option value="CreditoInicial">Crédito con Inicial</option>
                   </select>
                 </div>
+          
+
               </div>
+
+              {/* ── Moneda y Tipo Pago ── */}
+            
+              
 
               {/* ── Pagos ── */}
               {(factura.tipoPago === "Contado" ||
                 factura.tipoPago === "CreditoInicial") &&
                 !totales.soloGratuitas && (
-                  <div className="border border-gray-100 rounded-xl p-4 space-y-4 bg-gray-50/50">
+                  <div className="border border-gray-100 rounded-xl p-2 space-y-4 bg-gray-50/50">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
+                      <label className="text-xs font-bold text-gray-700 uppercase">
                         {factura.tipoPago === "CreditoInicial"
                           ? "Pago Inicial"
                           : "Datos de Pago"}
@@ -2430,145 +2337,96 @@ export default function FacturaPage() {
                         </button>
                       )}
                     </div>
-                    <div className="space-y-3">
-                      {pagos.map((pago, i) => (
-                        <div
-                          key={i}
-                          className="space-y-3 pb-3 border-b border-gray-100 last:border-0"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500">
-                                Medio de Pago
-                              </label>
-                              <select
-                                value={pago.medioPago}
-                                onChange={(e) =>
-                                  actualizarPago(i, "medioPago", e.target.value)
-                                }
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                              >
-                                {todosMedios.map((m) => (
-                                  <option
-                                    key={m}
-                                    value={m}
-                                    disabled={
-                                      mediosUsados.includes(m) &&
-                                      pago.medioPago !== m
-                                    }
-                                  >
-                                    {m}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500">
-                                Monto
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="number"
-                                  value={pago.monto}
-                                  onChange={(e) => {
-                                    actualizarPago(i, "monto", e.target.value);
-                                    setPagosEditados((prev) => {
-                                      const n = [...prev];
-                                      n[i] = e.target.value !== "";
-                                      return n;
-                                    });
-                                  }}
-                                  onBlur={(e) => {
-                                    if (
-                                      e.target.value === "" ||
-                                      e.target.value === "0"
-                                    ) {
-                                      setPagosEditados((prev) => {
-                                        const n = [...prev];
-                                        n[i] = false;
-                                        return n;
-                                      });
-                                      actualizarPago(i, "monto", "");
-                                    }
-                                  }}
-                                  placeholder={montoRestante(i)}
-                                  disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial'}
-                                  className={`w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
-                                    ${pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-                                />
-                                {pagos.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => eliminarPago(i)}
-                                    className="text-red-400 hover:text-red-600 px-2"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {pago.medioPago !== "Efectivo" && (
-                              <>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs text-gray-500">
-                                    Nº Operación
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={pago.numeroOperacion}
-                                    onChange={(e) =>
-                                      actualizarPago(
-                                        i,
-                                        "numeroOperacion",
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Número de operación"
-                                    className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                                  />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs text-gray-500">
-                                    Entidad Financiera
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={pago.entidadFinanciera}
-                                    onChange={(e) =>
-                                      actualizarPago(
-                                        i,
-                                        "entidadFinanciera",
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Banco / entidad"
-                                    className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                                  />
-                                </div>
-                              </>
-                            )}
-                            <div className="space-y-1.5 md:col-span-2">
-                              <label className="text-xs text-gray-500">
-                                Observaciones
-                              </label>
-                              <input
-                                type="text"
-                                value={pago.observaciones}
-                                onChange={(e) =>
-                                  actualizarPago(
-                                    i,
-                                    "observaciones",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Observaciones (opcional)"
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+
+<div className="space-y-3">
+  {pagos.map((pago, i) => (
+    <div key={i} className="pb-3 border-b border-gray-100 last:border-0">
+      <div className="flex items-end gap-3">
+
+        <div className="space-y-1.5 w-36 shrink-0">
+          <label className="text-xs text-gray-500">Medio de Pago</label>
+          <select
+            value={pago.medioPago}
+            onChange={(e) => actualizarPago(i, "medioPago", e.target.value)}
+            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+          >
+            {todosMedios.map((m) => (
+              <option key={m} value={m} disabled={mediosUsados.includes(m) && pago.medioPago !== m}>{m}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5 w-32 shrink-0">
+          <label className="text-xs text-gray-500">Monto</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={pago.monto}
+              onChange={(e) => {
+                actualizarPago(i, "monto", e.target.value);
+                setPagosEditados((prev) => { const n = [...prev]; n[i] = e.target.value !== ""; return n; });
+              }}
+              onBlur={(e) => {
+                if (e.target.value === "" || e.target.value === "0") {
+                  setPagosEditados((prev) => { const n = [...prev]; n[i] = false; return n; });
+                  actualizarPago(i, "monto", "");
+                }
+              }}
+              placeholder={montoRestante(i)}
+              disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial'}
+              className={`w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
+                ${pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+            />
+            {pagos.length > 1 && (
+              <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-1">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {pago.medioPago !== "Efectivo" && (
+          <>
+            <div className="space-y-1.5 w-36 shrink-0">
+              <label className="text-xs text-gray-500">Nº Operación</label>
+              <input
+                type="text"
+                value={pago.numeroOperacion}
+                onChange={(e) => actualizarPago(i, "numeroOperacion", e.target.value)}
+                placeholder="Nº operación"
+                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+              />
+            </div>
+            <div className="space-y-1.5 w-36 shrink-0">
+              <label className="text-xs text-gray-500">Entidad Financiera</label>
+              <input
+                type="text"
+                value={pago.entidadFinanciera}
+                onChange={(e) => actualizarPago(i, "entidadFinanciera", e.target.value)}
+                placeholder="Banco / entidad"
+                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-1.5 flex-1">
+          <label className="text-xs text-gray-500">Observaciones</label>
+          <input
+            type="text"
+            value={pago.observaciones}
+            onChange={(e) => actualizarPago(i, "observaciones", e.target.value)}
+            placeholder="Observaciones (opcional)"
+            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+          />
+        </div>
+
+      </div>
+    </div>
+  ))}
+</div>
+
+
                     {factura.tipoPago === "CreditoInicial" && (
                       <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
                         <p className="text-gray-500">
@@ -3689,7 +3547,127 @@ export default function FacturaPage() {
         {/* ── Sidebar ── */}
         <div className="space-y-6">
           <Card title="Vista Previa" subtitle="Representación gráfica del comprobante">
-            <div className="mb-3">
+
+     {/* ── Serie y correlativo ── */}
+
+<div>
+  {isSuperAdmin ? (
+    <>
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-gray-500 uppercase">
+          Sucursal
+        </label>
+        <select
+          value={sucursal?.sucursalId ?? ""}
+          disabled={loadingSucursales}
+          onChange={async (e) => {
+            if (!e.target.value) {
+              setSucursal(null);
+              setCorrelativoActual(null);
+              setDetalles([]);
+              setBusquedaProducto([]);
+              setShowDropdownProducto([]);
+              setCantidadBolsa(0);
+              return;
+            }
+            const sel = sucursales.find(
+              (s: Sucursal) => s.sucursalId === Number(e.target.value),
+            );
+            if (!sel) return;
+            setSucursal(sel);
+            setDetalles([]);
+            setBusquedaProducto([]);
+            setShowDropdownProducto([]);
+            setCantidadBolsa(0);
+            const res = await axios.get(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
+              { headers: { Authorization: `Bearer ${accessToken}` } },
+            );
+            setCorrelativoActual(res.data.correlativoFactura);
+            setFactura((prev) => ({
+              ...prev,
+              serie: sel.serieFactura,
+              correlativo: String(res.data.correlativoFactura).padStart(8, "0"),
+            }));
+          }}
+          className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+        >
+          <option value="">Seleccionar sucursal</option>
+          {sucursales.map((s: Sucursal) => (
+            <option key={s.sucursalId} value={s.sucursalId}>
+              {s.serieFactura} — {s.nombre ?? s.codEstablecimiento}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Info serie - estilos compactos */}
+      <div
+        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+          !sucursal
+            ? "bg-amber-50 border-amber-200"
+            : serieDisplay
+              ? "bg-green-50 border-green-300"
+              : "bg-gray-50 border-gray-200"
+        }`}
+      >
+        {!sucursal ? (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3.5 h-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
+            </svg>
+            <span>Elige una sucursal</span>
+          </span>
+        ) : !serieDisplay ? (
+          <span className="text-xs text-gray-400">Sin serie</span>
+        ) : (
+          <>
+            <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+              Factura:
+            </p>
+            <span className="text-xs font-mono font-semibold text-gray-800">
+              {serieDisplay}-{correlativoDisplay}
+            </span>
+          </>
+        )}
+      </div>
+    </>
+  ) : (
+    <div
+      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+        serieDisplay
+          ? "bg-green-50 border-green-300"
+          : "bg-gray-50 border-gray-200"
+      }`}
+    >
+      {loadingSucursal ? (
+        <span className="text-gray-400 text-xs">Cargando...</span>
+      ) : !serieDisplay ? (
+        <span className="text-xs text-gray-400">Sin serie</span>
+      ) : (
+        <>
+          <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+            Factura:
+          </p>
+          <span className="text-xs font-mono font-semibold text-gray-800">
+            {serieDisplay}-{correlativoDisplay}
+          </span>
+        </>
+      )}
+    </div>
+  )}
+</div>
+
+            <div className="mb-3 mt-3">
               <select
                 value={tamanoPdf}
                 onChange={async (e) => {

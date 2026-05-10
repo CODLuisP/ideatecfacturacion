@@ -952,7 +952,7 @@ export default function DashboardPage() {
               </Button>
             }
           >
-            <div className="overflow-x-auto -mx-6">
+            <div className="overflow-x-auto mx-0">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50">

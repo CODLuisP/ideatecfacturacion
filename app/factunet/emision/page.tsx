@@ -1439,36 +1439,34 @@ const imprimirPdf = () => {
 
           {/* Serie destacada */}
 
-
 <div className={cn(
-   "flex items-center gap-2.5 px-3 py-2 rounded-xl border w-full",
+  "flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm",
   isSuperAdmin && !sucursalActual
-    ? "bg-amber-50 border-amber-100"
+    ? "bg-amber-50 border-amber-200"
     : serie
-    ? "bg-green-50 border-green-100"
-    : "bg-gray-50 border-gray-100"
+    ? "bg-green-50 border-green-300"
+    : "bg-gray-50 border-gray-200"
 )}>
-  {isSuperAdmin && !sucursalActual
-    ? <span className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-        <Building2 className="w-4 h-4 shrink-0" />
-        Elige una sucursal para continuar
-      </span>
-    : loadingSucursal
-    ? <span className="text-gray-300 animate-pulse text-xs">Cargando...</span>
-    : !serie
-    ? <span className="text-xs font-medium text-gray-400">Sin serie</span>
-    :  <>
-    <p className="text-xs font-bold text-gray-900 uppercase ">
-      {tipo === 'boleta' ? 'Boleta:' : 'Factura:'}
-    </p>
-    <span className="text-[13px] font-bold text-gray-700">
-      {serie}-{String(correlativoActual ?? 1).padStart(8, '0')}
+  {isSuperAdmin && !sucursalActual ? (
+    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+      <Building2 className="w-3.5 h-3.5" />
+      <span>Elige una sucursal</span>
     </span>
-  </>
-  }
+  ) : loadingSucursal ? (
+    <span className="text-gray-400 text-xs">Cargando...</span>
+  ) : !serie ? (
+    <span className="text-xs text-gray-400">Sin serie</span>
+  ) : (
+    <>
+      <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+        {tipo === 'boleta' ? 'Boleta:' : 'Factura:'}
+      </p>
+      <span className="text-[12px] font-mono font-semibold text-gray-800">
+        {serie}-{String(correlativoActual ?? 1).padStart(8, '0')}
+      </span>
+    </>
+  )}
 </div>
-
-
 
 
           {/* ── Medio de Pago / Moneda ── */}
