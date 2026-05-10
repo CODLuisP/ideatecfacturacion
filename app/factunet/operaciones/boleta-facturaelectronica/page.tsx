@@ -15,18 +15,16 @@ export default function BoletaFacturaElectronicaPage() {
 
   const router = useRouter();
   const [tipo, setTipo] = useState<"boleta" | "factura">("boleta");
-  const [complejidad, setComplejidad] = useState<"simple" | "compleja">(
-    "compleja",
-  );
+  const [complejidad, setComplejidad] = useState<"simple" | "compleja">("compleja");
 
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (user !== null && user !== undefined) {
+    if (user !== null && user !== undefined && !isReady) {
       setComplejidad(user.tipoEmision ? "simple" : "compleja");
       setIsReady(true);
     }
-  }, [user]);
+  }, [user, isReady]);
 
   useEffect(() => {
     sharedVentaStore.clear();

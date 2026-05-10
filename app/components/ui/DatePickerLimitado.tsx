@@ -33,14 +33,14 @@ export function DatePickerLimitado({ value, onChange, modo, fechaMinima, label, 
 
   return (
     <div className={className}>
-      {label && <label className="text-xs font-bold text-gray-500 uppercase">{label}</label>}
+      {label && <label className="text-[10px] font-bold text-gray-500 uppercase">{label}</label>}
       <input
         type="date"
         value={value?.slice(0, 10) ?? ''}
         min={min}
         max={max}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+        className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
       />
     </div>
   )

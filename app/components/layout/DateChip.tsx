@@ -673,7 +673,6 @@ export const DateChip: React.FC<DateChipProps> = ({ date, className = "" }) => {
           style={{
             fontSize: "13px",
             fontWeight: 700,
-            letterSpacing: "0.05em",
             color: festivo.colorMuted,
             whiteSpace: "nowrap",
           }}
@@ -706,7 +705,6 @@ export const DateChip: React.FC<DateChipProps> = ({ date, className = "" }) => {
           fontSize: "12px",
           fontWeight: 700,
           color: "#343a40",
-          letterSpacing: "0.04em",
           whiteSpace: "nowrap",
         }}
       >

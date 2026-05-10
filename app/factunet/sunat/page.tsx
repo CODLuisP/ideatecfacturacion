@@ -164,7 +164,7 @@ function SecretInput({
           required={required}
           disabled={disabled}
           className={cn(
-            "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm pr-10 transition-colors",
+            "w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm pr-10 transition-colors",
             disabled
               ? "opacity-50 cursor-not-allowed"
               : "focus:border-brand-blue",
@@ -227,7 +227,7 @@ function TextInput({
           required={required}
           disabled={disabled}
           className={cn(
-            "w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm transition-colors",
+            "w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm transition-colors",
             disabled
               ? "opacity-50 cursor-not-allowed pr-10"
               : "focus:border-brand-blue",
@@ -545,7 +545,7 @@ export default function SunatPage() {
               )
             }
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               {loadingCompany ? (
                 <div className="space-y-3 animate-pulse">
                   <div className="h-10 bg-gray-100 rounded-xl" />

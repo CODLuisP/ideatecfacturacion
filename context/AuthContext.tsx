@@ -47,7 +47,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     null,
   );
   const [logoOverride, setLogoOverride] = useState<string | null>(null);
-  const [tipoEmisionOverride, setTipoEmisionOverride] = useState<boolean | null>(null);
+  const [tipoEmisionOverride, setTipoEmisionOverride] = useState<boolean | null>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("AuthContext_tipoEmision");
+      if (stored !== null) return stored === "true";
+    }
+    return null;
+  });
 
   const fetchCompanyData = useCallback(
     async (ruc: string, token: string | null) => {
@@ -59,7 +65,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         const data = await r.json();
         if (data?.environment) setEnvironmentOverride(data.environment);
         if (data?.igv !== undefined) setIgvOverride(data.igv);
-        if (data?.tipoEmision !== undefined) setTipoEmisionOverride(data.tipoEmision);
+        if (data?.tipoEmision !== undefined) {
+          setTipoEmisionOverride(data.tipoEmision);
+          localStorage.setItem("AuthContext_tipoEmision", String(data.tipoEmision));
+        }
         setLogoOverride(data?.logoBase64 ?? null);
       } catch {
         // falla silenciosamente

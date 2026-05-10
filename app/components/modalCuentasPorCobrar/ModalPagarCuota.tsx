@@ -23,9 +23,13 @@ export const ModalPagarCuota = ({
   cuota, tipoMoneda, onClose, onConfirm, loading, usuarioId
 }: ModalPagarCuotaProps) => {
 
-  const hoy  = new Date().toISOString().split('T')[0]
-  const venc = cuota.fechaVencimiento.split('T')[0]
-  const estaVencida = venc < hoy
+const d = new Date()
+const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+const dVenc = new Date(cuota.fechaVencimiento)
+const venc = `${dVenc.getFullYear()}-${String(dVenc.getMonth() + 1).padStart(2, '0')}-${String(dVenc.getDate()).padStart(2, '0')}`
+
+const estaVencida = venc < hoy
 
   // ── Flags para mostrar secciones según tasa configurada
   const mostrarDescuento = TASA_DESCUENTO_DIARIA > 0 && !estaVencida && hoy < venc
@@ -85,6 +89,9 @@ export const ModalPagarCuota = ({
     const errs: Record<string, string> = {}
     const monto = parseFloat(montoPagado)
     if (!montoPagado || isNaN(monto) || monto <= 0) errs.montoPagado = 'Ingrese un monto válido'
+    if (monto > montoRestante) {
+      errs.montoPagado = `El monto no puede superar el restante (${formatMoneda(montoRestante, tipoMoneda)})`
+    }
     if (!fechaPago) errs.fechaPago = 'Seleccione una fecha'
     if (!medioPago) errs.medioPago = 'Seleccione un medio de pago'
     setErrors(errs)
