@@ -14,7 +14,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useToast } from "@/app/components/ui/Toast";
 import ModalPuntoDireccion, {
   DireccionSeleccionada,
@@ -97,7 +97,7 @@ const labelClass = "text-[10px] font-bold text-gray-600 uppercase";
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export default function GuiaRemisionPage() {
+function GuiaRemisionContent() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
   const { showToast } = useToast();
@@ -2540,5 +2540,13 @@ export default function GuiaRemisionPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function GuiaRemisionPage() {
+  return (
+    <Suspense fallback={null}>
+      <GuiaRemisionContent />
+    </Suspense>
   );
 }

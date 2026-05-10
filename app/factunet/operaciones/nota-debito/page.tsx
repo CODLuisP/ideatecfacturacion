@@ -7,7 +7,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import axios from "axios";
 import { useToast } from "@/app/components/ui/Toast";
 import { useSucursal } from "../boleta/gestionBoletas/useSucursal";
@@ -150,7 +150,7 @@ const construirDetallesPorMotivo = (
   }
 };
 
-export default function NotaDebitoPage() {
+function NotaDebitoContent() {
   const searchParams = useSearchParams()
   const { showToast } = useToast();
   const router = useRouter();
@@ -1293,5 +1293,13 @@ export default function NotaDebitoPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NotaDebitoPage() {
+  return (
+    <Suspense fallback={null}>
+      <NotaDebitoContent />
+    </Suspense>
   );
 }

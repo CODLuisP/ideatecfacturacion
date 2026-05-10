@@ -16,7 +16,7 @@ import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useEmpresaEmisor } from "./gestionBoletas/useEmpresaEmisor";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import {
   Boleta,
   BoletaCliente,
@@ -66,7 +66,7 @@ interface PagoLocal {
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
 
-export default function BoletaPage() {
+function BoletaContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -3709,5 +3709,13 @@ export default function BoletaPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function BoletaPage() {
+  return (
+    <Suspense fallback={null}>
+      <BoletaContent />
+    </Suspense>
   );
 }

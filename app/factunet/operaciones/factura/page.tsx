@@ -16,7 +16,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import {
   Factura,
   FacturaCliente,
@@ -117,7 +117,7 @@ const MEDIOS_PAGO_DETRACCION = [
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
 
-export default function FacturaPage() {
+function FacturaContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -3807,5 +3807,13 @@ export default function FacturaPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function FacturaPage() {
+  return (
+    <Suspense fallback={null}>
+      <FacturaContent />
+    </Suspense>
   );
 }

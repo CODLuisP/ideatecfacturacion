@@ -170,6 +170,7 @@ export default function EditarProducto({
         categoria: categoriaActualizada,
         sucursalProducto: {
           sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
+          nomSucursal: producto.sucursalProducto.nomSucursal,
           precioUnitario: Number(precioInput || 0),
           stock: form.stock,
         },

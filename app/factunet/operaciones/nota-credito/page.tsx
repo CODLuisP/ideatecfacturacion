@@ -7,7 +7,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import axios from "axios";
 import { useToast } from "@/app/components/ui/Toast";
 import { useSucursal } from "../boleta/gestionBoletas/useSucursal";
@@ -195,7 +195,7 @@ const obtenerFechaLocal = (offsetDias = 0) => {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
 };
 
-export default function NotaCreditoPage() {
+function NotaCreditoContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -1474,5 +1474,13 @@ const actualizarStockDevolucion = async () => {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NotaCreditoPage() {
+  return (
+    <Suspense fallback={null}>
+      <NotaCreditoContent />
+    </Suspense>
   );
 }
