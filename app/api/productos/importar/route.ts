@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as any);
 
     const sheet = workbook.getWorksheet("Productos") ?? workbook.worksheets[0];
     if (!sheet) {

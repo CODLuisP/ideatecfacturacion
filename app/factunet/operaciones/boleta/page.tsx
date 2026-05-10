@@ -16,7 +16,7 @@ import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useEmpresaEmisor } from "./gestionBoletas/useEmpresaEmisor";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import {
   Boleta,
   BoletaCliente,
@@ -66,7 +66,7 @@ interface PagoLocal {
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
 
-export default function BoletaPage() {
+function BoletaContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -1581,6 +1581,32 @@ export default function BoletaPage() {
     if (enviarWhatsapp && !telefonoCliente.trim()) {
       showToast("Ingrese el teléfono para enviar por WhatsApp", "error");
       return;
+    }
+
+    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
+    const sumaCuotas = cuotas.reduce((acc, c) => acc + (Number(c.monto) || 0), 0)
+    const pagoInvalido = pagos.some(p => !p.monto || Number(p.monto) <= 0)
+    const cuotaInvalida = cuotas.some(c => !c.monto || Number(c.monto) <= 0)
+
+    if (boleta.tipoPago !== 'Credito' && pagoInvalido) {
+      showToast('Todos los montos de pago deben ser mayores a cero', 'error')
+      return
+    }
+    if (boleta.tipoPago !== 'Contado' && cuotaInvalida) {
+      showToast('Todos los montos de las cuotas deben ser mayores a cero', 'error')
+      return
+    }
+    if (boleta.tipoPago === 'Contado' && Math.abs(sumaPagos - totales.total) > 0.01) {
+      showToast(`Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+    if (boleta.tipoPago === 'Credito' && Math.abs(sumaCuotas - totales.total) > 0.01) {
+      showToast(`Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+    if (boleta.tipoPago === 'CreditoInicial' && Math.abs(sumaPagos + sumaCuotas - totales.total) > 0.01) {
+      showToast(`Pago inicial (${simbolo} ${(sumaPagos).toFixed(2)}) + cuotas (${simbolo} ${(sumaCuotas).toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
     }
 
     setEmitiendo(true);
@@ -3709,5 +3735,13 @@ export default function BoletaPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function BoletaPage() {
+  return (
+    <Suspense fallback={null}>
+      <BoletaContent />
+    </Suspense>
   );
 }

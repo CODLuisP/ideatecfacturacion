@@ -16,7 +16,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import {
   Factura,
   FacturaCliente,
@@ -117,7 +117,7 @@ const MEDIOS_PAGO_DETRACCION = [
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
 
-export default function FacturaPage() {
+function FacturaContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -1648,6 +1648,39 @@ export default function FacturaPage() {
     }
     if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return; }
     if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return; }
+
+    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
+    const sumaCuotas = cuotas.reduce((acc, c) => acc + (Number(c.monto) || 0), 0)
+    const pagoInvalido = pagos.some(p => !p.monto || Number(p.monto) <= 0)
+    const cuotaInvalida = cuotas.some(c => !c.monto || Number(c.monto) <= 0)
+    const montoDetraccionAplicada = aplicarDetraccion ? detraccion.montoDetraccion : 0
+
+    if (factura.tipoPago !== 'Credito' && pagoInvalido) {
+      showToast('Todos los montos de pago deben ser mayores a cero', 'error')
+      return
+    }
+    if (factura.tipoPago !== 'Contado' && cuotaInvalida) {
+      showToast('Todos los montos de las cuotas deben ser mayores a cero', 'error')
+      return
+    }
+    if (factura.tipoPago === 'Contado' && Math.abs(sumaPagos - totales.total) > 0.01) {
+      showToast(`Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+    if (factura.tipoPago === 'Credito') {
+      const montoEsperado = parseFloat(Math.max(0, totales.total - montoDetraccionAplicada).toFixed(2))
+      if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
+        showToast(`Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${montoEsperado.toFixed(2)})`, 'error')
+        return
+      }
+    }
+    if (factura.tipoPago === 'CreditoInicial') {
+      const montoEsperado = parseFloat(Math.max(0, totales.total - sumaPagos - montoDetraccionAplicada).toFixed(2))
+      if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
+        showToast(`Pago inicial (${simbolo} ${sumaPagos.toFixed(2)}) + cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${(sumaPagos + sumaCuotas).toFixed(2)} vs ${simbolo} ${totales.total.toFixed(2)})`, 'error')
+        return
+      }
+    }
 
     setEmitiendo(true);
     setErrorEmision(null);
@@ -3807,5 +3840,13 @@ export default function FacturaPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function FacturaPage() {
+  return (
+    <Suspense fallback={null}>
+      <FacturaContent />
+    </Suspense>
   );
 }
