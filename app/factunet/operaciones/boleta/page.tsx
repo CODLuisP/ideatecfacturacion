@@ -2000,8 +2000,9 @@ export default function BoletaPage() {
           )}
 
           <Card>
-            <form className="space-y-3 mx-3">
+            <form className="space-y-3">
              
+
 
               {/* ── Datos del Cliente ── */}
               <div className=" rounded-xl space-y-2">

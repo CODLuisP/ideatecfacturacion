@@ -1962,7 +1962,7 @@ export default function FacturaPage() {
               </div>
             )}
 
-            <form className="space-y-3 mx-3">
+            <form className="space-y-3">
               {/* ── 2. Serie y correlativo ── */}
         
 

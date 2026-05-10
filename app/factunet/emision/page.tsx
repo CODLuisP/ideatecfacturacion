@@ -1085,10 +1085,10 @@ const imprimirPdf = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* ── Columna izquierda ── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 ">
 
           {/* ── Datos del Cliente ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-2">
             <div className="flex items-center gap-2 ">
               <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-sm"><UserRound className="w-4 h-4 text-brand-blue" /></div>
               <h3 className="text-sm font-bold text-gray-800">Datos del Cliente</h3>
@@ -1234,7 +1234,7 @@ const imprimirPdf = () => {
           </div>
 
           {/* ── Detalle de Venta ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"> <ClipboardList className="w-4 h-4 text-brand-blue" /> </div>

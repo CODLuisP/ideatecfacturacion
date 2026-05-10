@@ -684,7 +684,7 @@ export default function NotaDebitoPage() {
           </div>
 
           <Card >
-            <form className="space-y-6 mx-3">
+            <form className="space-y-6 ">
 
               {/* ── Sucursal (superadmin) ── */}
               {isSuperAdmin && (

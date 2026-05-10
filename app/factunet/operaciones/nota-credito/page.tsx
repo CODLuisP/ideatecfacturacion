@@ -835,7 +835,7 @@ const actualizarStockDevolucion = async () => {
           </div>
 
           <Card >
-            <form className="space-y-4 mx-3">
+            <form className="space-y-4">
 
               {/* ── Sucursal (superadmin) ── */}
               {isSuperAdmin && (
