@@ -90,10 +90,10 @@ const MOTIVOS_TRASLADO = [
 ];
 
 const inputClass =
-  "w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all";
+  "w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all";
 const selectClass =
-  "w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue";
-const labelClass = "text-xs font-bold text-gray-500 uppercase";
+  "w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue";
+const labelClass = "text-[10px] font-bold text-gray-600 uppercase";
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -1493,7 +1493,7 @@ export default function GuiaRemisionPage() {
                   <label className={labelClass}>Serie y Número</label>
                   <div className="flex gap-2">
                     <div
-                      className={`w-1/3 py-2.5 px-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm flex items-center ${
+                      className={`w-1/3 py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm flex items-center ${
                         loadingSucursal ? "animate-pulse" : ""
                       }`}
                     >
@@ -1505,7 +1505,7 @@ export default function GuiaRemisionPage() {
                       value={
                         loadingSucursal ? "Cargando..." : correlativoFormateado
                       }
-                      className="w-2/3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono"
+                      className="w-2/3 py-2 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono"
                     />
                   </div>
                   {errorSucursal && (
@@ -1588,7 +1588,7 @@ export default function GuiaRemisionPage() {
                 <div className="space-y-1.5">
                   <label className={labelClass}>Punto de Partida</label>
                   {puntoPartida ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                       <p className="text-xs text-gray-700 leading-relaxed">
                         {puntoPartida.resumen}
                       </p>
@@ -1604,7 +1604,7 @@ export default function GuiaRemisionPage() {
                     <button
                       type="button"
                       onClick={() => setModalPartida(true)}
-                      className="w-full py-2.5 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
+                      className="w-full py-2 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
                     >
                       + Agregar punto de partida
                     </button>
@@ -1615,7 +1615,7 @@ export default function GuiaRemisionPage() {
                 <div className="space-y-1.5">
                   <label className={labelClass}>Punto de Llegada</label>
                   {puntoLlegada ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                       <p className="text-xs text-gray-700 leading-relaxed">
                         {puntoLlegada.resumen}
                       </p>
@@ -1631,7 +1631,7 @@ export default function GuiaRemisionPage() {
                     <button
                       type="button"
                       onClick={() => setModalLlegada(true)}
-                      className="w-full py-2.5 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
+                      className="w-full py-2 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
                     >
                       + Agregar punto de llegada
                     </button>
@@ -1821,7 +1821,7 @@ export default function GuiaRemisionPage() {
                     )}
                   </div>
                   {transportistaPublico ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                       <div>
                         <p className="text-sm font-medium text-gray-800">
                           {transportistaPublico.razonSocial}
@@ -1927,7 +1927,7 @@ export default function GuiaRemisionPage() {
                           setDestinatarioSunatResultado(null);
                           setDestinatarioSunatHint(null);
                         }}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
                       />
                       <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
 
@@ -1977,7 +1977,7 @@ export default function GuiaRemisionPage() {
                               destinatarioQuery.replace(/\D/g, ""),
                             )
                           }
-                          className="w-full py-2.5 px-4 text-sm text-brand-blue border border-dashed border-brand-blue/40 rounded-xl hover:bg-brand-blue/5 transition-colors disabled:opacity-50"
+                          className="w-full py-2 px-4 text-sm text-brand-blue border border-dashed border-brand-blue/40 rounded-xl hover:bg-brand-blue/5 transition-colors disabled:opacity-50"
                         >
                           {loadingSunat
                             ? "Consultando SUNAT..."
@@ -2131,7 +2131,7 @@ export default function GuiaRemisionPage() {
                     {documentosRelacionados.map((doc, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl"
+                        className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl"
                       >
                         <div>
                           <p className="text-sm font-medium text-gray-800">
@@ -2286,7 +2286,7 @@ export default function GuiaRemisionPage() {
                   rows={3}
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
-                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm resize-none"
+                  className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm resize-none"
                 />
               </div>
             </form>
@@ -2336,7 +2336,7 @@ export default function GuiaRemisionPage() {
             ) : (
               /* — Sin emitir aún — */
               <div className="space-y-3">
-                <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+            <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                   <div className="p-4 rounded-full bg-white shadow-sm">
                     <Printer className="w-8 h-8 text-gray-400" />
                   </div>

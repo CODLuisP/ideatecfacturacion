@@ -17,6 +17,7 @@ import { ProductoSucursal } from '../productos/gestioProductos/Producto';
 import { useProductosSucursal } from '../productos/gestioProductos/useProductosSucursal';
 import { sharedVentaStore } from '../operaciones/sharedVentaStore';
 import { cn } from "@/app/utils/cn";
+import { ModalGuardarClienteBoleta } from '../operaciones/boleta/gestionBoletas/Modalguardarclienteboleta';
 // ── Tipos ──────────────────────────────────────────────────────
 type TipoComprobante = 'boleta' | 'factura';
 
@@ -92,7 +93,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const loadingCli = tipo === 'boleta' ? loadingB      : loadingF;
   const errorCli   = tipo === 'boleta' ? errorB        : errorF;
   const buscarCli  = tipo === 'boleta' ? buscarB       : buscarF;
-  const { clientes } = useClientesRuc();
+  const { clientes, fetchClientes } = useClientesRuc();
 
   // ── Estado cliente ─────────────────────────────────────────
   const [tipoDoc, setTipoDoc] = useState('01');
@@ -120,6 +121,56 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
 
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
+
+  // ── Modal guardar cliente ────────────────────────────────────
+  const [showModalCliente, setShowModalCliente] = useState(false);
+
+  const guardarCliente = async (extra: {
+    nombreComercial: string;
+    telefono: string;
+    correo: string;
+    direccionLineal: string;
+  }) => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+        {
+          sucursalID: isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID,
+          numeroDocumento: clienteSeleccionado?.numeroDocumento,
+          razonSocialNombre: clienteSeleccionado?.razonSocial,
+          nombreComercial: extra.nombreComercial || "",
+          telefono: extra.telefono || "",
+          correo: extra.correo || "",
+          tipoDocumentoId: clienteSeleccionado?.tipoDocumento,
+          direccion: {
+            ubigeo: clienteSeleccionado?.ubigeo || "",
+            direccionLineal:
+              extra.direccionLineal || clienteSeleccionado?.direccionLineal || "",
+            departamento: clienteSeleccionado?.departamento || "",
+            provincia: clienteSeleccionado?.provincia || "",
+            distrito: clienteSeleccionado?.distrito || "",
+            tipoDireccion: "PRINCIPAL",
+          },
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      showToast("Cliente guardado correctamente", "success");
+      setShowModalCliente(false);
+      const listaActualizada = await fetchClientes();
+      const clienteGuardado = listaActualizada?.find(
+        (c: any) => c.numeroDocumento === clienteSeleccionado?.numeroDocumento,
+      );
+      setClienteSeleccionado((prev) => prev ? ({
+        ...prev,
+        clienteId: clienteGuardado?.clienteId ?? null,
+        direccionLineal: extra.direccionLineal,
+      }) : null);
+      setCorreoCliente(extra.correo);
+      setTelefonoCliente(extra.telefono);
+    } catch {
+      showToast("Error al guardar el cliente", "error");
+    }
+  };
 
   const isFirstRenderTipo = useRef(true);
   useEffect(() => {
@@ -1052,7 +1103,7 @@ const imprimirPdf = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Tipo doc + búsqueda */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">
                   {tipo === 'factura' ? 'RUC / CE' : 'Tipo y Nº Documento'}
                 </label>
                 <div className="flex gap-2">
@@ -1106,6 +1157,7 @@ const imprimirPdf = () => {
                   </div>
                 </div>
                 {/* Razón social */}
+                <div className="flex items-center gap-2">
                   <input type="text"
                     disabled={clienteVarios || !noEncontrado}
                     value={clienteVarios ? 'Clientes Varios' : (clienteSeleccionado?.razonSocial ?? clienteManual)}
@@ -1124,12 +1176,25 @@ const imprimirPdf = () => {
                     placeholder="Nombre / Razón social"
                     className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
                   />
+                  {!clienteVarios &&
+                    clienteSeleccionado?.clienteId === null &&
+                    clienteSeleccionado?.razonSocial && (
+                      <button
+                        type="button"
+                        onClick={() => setShowModalCliente(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                        title="Guardar cliente"
+                      >
+                        +
+                      </button>
+                    )}
+                </div>
                 {errorCli && errorVisible && <p className="text-xs text-red-500">{errorCli} Digitar nombre manualmente.</p>}
               </div>
 
               {/* Correo y teléfono */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Contacto</label>
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Contacto</label>
                 <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2
                   ${enviarCorreo && !correoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
                   <input type="text" value={correoCliente}
@@ -1393,7 +1458,7 @@ const imprimirPdf = () => {
             {isSuperAdmin && (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sucursal</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Sucursal</label>
                   {loadingSucursales && (
                     <div className="w-3 h-3 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
                   )}
@@ -1439,36 +1504,34 @@ const imprimirPdf = () => {
 
           {/* Serie destacada */}
 
-
 <div className={cn(
-   "flex items-center gap-2.5 px-3 py-2 rounded-xl border w-full",
+  "flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm",
   isSuperAdmin && !sucursalActual
-    ? "bg-amber-50 border-amber-100"
+    ? "bg-amber-50 border-amber-200"
     : serie
-    ? "bg-green-50 border-green-100"
-    : "bg-gray-50 border-gray-100"
+    ? "bg-green-50 border-green-300"
+    : "bg-gray-50 border-gray-200"
 )}>
-  {isSuperAdmin && !sucursalActual
-    ? <span className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-        <Building2 className="w-4 h-4 shrink-0" />
-        Elige una sucursal para continuar
-      </span>
-    : loadingSucursal
-    ? <span className="text-gray-300 animate-pulse text-xs">Cargando...</span>
-    : !serie
-    ? <span className="text-xs font-medium text-gray-400">Sin serie</span>
-    :  <>
-    <p className="text-xs font-bold text-gray-900 uppercase ">
-      {tipo === 'boleta' ? 'Boleta:' : 'Factura:'}
-    </p>
-    <span className="text-[13px] font-bold text-gray-700">
-      {serie}-{String(correlativoActual ?? 1).padStart(8, '0')}
+  {isSuperAdmin && !sucursalActual ? (
+    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+      <Building2 className="w-3.5 h-3.5" />
+      <span>Elige una sucursal</span>
     </span>
-  </>
-  }
+  ) : loadingSucursal ? (
+    <span className="text-gray-400 text-xs">Cargando...</span>
+  ) : !serie ? (
+    <span className="text-xs text-gray-400">Sin serie</span>
+  ) : (
+    <>
+      <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+        {tipo === 'boleta' ? 'Boleta:' : 'Factura:'}
+      </p>
+      <span className="text-[12px] font-mono font-semibold text-gray-800">
+        {serie}-{String(correlativoActual ?? 1).padStart(8, '0')}
+      </span>
+    </>
+  )}
 </div>
-
-
 
 
           {/* ── Medio de Pago / Moneda ── */}
@@ -1646,6 +1709,23 @@ const imprimirPdf = () => {
           </div>
         </div>
       </div>
+
+      {showModalCliente && clienteSeleccionado && !clienteVarios && (
+        <ModalGuardarClienteBoleta
+          cliente={{
+            numeroDocumento: clienteSeleccionado.numeroDocumento ?? "",
+            razonSocial: clienteSeleccionado.razonSocial ?? "",
+            tipoDocumento: clienteSeleccionado.tipoDocumento ?? "",
+            ubigeo: clienteSeleccionado.ubigeo ?? "",
+            direccionLineal: clienteSeleccionado.direccionLineal ?? "",
+            departamento: clienteSeleccionado.departamento ?? "",
+            provincia: clienteSeleccionado.provincia ?? "",
+            distrito: clienteSeleccionado.distrito ?? "",
+          }}
+          onGuardar={guardarCliente}
+          onCerrar={() => setShowModalCliente(false)}
+        />
+      )}
     </div>
   );
 }

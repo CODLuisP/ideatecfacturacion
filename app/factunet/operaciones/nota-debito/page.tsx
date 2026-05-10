@@ -683,14 +683,14 @@ export default function NotaDebitoPage() {
             </div>
           </div>
 
-          <Card title="Datos de la Nota de Débito" subtitle="Completa la información requerida">
-            <form className="space-y-6">
+          <Card >
+            <form className="space-y-6 mx-3">
 
               {/* ── Sucursal (superadmin) ── */}
               {isSuperAdmin && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Sucursal</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Sucursal</label>
                     <select
                       value={sucursal?.sucursalId ?? ""}
                       disabled={loadingSucursales || vieneDesdeLista}
@@ -703,7 +703,7 @@ export default function NotaDebitoPage() {
                         setCorrelativoNDFactura(res.data.correlativoNotaDebitoFactura ?? null);
                         setCorrelativoNDBoleta(res.data.correlativoNotaDebitoBoleta ?? null);
                       }}
-                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                      className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                     >
                       <option value="">Seleccionar sucursal</option>
                       {sucursales.map((s: Sucursal) => (
@@ -714,10 +714,33 @@ export default function NotaDebitoPage() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo ND</label>
-                    <input type="text" disabled
-                      value={!sucursal ? "Selecciona una sucursal" : serieInput ? `${serieND}-${correlativoDisplay}` : "Selecciona serie del comprobante"}
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">
+                      Serie y Correlativo ND
+                    </label>
+                    <div
+                      className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl border w-full text-sm ${
+                        !sucursal
+                          ? "bg-gray-50 border-gray-200"
+                          : serieInput
+                          ? "bg-green-50 border-green-300"
+                          : "bg-gray-50 border-gray-200"
+                      }`}
+                    >
+                      {!sucursal ? (
+      <span className="text-[12px] text-gray-400">Selecciona una sucursal</span>
+                      ) : !serieInput ? (
+                        <span className="text-[12px] text-gray-400">Selecciona serie del comprobante</span>
+                      ) : (
+                        <>
+                          <p className="text-[12px] font-bold uppercase text-gray-500 tracking-wide">
+                            ND
+                          </p>
+                          <span className="text-[12px] font-mono font-semibold text-gray-800">
+                            {serieND}-{correlativoDisplay}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -725,15 +748,36 @@ export default function NotaDebitoPage() {
               {/* Admin normal */}
               {!isSuperAdmin && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo ND</label>
-                  <input type="text" disabled
-                    value={loadingSucursal ? "Cargando..." : serieInput ? `${serieND}-${correlativoDisplay}` : "Selecciona serie del comprobante"}
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Serie y Correlativo ND</label>
+                  <div
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+                      loadingSucursal
+                        ? "bg-gray-50 border-gray-200"
+                        : serieInput
+                        ? "bg-green-50 border-green-300"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    {loadingSucursal ? (
+                      <span className="text-xs text-gray-400">Cargando...</span>
+                    ) : !serieInput ? (
+                      <span className="text-xs text-gray-400">Selecciona serie del comprobante</span>
+                    ) : (
+                      <>
+                        <p className="text-[12px] font-bold uppercase text-gray-500 tracking-wide">
+                          ND
+                        </p>
+                        <span className="text-[12px] font-mono font-semibold text-gray-800">
+                          {serieND}-{correlativoDisplay}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* ── Buscador ── */}
-              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-4">
+              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-2 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <Search className="w-4 h-4 text-brand-blue" />
@@ -743,12 +787,12 @@ export default function NotaDebitoPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Serie</label>
                     <select
                       value={serieInput}
                       onChange={(e) => { setSerieInput(e.target.value); if (comprobante) limpiarBuscador(); }}
                       disabled={isSuperAdmin && sinSucursal || vieneDesdeLista}
-                      className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50"
+                      className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50"
                     >
                       <option value="">Seleccionar serie</option>
                       {seriesDisponibles.map((s) => (
@@ -758,14 +802,14 @@ export default function NotaDebitoPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Correlativo</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Correlativo</label>
                     <div className="relative">
                       <input
                         type="text" value={correlativoInput}
                         onChange={(e) => setCorrelativoInput(e.target.value.replace(/\D/g, ""))}
                         placeholder="127" maxLength={10} disabled={vieneDesdeLista}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarComprobante(serieInput, correlativoInput); } }}
-                        className="w-full py-2.5 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono"
+                        className="w-full py-2 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono"
                       />
                       {(correlativoInput || comprobante) && (
                         <button type="button" 
@@ -857,7 +901,7 @@ export default function NotaDebitoPage() {
                     )}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                       <div className="space-y-1">
-                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
                           <input type="email" value={correoCliente} placeholder="Correo del cliente"
                             onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
                             className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
@@ -868,7 +912,7 @@ export default function NotaDebitoPage() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
                           <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
                             onChange={(e) => { 
                               const s = e.target.value.replace(/\D/g, ""); 
@@ -896,7 +940,7 @@ export default function NotaDebitoPage() {
               {/* ── Motivo y fecha ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Motivo</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Motivo</label>
                   <select
                     value={codMotivo}
                     onChange={(e) => {
@@ -906,7 +950,7 @@ export default function NotaDebitoPage() {
                       setDesMotivo(motivo?.label ?? "");
                       setIncluyePenalidad(false);
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="">Seleccionar motivo</option>
                     {MOTIVOS_ND.map((m) => (
@@ -919,7 +963,7 @@ export default function NotaDebitoPage() {
                       <label className="text-[10px] font-bold text-gray-400 uppercase">Descripción del motivo</label>
                       <input type="text" value={desMotivo} onChange={(e) => setDesMotivo(e.target.value)}
                         placeholder="Descripción del motivo..." maxLength={250}
-                        className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                        className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                     </div>
                   )}
 
@@ -934,12 +978,12 @@ export default function NotaDebitoPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Emisión</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Fecha de Emisión</label>
                   <input type="date" value={fechaEmision}
                     max={obtenerFechaLocal()}
                     min={obtenerFechaLocal(-2)}
                     onChange={(e) => setFechaEmision(e.target.value)}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                 </div>
               </div>
 
@@ -1196,22 +1240,22 @@ export default function NotaDebitoPage() {
                 )}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2 rounded-lg transition-all duration-200">
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
                   <button type="button"
                     onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `${empresa?.numeroDocumento}-08-${serieND}-${correlativoDisplay}.pdf`; a.click(); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2 rounded-lg transition-all duration-200 shadow-sm">
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
                   <button type="button" onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2 rounded-lg transition-all duration-200 shadow-sm">
                     <Printer className="w-3.5 h-3.5" /> Imprimir
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+           <div className="h-48 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                 <div className="p-4 rounded-full bg-white shadow-sm"><Printer className="w-8 h-8 text-gray-400" /></div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
