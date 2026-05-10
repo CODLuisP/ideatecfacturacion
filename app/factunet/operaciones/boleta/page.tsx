@@ -1583,6 +1583,32 @@ export default function BoletaPage() {
       return;
     }
 
+    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
+    const sumaCuotas = cuotas.reduce((acc, c) => acc + (Number(c.monto) || 0), 0)
+    const pagoInvalido = pagos.some(p => !p.monto || Number(p.monto) <= 0)
+    const cuotaInvalida = cuotas.some(c => !c.monto || Number(c.monto) <= 0)
+
+    if (boleta.tipoPago !== 'Credito' && pagoInvalido) {
+      showToast('Todos los montos de pago deben ser mayores a cero', 'error')
+      return
+    }
+    if (boleta.tipoPago !== 'Contado' && cuotaInvalida) {
+      showToast('Todos los montos de las cuotas deben ser mayores a cero', 'error')
+      return
+    }
+    if (boleta.tipoPago === 'Contado' && Math.abs(sumaPagos - totales.total) > 0.01) {
+      showToast(`Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+    if (boleta.tipoPago === 'Credito' && Math.abs(sumaCuotas - totales.total) > 0.01) {
+      showToast(`Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+    if (boleta.tipoPago === 'CreditoInicial' && Math.abs(sumaPagos + sumaCuotas - totales.total) > 0.01) {
+      showToast(`Pago inicial (${simbolo} ${(sumaPagos).toFixed(2)}) + cuotas (${simbolo} ${(sumaCuotas).toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+
     setEmitiendo(true);
     setErrorEmision(null);
     try {
