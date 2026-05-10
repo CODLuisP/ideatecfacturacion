@@ -17,6 +17,7 @@ import { ProductoSucursal } from '../productos/gestioProductos/Producto';
 import { useProductosSucursal } from '../productos/gestioProductos/useProductosSucursal';
 import { sharedVentaStore } from '../operaciones/sharedVentaStore';
 import { cn } from "@/app/utils/cn";
+import { ModalGuardarClienteBoleta } from '../operaciones/boleta/gestionBoletas/Modalguardarclienteboleta';
 // ── Tipos ──────────────────────────────────────────────────────
 type TipoComprobante = 'boleta' | 'factura';
 
@@ -92,7 +93,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const loadingCli = tipo === 'boleta' ? loadingB      : loadingF;
   const errorCli   = tipo === 'boleta' ? errorB        : errorF;
   const buscarCli  = tipo === 'boleta' ? buscarB       : buscarF;
-  const { clientes } = useClientesRuc();
+  const { clientes, fetchClientes } = useClientesRuc();
 
   // ── Estado cliente ─────────────────────────────────────────
   const [tipoDoc, setTipoDoc] = useState('01');
@@ -120,6 +121,56 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
 
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
+
+  // ── Modal guardar cliente ────────────────────────────────────
+  const [showModalCliente, setShowModalCliente] = useState(false);
+
+  const guardarCliente = async (extra: {
+    nombreComercial: string;
+    telefono: string;
+    correo: string;
+    direccionLineal: string;
+  }) => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+        {
+          sucursalID: isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID,
+          numeroDocumento: clienteSeleccionado?.numeroDocumento,
+          razonSocialNombre: clienteSeleccionado?.razonSocial,
+          nombreComercial: extra.nombreComercial || "",
+          telefono: extra.telefono || "",
+          correo: extra.correo || "",
+          tipoDocumentoId: clienteSeleccionado?.tipoDocumento,
+          direccion: {
+            ubigeo: clienteSeleccionado?.ubigeo || "",
+            direccionLineal:
+              extra.direccionLineal || clienteSeleccionado?.direccionLineal || "",
+            departamento: clienteSeleccionado?.departamento || "",
+            provincia: clienteSeleccionado?.provincia || "",
+            distrito: clienteSeleccionado?.distrito || "",
+            tipoDireccion: "PRINCIPAL",
+          },
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      showToast("Cliente guardado correctamente", "success");
+      setShowModalCliente(false);
+      const listaActualizada = await fetchClientes();
+      const clienteGuardado = listaActualizada?.find(
+        (c: any) => c.numeroDocumento === clienteSeleccionado?.numeroDocumento,
+      );
+      setClienteSeleccionado((prev) => prev ? ({
+        ...prev,
+        clienteId: clienteGuardado?.clienteId ?? null,
+        direccionLineal: extra.direccionLineal,
+      }) : null);
+      setCorreoCliente(extra.correo);
+      setTelefonoCliente(extra.telefono);
+    } catch {
+      showToast("Error al guardar el cliente", "error");
+    }
+  };
 
   const isFirstRenderTipo = useRef(true);
   useEffect(() => {
@@ -1106,6 +1157,7 @@ const imprimirPdf = () => {
                   </div>
                 </div>
                 {/* Razón social */}
+                <div className="flex items-center gap-2">
                   <input type="text"
                     disabled={clienteVarios || !noEncontrado}
                     value={clienteVarios ? 'Clientes Varios' : (clienteSeleccionado?.razonSocial ?? clienteManual)}
@@ -1124,6 +1176,19 @@ const imprimirPdf = () => {
                     placeholder="Nombre / Razón social"
                     className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
                   />
+                  {!clienteVarios &&
+                    clienteSeleccionado?.clienteId === null &&
+                    clienteSeleccionado?.razonSocial && (
+                      <button
+                        type="button"
+                        onClick={() => setShowModalCliente(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                        title="Guardar cliente"
+                      >
+                        +
+                      </button>
+                    )}
+                </div>
                 {errorCli && errorVisible && <p className="text-xs text-red-500">{errorCli} Digitar nombre manualmente.</p>}
               </div>
 
@@ -1644,6 +1709,23 @@ const imprimirPdf = () => {
           </div>
         </div>
       </div>
+
+      {showModalCliente && clienteSeleccionado && !clienteVarios && (
+        <ModalGuardarClienteBoleta
+          cliente={{
+            numeroDocumento: clienteSeleccionado.numeroDocumento ?? "",
+            razonSocial: clienteSeleccionado.razonSocial ?? "",
+            tipoDocumento: clienteSeleccionado.tipoDocumento ?? "",
+            ubigeo: clienteSeleccionado.ubigeo ?? "",
+            direccionLineal: clienteSeleccionado.direccionLineal ?? "",
+            departamento: clienteSeleccionado.departamento ?? "",
+            provincia: clienteSeleccionado.provincia ?? "",
+            distrito: clienteSeleccionado.distrito ?? "",
+          }}
+          onGuardar={guardarCliente}
+          onCerrar={() => setShowModalCliente(false)}
+        />
+      )}
     </div>
   );
 }
