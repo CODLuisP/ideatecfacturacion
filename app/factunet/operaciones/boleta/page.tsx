@@ -3378,7 +3378,7 @@ export default function BoletaPage() {
                       />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-8 text-lg font-bold text-brand-blue pt-1 border-t border-gray-100">
+                  <div className="flex justify-end gap-8 text-[16px] font-bold text-brand-blue pt-1 border-t border-gray-100">
                     <span>Total:</span>
                     <span className="w-24">
                       {simbolo} {totales.importeTotal.toFixed(2)}
@@ -3401,7 +3401,7 @@ export default function BoletaPage() {
   {isSuperAdmin ? (
     <>
       <div className="space-y-1.5">
-        <label className="text-xs font-bold text-gray-500 uppercase">
+        <label className="text-[10px] font-bold text-gray-600 uppercase">
           Sucursal
         </label>
         <select
@@ -3439,7 +3439,7 @@ export default function BoletaPage() {
               correlativo: String(res.data.correlativoBoleta).padStart(8, "0"),
             }));
           }}
-          className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+          className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
         >
           <option value="">Seleccionar sucursal</option>
           {sucursales.map((s: Sucursal) => (
@@ -3452,7 +3452,7 @@ export default function BoletaPage() {
 
       {/* Info serie con estilos compactos */}
       <div
-        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+        className={`flex items-center gap-2 mt-3 px-2 py-2 rounded-lg border w-full text-sm ${
           !sucursal
             ? "bg-amber-50 border-amber-200"
             : serieDisplay
@@ -3625,8 +3625,7 @@ export default function BoletaPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <div className="p-4 rounded-full bg-white shadow-sm">
+<div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">                <div className="p-4 rounded-full bg-white shadow-sm">
                   <Printer className="w-8 h-8 text-gray-400" />
                 </div>
                 <div>

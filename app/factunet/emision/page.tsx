@@ -1052,7 +1052,7 @@ const imprimirPdf = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Tipo doc + búsqueda */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">
                   {tipo === 'factura' ? 'RUC / CE' : 'Tipo y Nº Documento'}
                 </label>
                 <div className="flex gap-2">
@@ -1129,7 +1129,7 @@ const imprimirPdf = () => {
 
               {/* Correo y teléfono */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Contacto</label>
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Contacto</label>
                 <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2
                   ${enviarCorreo && !correoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
                   <input type="text" value={correoCliente}
@@ -1393,7 +1393,7 @@ const imprimirPdf = () => {
             {isSuperAdmin && (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sucursal</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Sucursal</label>
                   {loadingSucursales && (
                     <div className="w-3 h-3 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
                   )}

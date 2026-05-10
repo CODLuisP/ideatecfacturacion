@@ -3554,7 +3554,7 @@ export default function FacturaPage() {
   {isSuperAdmin ? (
     <>
       <div className="space-y-1.5">
-        <label className="text-xs font-bold text-gray-500 uppercase">
+        <label className="text-[10px] font-bold text-gray-600 uppercase">
           Sucursal
         </label>
         <select
@@ -3603,7 +3603,7 @@ export default function FacturaPage() {
 
       {/* Info serie - estilos compactos */}
       <div
-        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full mt-3 text-sm ${
           !sucursal
             ? "bg-amber-50 border-amber-200"
             : serieDisplay
@@ -3742,7 +3742,7 @@ export default function FacturaPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                 <div className="p-4 rounded-full bg-white shadow-sm">
                   <Printer className="w-8 h-8 text-gray-400" />
                 </div>
