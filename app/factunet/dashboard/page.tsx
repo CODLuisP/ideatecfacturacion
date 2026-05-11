@@ -98,7 +98,7 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     detail: "La factura F001-00122 fue rechazada por SUNAT con error 2329.",
     fecha: "14/01/2025 22:15",
     comprobante: "F001-00122",
-  }
+  },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -217,7 +217,10 @@ const DesgloseNotasCard: React.FC<{
         </div>
         <div className="grid grid-cols-2 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="p-4 rounded-xl border border-gray-100 space-y-2">
+            <div
+              key={i}
+              className="p-4 rounded-xl border border-gray-100 space-y-2"
+            >
               <Skeleton className="h-3 w-32" />
               <Skeleton className="h-6 w-24" />
               <Skeleton className="h-3 w-40" />
@@ -250,7 +253,9 @@ const DesgloseNotasCard: React.FC<{
               NC · Día actual
             </p>
           </div>
-          <p className="text-lg font-bold text-rose-700">{formatMoneda(ncDia)}</p>
+          <p className="text-lg font-bold text-rose-700">
+            {formatMoneda(ncDia)}
+          </p>
           <p className="text-[11px] text-rose-500 mt-1">
             Afectan documentos emitidos hoy
           </p>
@@ -266,60 +271,110 @@ const DesgloseNotasCard: React.FC<{
               ND · Día actual
             </p>
           </div>
-          <p className="text-lg font-bold text-emerald-700">{formatMoneda(ndDia)}</p>
+          <p className="text-lg font-bold text-emerald-700">
+            {formatMoneda(ndDia)}
+          </p>
           <p className="text-[11px] text-emerald-500 mt-1">
             Afectan documentos emitidos hoy
           </p>
         </div>
 
         {/* NC otras fechas */}
-        <div className={cn(
-          "p-2 rounded-xl border",
-          hayNotasOtrasFechas
-            ? "border-amber-100 bg-amber-50/50"
-            : "border-gray-100 bg-gray-50/50"
-        )}>
+        <div
+          className={cn(
+            "p-2 rounded-xl border",
+            hayNotasOtrasFechas
+              ? "border-amber-100 bg-amber-50/50"
+              : "border-gray-100 bg-gray-50/50",
+          )}
+        >
           <div className="flex items-center gap-2 mb-2">
-            <div className={cn("p-1.5 rounded-lg", hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100")}>
-              <ArrowLeftRight size={14} className={hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"} />
+            <div
+              className={cn(
+                "p-1.5 rounded-lg",
+                hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100",
+              )}
+            >
+              <ArrowLeftRight
+                size={14}
+                className={
+                  hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"
+                }
+              />
             </div>
-            <p className={cn(
-              "text-xs font-semibold uppercase tracking-wide",
-              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400"
-            )}>
+            <p
+              className={cn(
+                "text-xs font-semibold uppercase tracking-wide",
+                hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+              )}
+            >
               NC · Otras fechas
             </p>
           </div>
-          <p className={cn("text-lg font-bold", hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400")}>
+          <p
+            className={cn(
+              "text-lg font-bold",
+              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+            )}
+          >
             {formatMoneda(ncOtras)}
           </p>
-          <p className={cn("text-[11px] mt-1", hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400")}>
+          <p
+            className={cn(
+              "text-[11px] mt-1",
+              hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400",
+            )}
+          >
             Afectan documentos de días anteriores
           </p>
         </div>
 
         {/* ND otras fechas */}
-        <div className={cn(
-          "p-2 rounded-xl border",
-          hayNotasOtrasFechas
-            ? "border-amber-100 bg-amber-50/50"
-            : "border-gray-100 bg-gray-50/50"
-        )}>
+        <div
+          className={cn(
+            "p-2 rounded-xl border",
+            hayNotasOtrasFechas
+              ? "border-amber-100 bg-amber-50/50"
+              : "border-gray-100 bg-gray-50/50",
+          )}
+        >
           <div className="flex items-center gap-2 mb-2">
-            <div className={cn("p-1.5 rounded-lg", hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100")}>
-              <ArrowLeftRight size={14} className={hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"} />
+            <div
+              className={cn(
+                "p-1.5 rounded-lg",
+                hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100",
+              )}
+            >
+              <ArrowLeftRight
+                size={14}
+                className={
+                  hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"
+                }
+              />
             </div>
-            <p className={cn(
-              "text-xs font-semibold uppercase tracking-wide",
-              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400"
-            )}>
+            <p
+              className={cn(
+                "text-xs font-semibold uppercase tracking-wide",
+                hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+              )}
+            >
               ND · Otras fechas
             </p>
           </div>
-          <p className={cn("text-lg font-bold", hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400")}>
+          <p
+            className={cn(
+              "text-lg font-bold",
+              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+            )}
+          >
             {formatMoneda(ndOtras)}
           </p>
-          <p className={cn("text-[11px] mt-1", hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400")}>
+          <p
+            className={cn(
+              "text-[11px] mt-1",
+              hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400",
+            )}
+          >
             Afectan documentos de días anteriores
           </p>
         </div>
@@ -343,7 +398,8 @@ const DesgloseNotasCard: React.FC<{
       {hayNotasOtrasFechas && (
         <p className="text-[11px] text-amber-600 mt-3 flex items-center gap-1">
           <AlertTriangle size={11} />
-          Existen notas que afectan documentos de días anteriores y no impactan las ventas netas de hoy.
+          Existen notas que afectan documentos de días anteriores y no impactan
+          las ventas netas de hoy.
         </p>
       )}
     </Card>
@@ -361,7 +417,9 @@ export default function DashboardPage() {
   const hookSucursal = useDashboardSucursal();
   const { sucursales } = useSucursalRuc(isSuperAdmin);
 
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<
+    number | null
+  >(null);
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
   const [fecha, setFecha] = useState<string>(getFechaHoy());
 
@@ -382,15 +440,33 @@ export default function DashboardPage() {
       if (!userRuc) return;
       if (isSuperAdmin) {
         if (sucursalParam) {
-          fetchDashboardSucursal({ sucursalId: sucursalParam, fecha: fechaParam, limite: 10 });
+          fetchDashboardSucursal({
+            sucursalId: sucursalParam,
+            fecha: fechaParam,
+            limite: 10,
+          });
         } else {
-          fetchDashboardEmpresa({ ruc: userRuc, fecha: fechaParam, limite: 10 });
+          fetchDashboardEmpresa({
+            ruc: userRuc,
+            fecha: fechaParam,
+            limite: 10,
+          });
         }
       } else {
-        fetchDashboardSucursal({ sucursalId: Number(userSucursalID), fecha: fechaParam, limite: 10 });
+        fetchDashboardSucursal({
+          sucursalId: Number(userSucursalID),
+          fecha: fechaParam,
+          limite: 10,
+        });
       }
     },
-    [userRuc, userSucursalID, isSuperAdmin, fetchDashboardSucursal, fetchDashboardEmpresa],
+    [
+      userRuc,
+      userSucursalID,
+      isSuperAdmin,
+      fetchDashboardSucursal,
+      fetchDashboardEmpresa,
+    ],
   );
 
   useEffect(() => {
@@ -420,7 +496,10 @@ export default function DashboardPage() {
         r.fecha.startsWith(fechaStr),
       );
       dias.push({
-        name: d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit" }),
+        name: d.toLocaleDateString("es-PE", {
+          weekday: "short",
+          day: "2-digit",
+        }),
         sales: encontrado ? Number(encontrado.totalVentas.toFixed(2)) : 0,
       });
     }
@@ -485,12 +564,16 @@ export default function DashboardPage() {
   return (
     <>
       {showTodasAlertas && (
-  <NotificacionesSunatModal
-    onClose={() => setShowTodasAlertas(false)}
-    sucursalId={sucursalSeleccionada}
-    empresaRuc={isSuperAdmin && !sucursalSeleccionada ? user?.ruc : undefined}
-  />
-)}
+        <NotificacionesSunatModal
+          onClose={() => setShowTodasAlertas(false)}
+          sucursalId={
+            isSuperAdmin ? sucursalSeleccionada : Number(user?.sucursalID)
+          }
+          empresaRuc={
+            isSuperAdmin && !sucursalSeleccionada ? user?.ruc : undefined
+          }
+        />
+      )}
 
       {/* ─── Header ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -527,7 +610,9 @@ export default function DashboardPage() {
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-sm font-bold text-red-900">Error al cargar datos</p>
+              <p className="text-sm font-bold text-red-900">
+                Error al cargar datos
+              </p>
               <p className="text-xs text-red-600 mt-0.5">{error}</p>
             </div>
           </div>
@@ -607,12 +692,30 @@ export default function DashboardPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
                       <defs>
-                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0052CC" stopOpacity={0.1} />
-                          <stop offset="95%" stopColor="#0052CC" stopOpacity={0} />
+                        <linearGradient
+                          id="colorSales"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#0052CC"
+                            stopOpacity={0.1}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#0052CC"
+                            stopOpacity={0}
+                          />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="#f0f0f0"
+                      />
                       <XAxis
                         dataKey="name"
                         axisLine={false}
@@ -676,37 +779,68 @@ export default function DashboardPage() {
               </div>
             </Card>
           ) : (
+            // ─── Notificaciones SUNAT ───────────────────────────────────────────────────
             <Card
               title="Notificaciones SUNAT"
               subtitle="Estado de comprobantes y alertas"
               className="border-t-4 border-t-brand-red"
             >
-              <div className="space-y-4 mt-2">
-                {ALL_NOTIFICACIONES.slice(0, 3).map((notif) => (
-                  <div
-                    key={notif.id}
-                    className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer border border-transparent hover:border-gray-100"
-                    onClick={() => setShowTodasAlertas(true)}
-                  >
-                    <div
-                      className={cn(
-                        "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                        notif.type === "success"
-                          ? "bg-emerald-500"
-                          : notif.type === "warning"
-                            ? "bg-amber-500"
-                            : "bg-rose-500",
-                      )}
-                    />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">{notif.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{notif.desc}</p>
-                      <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase">
-                        {notif.time}
-                      </p>
-                    </div>
+              <div className="space-y-2 mt-2">
+                {/* Aceptados */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-emerald-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Aceptados del día
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Todos los comprobantes que SUNAT aceptó correctamente hoy.
+                    </p>
                   </div>
-                ))}
+                </div>
+
+                {/* Rechazados */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-rose-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Rechazados del día
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Comprobantes que SUNAT rechazó hoy. Revisa el código de
+                      error y corrige antes de reenviar.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pendientes */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-amber-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Pendientes de envío
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Comprobantes emitidos hoy que aún no han recibido
+                      respuesta de SUNAT.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Certificado */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-blue-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Certificado digital
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Vigencia de tu certificado de firma electrónica. Te
+                      alertamos si está por vencer.
+                    </p>
+                  </div>
+                </div>
+
                 <Button
                   variant="outline"
                   className="w-full mt-2"
@@ -771,7 +905,13 @@ export default function DashboardPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50">
-                    {["ID Comprobante", "Cliente", "Fecha", "Total", "Estado"].map((h) => (
+                    {[
+                      "ID Comprobante",
+                      "Cliente",
+                      "Fecha",
+                      "Total",
+                      "Estado",
+                    ].map((h) => (
                       <th
                         key={h}
                         className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -784,13 +924,19 @@ export default function DashboardPage() {
                 <tbody className="divide-y divide-gray-100">
                   {(dashboard?.comprobantesRecientes ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-sm text-gray-400"
+                      >
                         Sin comprobantes recientes
                       </td>
                     </tr>
                   ) : (
                     (dashboard?.comprobantesRecientes ?? []).map((doc, i) => (
-                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                      <tr
+                        key={i}
+                        className="hover:bg-gray-50/50 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <span className="text-sm font-medium text-brand-blue">
                             {doc.numeroCompleto}
