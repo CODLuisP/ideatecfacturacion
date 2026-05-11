@@ -263,7 +263,7 @@ export default function ReportesPage() {
 
     await avanzados.descargarExcelListado(
       { ...getParamsBase(), ...modal.filtros, codEstablecimiento: codEst },
-      resolverTitulo('listado-comprobantes')
+      resolverTitulo('Libro Contable')
     );
   };
 
@@ -274,7 +274,7 @@ export default function ReportesPage() {
 
     await avanzados.descargarExcelProductos(
       { ...getParamsBase(), ...modal.filtros, codEstablecimiento: codEst },
-      resolverTitulo('top-productos')
+      resolverTitulo('Top Productos')
     );
   };
 
@@ -296,7 +296,7 @@ export default function ReportesPage() {
 
     await avanzados.descargarExcelMedios(
       { ...getParamsBase(), ...modal.filtros, codEstablecimiento: codEst },
-      resolverTitulo('medios-pago')
+      resolverTitulo('Medios de Pago mas usados')
     );
   };
 
