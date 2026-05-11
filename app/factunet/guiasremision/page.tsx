@@ -67,6 +67,8 @@ interface GuiaDto {
   estadoSunat: string;
   codigoRespuestaSunat?: string;
   mensajeRespuestaSunat?: string;
+  xmlGenerado?: string | null;
+  xmlRespuestaSunat?: string | null;
 }
 
 // ─── Page Principal ───────────────────────────────────────────────────────────
@@ -105,6 +107,13 @@ export default function GuiasRemisionPage() {
   const [avSerie, setAvSerie] = useState("");
   const [avNumero, setAvNumero] = useState("");
   const hoy = new Date().toISOString().split("T")[0];
+
+  const [loadingXmlMap, setLoadingXmlMap] = useState<Record<number, boolean>>(
+    {},
+  );
+  const [loadingCdrMap, setLoadingCdrMap] = useState<Record<number, boolean>>(
+    {},
+  );
 
   // ── Carga inicial por tipo ──
   const cargarGuias = useCallback(
@@ -264,6 +273,32 @@ export default function GuiasRemisionPage() {
     cargarGuias(tipo);
   };
 
+  const descargarArchivo = async (
+    ruta: string | null | undefined,
+    nombre: string,
+    guiaId: number,
+    tipo: "xml" | "cdr",
+  ) => {
+    if (!ruta) return;
+    const setLoading = tipo === "xml" ? setLoadingXmlMap : setLoadingCdrMap;
+    setLoading((prev) => ({ ...prev, [guiaId]: true }));
+    try {
+      const url = `${process.env.NEXT_PUBLIC_STORAGE_URL}/files${ruta}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Error al descargar");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = nombre;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      showToast(`Error al descargar ${tipo.toUpperCase()}`, "error");
+    } finally {
+      setLoading((prev) => ({ ...prev, [guiaId]: false }));
+    }
+  };
+
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
       {guiaIdDetalle && (
@@ -291,25 +326,25 @@ export default function GuiasRemisionPage() {
             <button
               onClick={() => cambiarTipo("remitente")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all",
+                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-md transition-all",
                 tipoGuia === "remitente"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-gray-600 hover:bg-gray-100",
               )}
             >
-              <Package size={14} />
+              <Package size={13} />
               Guía Remitente
             </button>
             <button
               onClick={() => cambiarTipo("transportista")}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all",
+                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-md transition-all",
                 tipoGuia === "transportista"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-gray-600 hover:bg-gray-100",
               )}
             >
-              <Truck size={14} />
+              <Truck size={13} />
               Guía Transportista
             </button>
           </div>
@@ -332,7 +367,7 @@ export default function GuiasRemisionPage() {
                       ? "Buscar por destinatario, RUC/DNI o N° guía..."
                       : "Buscar por remitente, RUC/DNI o N° guía..."
                   }
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-xs"
                 />
                 {search && (
                   <button
@@ -355,7 +390,7 @@ export default function GuiasRemisionPage() {
               <button
                 onClick={() => setShowAvanzado((o) => !o)}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium border rounded-xl transition-all shadow-sm",
+                  "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md transition-all shadow-sm",
                   showAvanzado
                     ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -370,7 +405,6 @@ export default function GuiasRemisionPage() {
                   )}
                 />
               </button>
-
             </div>
 
             {/* Botón nueva guía */}
@@ -379,9 +413,9 @@ export default function GuiasRemisionPage() {
                 onClick={() =>
                   router.push("/factunet/operaciones/guia-remision")
                 }
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-brand-blue hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-white bg-brand-blue hover:bg-blue-700 rounded-md shadow-sm transition-colors"
               >
-                <Plus size={14} /> Nueva Guía
+                <Plus size={13} /> Nueva Guía
               </button>
             </div>
           </div>
@@ -393,8 +427,16 @@ export default function GuiasRemisionPage() {
               <div className="flex border-b border-gray-100">
                 {(
                   [
-                    { key: "fechas", label: "Por fechas", icon: <Calendar size={14} /> },
-                    { key: "unico", label: "Guía única", icon: <Hash size={14} /> },
+                    {
+                      key: "fechas",
+                      label: "Por fechas",
+                      icon: <Calendar size={14} />,
+                    },
+                    {
+                      key: "unico",
+                      label: "Guía única",
+                      icon: <Hash size={14} />,
+                    },
                   ] as const
                 ).map((tab) => (
                   <button
@@ -407,7 +449,7 @@ export default function GuiasRemisionPage() {
                       setAvNumero("");
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap",
+                      "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap",
                       modoAvanzado === tab.key
                         ? "border-blue-600 text-blue-600 bg-blue-50/50"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50",
@@ -425,7 +467,7 @@ export default function GuiasRemisionPage() {
                   {modoAvanzado === "fechas" && (
                     <>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha desde
                         </label>
                         <input
@@ -437,11 +479,11 @@ export default function GuiasRemisionPage() {
                             if (avFechaHasta && e.target.value > avFechaHasta)
                               setAvFechaHasta("");
                           }}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Fecha hasta
                         </label>
                         <input
@@ -450,7 +492,7 @@ export default function GuiasRemisionPage() {
                           min={avFechaDesde || undefined}
                           max={hoy}
                           onChange={(e) => setAvFechaHasta(e.target.value)}
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all"
                         />
                       </div>
                     </>
@@ -459,7 +501,7 @@ export default function GuiasRemisionPage() {
                   {modoAvanzado === "unico" && (
                     <>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Serie
                         </label>
                         <input
@@ -468,11 +510,11 @@ export default function GuiasRemisionPage() {
                             setAvSerie(e.target.value.toUpperCase())
                           }
                           placeholder="T001"
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase mr-1">
                           Número
                         </label>
                         <input
@@ -480,7 +522,7 @@ export default function GuiasRemisionPage() {
                           value={avNumero}
                           onChange={(e) => setAvNumero(e.target.value)}
                           placeholder="1"
-                          className="py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
+                          className="py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 transition-all w-28"
                         />
                       </div>
                     </>
@@ -491,12 +533,12 @@ export default function GuiasRemisionPage() {
                     <button
                       onClick={buscarAvanzado}
                       disabled={loading}
-                      className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-sm transition-all"
+                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md shadow-sm transition-all"
                     >
                       {loading ? (
-                        <RefreshCw size={14} className="animate-spin" />
+                        <RefreshCw size={13} className="animate-spin" />
                       ) : (
-                        <Search size={14} />
+                        <Search size={13} />
                       )}{" "}
                       Buscar
                     </button>
@@ -508,9 +550,9 @@ export default function GuiasRemisionPage() {
                         setAvNumero("");
                         cargarGuias(tipoGuia);
                       }}
-                      className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-xl transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-md transition-all"
                     >
-                      <X size={13} /> Limpiar
+                      <X size={12} /> Limpiar
                     </button>
                   </div>
                 </div>
@@ -543,7 +585,7 @@ export default function GuiasRemisionPage() {
       <style>
         {` .guia-table-wrapper {
             overflow-y: auto;
-            max-height: calc(100vh - 330px);
+            max-height: calc(100vh - 290px);
             scrollbar-width: thin;
             scrollbar-color: #CBD5E1 transparent;
           }
@@ -573,6 +615,10 @@ export default function GuiasRemisionPage() {
                   `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
                 )
               }
+              loadingXmlMap={loadingXmlMap}
+              loadingCdrMap={loadingCdrMap}
+              onDescargar={descargarArchivo}
+              accessToken={accessToken ?? ""}
             />
           ) : (
             <TablaTransportista
@@ -588,6 +634,10 @@ export default function GuiasRemisionPage() {
                   `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
                 )
               }
+              loadingXmlMap={loadingXmlMap}
+              loadingCdrMap={loadingCdrMap}
+              onDescargar={descargarArchivo}
+              accessToken={accessToken ?? ""}
             />
           )}
         </div>
@@ -618,6 +668,10 @@ function TablaRemitente({
   onEnviarSunat,
   loadingGuiaId,
   onEditar,
+  loadingXmlMap,
+  loadingCdrMap,
+  onDescargar,
+  accessToken,
 }: {
   guias: GuiaDto[];
   loading: boolean;
@@ -627,6 +681,15 @@ function TablaRemitente({
   onEnviarSunat: (guiaId: number) => void;
   loadingGuiaId: number | null;
   onEditar: (guiaId: number) => void;
+  loadingXmlMap: Record<number, boolean>;
+  loadingCdrMap: Record<number, boolean>;
+  onDescargar: (
+    ruta: string | null | undefined,
+    nombre: string,
+    guiaId: number,
+    tipo: "xml" | "cdr",
+  ) => void;
+  accessToken: string;
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
@@ -648,6 +711,15 @@ function TablaRemitente({
             TRANSPORTISTA
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            PDF
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            XML
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            CDR
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             CORREO
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
@@ -665,37 +737,37 @@ function TablaRemitente({
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
-        {loading ? (
-          <tr>
-            <td colSpan={9} className="px-6 py-16 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <RefreshCw size={24} className="animate-spin text-blue-400" />
-                <span className="text-sm text-gray-400">Cargando guías...</span>
-              </div>
-            </td>
-          </tr>
-        ) : guias.length === 0 ? (
-          <tr>
-            <td
-              colSpan={9}
-              className="px-6 py-16 text-center text-sm text-gray-400"
-            >
-              No se encontraron guías con ese criterio.
-            </td>
-          </tr>
+
+
+{loading ? (
+  <tr>
+    <td colSpan={13} className="px-6 py-16 text-center w-full">
+      <div className="flex flex-col items-center justify-center gap-3">
+        <RefreshCw size={24} className="animate-spin text-blue-400" />
+        <span className="text-sm text-gray-400">Cargando guías...</span>
+      </div>
+    </td>
+  </tr>
+) : guias.length === 0 ? (
+  <tr>
+    <td colSpan={13} className="px-6 py-16 text-center text-sm text-gray-400 w-full">
+      No se encontraron guías con ese criterio.
+    </td>
+  </tr>
+
         ) : (
           guias.map((g) => (
             <tr
               key={g.guiaId}
               className="hover:bg-gray-50/50 transition-colors"
             >
-              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
+              <td className="px-5 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
                 {fmtFecha(g.fechaEmision)}
               </td>
               <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
                 {g.numeroCompleto}
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">
                     {g.destinatarioNumDoc}
@@ -705,7 +777,7 @@ function TablaRemitente({
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 {g.transportistaPlaca ? (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-mono font-semibold text-gray-700">
                     <Truck size={11} className="text-gray-500" />
@@ -715,7 +787,7 @@ function TablaRemitente({
                   <span className="text-xs text-gray-400">—</span>
                 )}
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="text-xs text-gray-600 flex items-center gap-1">
                   <Truck size={12} className="text-gray-400 shrink-0" />
                   <span className="truncate max-w-36">
@@ -723,7 +795,83 @@ function TablaRemitente({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <button
+                    onClick={async () => {
+                      const ventana = window.open("", "_blank");
+                      if (ventana) {
+                        ventana.document.write(`
+            <html><head><title>Cargando PDF...</title></head>
+            <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+              <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF...</p>
+            </body></html>
+          `);
+                      }
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${g.guiaId}/pdf`,
+                        { headers: { Authorization: `Bearer ${accessToken}` } },
+                      );
+                      if (!res.ok) {
+                        ventana?.close();
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(
+                        new Blob([blob], { type: "application/pdf" }),
+                      );
+                      if (ventana) ventana.location.href = url;
+                    }}
+                    title="Ver PDF"
+                    className="p-1.5 rounded-lg transition-colors"
+                  >
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                      className="w-5 h-5 opacity-90"
+                      alt="PDF"
+                    />
+                  </button>
+                </div>
+              </td>
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlGenerado ? "available" : "pending"}
+                    loading={loadingXmlMap[g.guiaId]}
+                    label="XML"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlGenerado,
+                        `${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "xml",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlRespuestaSunat ? "available" : "pending"}
+                    loading={loadingCdrMap[g.guiaId]}
+                    label="CDR"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlRespuestaSunat,
+                        `R-${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "cdr",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
@@ -732,7 +880,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="whatsapp"
@@ -741,7 +889,7 @@ function TablaRemitente({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   {loadingGuiaId === g.guiaId ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
@@ -753,7 +901,7 @@ function TablaRemitente({
                   )}
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <button
                   onClick={() => onVerDetalle(g.guiaId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -761,7 +909,7 @@ function TablaRemitente({
                   <Eye size={13} /> Ver
                 </button>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <DropdownOpcionesGuia
                     estado={g.estadoSunat}
@@ -788,6 +936,10 @@ function TablaTransportista({
   onEnviarSunat,
   loadingGuiaId,
   onEditar,
+  loadingXmlMap,
+  loadingCdrMap,
+  onDescargar,
+  accessToken,
 }: {
   guias: GuiaDto[];
   loading: boolean;
@@ -797,6 +949,15 @@ function TablaTransportista({
   onEnviarSunat: (guiaId: number) => void;
   loadingGuiaId: number | null;
   onEditar: (guiaId: number) => void;
+  loadingXmlMap: Record<number, boolean>;
+  loadingCdrMap: Record<number, boolean>;
+  onDescargar: (
+    ruta: string | null | undefined,
+    nombre: string,
+    guiaId: number,
+    tipo: "xml" | "cdr",
+  ) => void;
+  accessToken: string;
 }) {
   return (
     <table className={cn("w-full text-left border-collapse", showAvanzado)}>
@@ -819,6 +980,15 @@ function TablaTransportista({
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             PLACA
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            PDF
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            XML
+          </th>
+          <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+            CDR
           </th>
           <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
             CORREO
@@ -862,13 +1032,13 @@ function TablaTransportista({
               key={g.guiaId}
               className="hover:bg-gray-50/50 transition-colors"
             >
-              <td className="px-5 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">
+              <td className="px-5 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
                 {fmtFecha(g.fechaEmision)}
               </td>
-              <td className="px-5 py-4 text-sm text-gray-800 whitespace-nowrap">
+              <td className="px-5 py-3 text-sm text-gray-800 whitespace-nowrap">
                 {g.numeroCompleto}
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">
                     {g.destinatarioNumDoc}
@@ -878,7 +1048,7 @@ function TablaTransportista({
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -886,7 +1056,7 @@ function TablaTransportista({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="text-xs text-gray-600 flex items-start gap-1">
                   <MapPin size={12} className="text-blue-400 mt-0.5 shrink-0" />
                   <span className="line-clamp-2">
@@ -894,13 +1064,89 @@ function TablaTransportista({
                   </span>
                 </span>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-3">
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-mono font-semibold text-gray-700">
                   <Truck size={11} className="text-gray-500" />
                   {g.transportistaPlaca ?? "—"}
                 </span>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <button
+                    onClick={async () => {
+                      const ventana = window.open("", "_blank");
+                      if (ventana) {
+                        ventana.document.write(`
+            <html><head><title>Cargando PDF...</title></head>
+            <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:sans-serif;flex-direction:column;gap:16px;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+              <p style="color:#64748b;font-size:14px;margin:0">Cargando PDF...</p>
+            </body></html>
+          `);
+                      }
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL}/api/guias/${g.guiaId}/pdf`,
+                        { headers: { Authorization: `Bearer ${accessToken}` } },
+                      );
+                      if (!res.ok) {
+                        ventana?.close();
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(
+                        new Blob([blob], { type: "application/pdf" }),
+                      );
+                      if (ventana) ventana.location.href = url;
+                    }}
+                    title="Ver PDF"
+                    className="p-1.5 rounded-lg transition-colors"
+                  >
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                      className="w-5 h-5 opacity-90"
+                      alt="PDF"
+                    />
+                  </button>
+                </div>
+              </td>
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlGenerado ? "available" : "pending"}
+                    loading={loadingXmlMap[g.guiaId]}
+                    label="XML"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlGenerado,
+                        `${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "xml",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-3 text-center">
+                <div className="flex justify-center">
+                  <GuiaFileIcon
+                    status={g.xmlRespuestaSunat ? "available" : "pending"}
+                    loading={loadingCdrMap[g.guiaId]}
+                    label="CDR"
+                    onClick={() =>
+                      onDescargar(
+                        g.xmlRespuestaSunat,
+                        `R-${g.numeroCompleto}.zip`,
+                        g.guiaId,
+                        "cdr",
+                      )
+                    }
+                  />
+                </div>
+              </td>
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="email"
@@ -909,7 +1155,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   <BtnEnvio
                     tipo="whatsapp"
@@ -918,7 +1164,7 @@ function TablaTransportista({
                   />
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <div className="flex justify-center">
                   {loadingGuiaId === g.guiaId ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
@@ -930,7 +1176,7 @@ function TablaTransportista({
                   )}
                 </div>
               </td>
-              <td className="px-5 py-4 text-center">
+              <td className="px-5 py-3 text-center">
                 <button
                   onClick={() => onVerDetalle(g.guiaId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -938,7 +1184,7 @@ function TablaTransportista({
                   <Eye size={13} /> Ver
                 </button>
               </td>
-              <td className="px-5 py-4 text-center ">
+              <td className="px-5 py-3 text-center ">
                 <div className="flex justify-center">
                   <DropdownOpcionesGuia
                     estado={g.estadoSunat}
@@ -1022,7 +1268,7 @@ const DropdownFiltro = ({
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex items-center gap-2 pl-3 pr-2.5 py-2.5 text-sm font-medium border rounded-lg outline-none transition-all shadow-sm whitespace-nowrap",
+          "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md outline-none transition-all shadow-sm whitespace-nowrap",
           active
             ? "bg-blue-600 text-white border-blue-600"
             : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50",
@@ -1046,7 +1292,7 @@ const DropdownFiltro = ({
         )}
       </button>
       {open && (
-        <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-44">
+        <div className="absolute top-full mt-1 left-0 z-40 bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden min-w-44">
           {options.map((opt) => (
             <button
               key={opt}
@@ -1055,7 +1301,7 @@ const DropdownFiltro = ({
                 setOpen(false);
               }}
               className={cn(
-                "w-full flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors text-left",
+                "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left",
                 value === opt
                   ? "bg-blue-50 text-blue-700 font-semibold"
                   : "text-gray-700 hover:bg-gray-50",
@@ -1075,6 +1321,49 @@ const DropdownFiltro = ({
         </div>
       )}
     </div>
+  );
+};
+
+const GuiaFileIcon = ({
+  status,
+  loading,
+  label,
+  onClick,
+}: {
+  status: "available" | "pending";
+  loading?: boolean;
+  label: string;
+  onClick?: () => void;
+}) => {
+  const disponible = status === "available";
+  return (
+    <button
+      onClick={onClick}
+      disabled={!disponible || loading}
+      title={
+        loading
+          ? "Descargando..."
+          : disponible
+            ? `Descargar ${label}`
+            : `${label} no disponible`
+      }
+      className={cn(
+        "p-1.5 rounded-lg transition-colors",
+        !disponible && "opacity-30 cursor-not-allowed",
+      )}
+    >
+      <RefreshCw
+        size={18}
+        className={cn(
+          "transition-colors",
+          loading
+            ? "animate-spin text-blue-400"
+            : disponible
+              ? "text-emerald-500"
+              : "text-gray-300",
+        )}
+      />
+    </button>
   );
 };
 

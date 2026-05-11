@@ -22,6 +22,7 @@ export interface AuthUser {
   environment: string | null;
   logoBase64: string | null;
   igv: number;
+  tipoEmision: boolean;
 }
 
 interface AuthContextValue {
@@ -46,17 +47,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     null,
   );
   const [logoOverride, setLogoOverride] = useState<string | null>(null);
+  const [tipoEmisionOverride, setTipoEmisionOverride] = useState<boolean | null>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("AuthContext_tipoEmision");
+      if (stored !== null) return stored === "true";
+    }
+    return null;
+  });
 
   const fetchCompanyData = useCallback(
     async (ruc: string, token: string | null) => {
       try {
-        const r = await fetch(`http://localhost:5004/api/companies/${ruc}`, {
+        const r = await fetch(`https://factunetapi.ideatec.com.pe:8443/api/companies/${ruc}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) return;
         const data = await r.json();
         if (data?.environment) setEnvironmentOverride(data.environment);
         if (data?.igv !== undefined) setIgvOverride(data.igv);
+        if (data?.tipoEmision !== undefined) {
+          setTipoEmisionOverride(data.tipoEmision);
+          localStorage.setItem("AuthContext_tipoEmision", String(data.tipoEmision));
+        }
         setLogoOverride(data?.logoBase64 ?? null);
       } catch {
         // falla silenciosamente
@@ -92,7 +104,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       nombreEmpresa: session.user.nombreEmpresa ?? null,
       environment: environmentOverride ?? session.user.environment ?? null,
       logoBase64: logoOverride,
-      igv: igvOverride ?? session.user.igv ?? 18, // 👈 agregar
+      igv: igvOverride ?? session.user.igv ?? 18,
+      tipoEmision: tipoEmisionOverride ?? session.user.tipoEmision ?? true,
     };
   }, [
     session?.user?.id,
@@ -105,6 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     environmentOverride,
     logoOverride,
     igvOverride,
+    tipoEmisionOverride,
   ]);
 
   const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);

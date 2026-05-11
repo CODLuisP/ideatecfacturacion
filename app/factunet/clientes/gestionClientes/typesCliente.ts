@@ -18,7 +18,6 @@ export interface Cliente {
   sucursalID: number
   razonSocialNombre: string
   numeroDocumento: string
-  nombreComercial: string | null
   fechaCreacion: string
   telefono: string | null
   correo: string | null

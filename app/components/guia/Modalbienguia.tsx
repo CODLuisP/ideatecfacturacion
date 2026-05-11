@@ -72,7 +72,7 @@ export default function ModalBienGuia({
 
   // — Campos comunes
   const [cantidad, setCantidad] = useState<number | "">(1);
-  const [pesoKg, setPesoKg] = useState<number | "">(0);
+  const [pesoKg, setPesoKg] = useState<number | "">("");
 
   // — Campos solo manual
   const [codigoManual, setCodigoManual] = useState("");
@@ -109,6 +109,7 @@ export default function ModalBienGuia({
   // ── Validación ────────────────────────────────────────────────────────────
   const puedeAgregar = (() => {
     if (!cantidad || Number(cantidad) <= 0) return false;
+    if (!pesoKg || Number(pesoKg) <= 0) return false;
     if (modo === "catalogo") return !!productoSeleccionado;
     if (modo === "manual") return !!descripcionManual.trim();
     return false;
@@ -347,9 +348,6 @@ export default function ModalBienGuia({
               <div className="space-y-1.5">
                 <label className={labelClass}>
                   Peso (kg){" "}
-                  <span className="text-gray-400 normal-case font-normal">
-                    (opcional)
-                  </span>
                 </label>
                 <input
                   type="number"

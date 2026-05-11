@@ -11,7 +11,7 @@ export function useCategoriasLista() {
   const [loadingCategorias, setLoadingCategorias] = useState(false)
 
   const fetchCategorias = async (ruc: string) => {
-    if (!ruc) return 
+    if (!ruc) return []
     setLoadingCategorias(true)
     try {
       const res = await axios.get(
@@ -24,10 +24,12 @@ export function useCategoriasLista() {
         categoriaNombre: c.categoriaNombre,
       }))
       setCategorias(data)
+      return data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
         showToast("Error al cargar categorías", "error");
       }
+      return []
     } finally {
       setLoadingCategorias(false)
     }

@@ -15,10 +15,15 @@ export interface ComprobanteReciente {
 
 export interface DashboardData {
   ventasDelDia: number
+  ventasNetas: number
   facturasEmitidas: number
   boletasEmitidas: number
   notasCreditoEmitidas: number
   notasDebitoEmitidas: number
+  totalNotasCreditoDelDia: number
+  totalNotasCreditoOtrasFechas: number
+  totalNotasDebitoDelDia: number
+  totalNotasDebitoOtrasFechas: number
   rendimientoVentas: RendimientoVentas[]
   comprobantesRecientes: ComprobanteReciente[]
 }

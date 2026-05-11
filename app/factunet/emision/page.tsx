@@ -1,9 +1,9 @@
 "use client";
-import { Plus, Trash2, ShieldCheck, Zap, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Receipt, FileCheck, AlertTriangle, Building2, Hash } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Download, Printer, X, UserRound, ClipboardList, ExternalLink, Building2, Hash } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { formatoFechaActual } from '@/app/components/ui/formatoFecha';
-import { numeroALetras } from '@/app/components/ui/numeroALetras';
+import { numeroAlertas } from '@/app/components/ui/numeroAlertas';
 import { useToast } from '@/app/components/ui/Toast';
 import axios from 'axios';
 import { Cliente } from '../clientes/gestionClientes/typesCliente';
@@ -17,6 +17,7 @@ import { ProductoSucursal } from '../productos/gestioProductos/Producto';
 import { useProductosSucursal } from '../productos/gestioProductos/useProductosSucursal';
 import { sharedVentaStore } from '../operaciones/sharedVentaStore';
 import { cn } from "@/app/utils/cn";
+import { ModalGuardarClienteBoleta } from '../operaciones/boleta/gestionBoletas/Modalguardarclienteboleta';
 // ── Tipos ──────────────────────────────────────────────────────
 type TipoComprobante = 'boleta' | 'factura';
 
@@ -24,7 +25,7 @@ interface ItemRapido {
   id: string;
   descripcion: string;
   cantidad: number;
-  precioUnitario: number;   // base sin IGV
+  precioUnitario: number;
   precioVentaConIGV: number;
   porcentajeIGV: number;
   productoId: number | null;
@@ -92,7 +93,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   const loadingCli = tipo === 'boleta' ? loadingB      : loadingF;
   const errorCli   = tipo === 'boleta' ? errorB        : errorF;
   const buscarCli  = tipo === 'boleta' ? buscarB       : buscarF;
-  const { clientes } = useClientesRuc();
+  const { clientes, fetchClientes } = useClientesRuc();
 
   // ── Estado cliente ─────────────────────────────────────────
   const [tipoDoc, setTipoDoc] = useState('01');
@@ -121,9 +122,55 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
 
-  //REITENTAR ENVIO A SUNAT SI NO RESPONDE API SUNAT
-  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
-  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
+  // ── Modal guardar cliente ────────────────────────────────────
+  const [showModalCliente, setShowModalCliente] = useState(false);
+
+  const guardarCliente = async (extra: {
+    nombreComercial: string;
+    telefono: string;
+    correo: string;
+    direccionLineal: string;
+  }) => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente`,
+        {
+          sucursalID: isSuperAdmin ? sucursalActual?.sucursalId : user?.sucursalID,
+          numeroDocumento: clienteSeleccionado?.numeroDocumento,
+          razonSocialNombre: clienteSeleccionado?.razonSocial,
+          nombreComercial: extra.nombreComercial || "",
+          telefono: extra.telefono || "",
+          correo: extra.correo || "",
+          tipoDocumentoId: clienteSeleccionado?.tipoDocumento,
+          direccion: {
+            ubigeo: clienteSeleccionado?.ubigeo || "",
+            direccionLineal:
+              extra.direccionLineal || clienteSeleccionado?.direccionLineal || "",
+            departamento: clienteSeleccionado?.departamento || "",
+            provincia: clienteSeleccionado?.provincia || "",
+            distrito: clienteSeleccionado?.distrito || "",
+            tipoDireccion: "PRINCIPAL",
+          },
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      showToast("Cliente guardado correctamente", "success");
+      setShowModalCliente(false);
+      const listaActualizada = await fetchClientes();
+      const clienteGuardado = listaActualizada?.find(
+        (c: any) => c.numeroDocumento === clienteSeleccionado?.numeroDocumento,
+      );
+      setClienteSeleccionado((prev) => prev ? ({
+        ...prev,
+        clienteId: clienteGuardado?.clienteId ?? null,
+        direccionLineal: extra.direccionLineal,
+      }) : null);
+      setCorreoCliente(extra.correo);
+      setTelefonoCliente(extra.telefono);
+    } catch {
+      showToast("Error al guardar el cliente", "error");
+    }
+  };
 
   const isFirstRenderTipo = useRef(true);
   useEffect(() => {
@@ -706,7 +753,7 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         descuentoGlobal: 0, codigoTipoDescGlobal: '03',
         usuarioCreacion: user?.id ?? 0,
         enviadoEnResumen: tipo === 'factura' ? null : enviarEnResumen,
-        legends: [{ code: '1000', value: numeroALetras(totales.importeTotal, moneda) }],
+        legends: [{ code: '1000', value: numeroAlertas(totales.importeTotal, moneda) }],
       };
 
       // ── 1. Generar XML y guardar en BD ──────────────────────
@@ -741,15 +788,6 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
   };
 
-  const reintentarEnvio = async () => {
-    if (!comprobanteIdEmitido) return;
-    setEmitiendo(true);
-    setErrorEmision(null);
-    setComprobanteRechazado(false);
-    await enviarASunat(comprobanteIdEmitido);
-    setEmitiendo(false);
-  };
-
   const enviarASunat = async (comprobanteId: number) => {
     try {
       const resSunat = await axios.post(
@@ -761,32 +799,34 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
       if (resSunat.data.exitoso) {
         showToast(resSunat.data.mensaje ?? 'Comprobante emitido correctamente.', 'success');
         setEmitido(true);
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(false);
         procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT rechazó — nueva emisión obligatoria
+        // SUNAT respondió pero rechazó — sin reintento
+        const serieCorrelativo = `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`;
         setErrorEmision(resSunat.data.mensaje ?? 'Comprobante rechazado por SUNAT');
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast('Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.', 'error');
+        showToast(`El comprobante ${serieCorrelativo} fue rechazado.`, 'error');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
     } catch (err: any) {
       const tieneRespuesta = !!err?.response;
-      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? '';
 
       if (tieneRespuesta) {
-        // ❌ Error con respuesta — nueva emisión
+        // SUNAT respondió con error HTTP — sin reintento
+        const serieCorrelativo = `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`;
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? '';
         setErrorEmision(mensaje || 'Comprobante rechazado por SUNAT');
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast('Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.', 'error');
+        showToast(`El comprobante ${serieCorrelativo} fue rechazado.`, 'error');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT caída — SÍ permitir reintento
-        setErrorEmision('No se pudo conectar con SUNAT. Puedes reintentar el envío.');
-        setComprobanteRechazado(true);
-        setRechazadoPorSunat(false);
-        showToast('SUNAT no responde. Puedes reintentar.', 'error');
+        // SUNAT no responde / timeout — reintento silencioso
+        const serieCorrelativo = `${serie}-${String(correlativoActual ?? 1).padStart(8, '0')}`;
+        setErrorEmision('No se pudo conectar con SUNAT.');
+        showToast(`El comprobante ${serieCorrelativo} fue generado. Verificar estado en sección Comprobantes.`, 'error');
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
       }
     }
   };
@@ -822,28 +862,34 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
         );
 
         if (enviarCorreo && correoCliente) {
-          try {
-            const formData = new FormData();
-            formData.append('toEmail', correoCliente);
-            formData.append('toName', clienteSeleccionado?.razonSocial ?? 'Cliente');
-            formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
-            formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
-            formData.append('tipo', esBoleta ? '3' : '1');
-            formData.append('comprobanteJson', JSON.stringify({
-              serieNumero: serieNum, estadoSunat: 'ACEPTADO',
-              items: items.filter(i => !i._esIcbper).map(i => ({
-                descripcion: i.descripcion ?? '', cantidad: i.cantidad ?? 1, precioUnitario: i.precioVentaConIGV ?? 0,
-              })),
-              igv: totales.igv, total: totales.importeTotal,
-            }));
-            formData.append('adjunto', pdfFile);
-            const resCorreo = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-              { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
-            );
-            if (!resCorreo.ok) throw new Error('Error al enviar el correo');
-            showToast('Comprobante enviado por correo', 'success');
-          } catch { showToast('Error al enviar por correo', 'error'); }
+          const correosLista = correoCliente.split(',').map(s => s.trim()).filter(Boolean);
+          const comprobanteJson = JSON.stringify({
+            serieNumero: serieNum, estadoSunat: 'ACEPTADO',
+            items: items.filter(i => !i._esIcbper).map(i => ({
+              descripcion: i.descripcion ?? '', cantidad: i.cantidad ?? 1, precioUnitario: i.precioVentaConIGV ?? 0,
+            })),
+            igv: totales.igv, total: totales.importeTotal,
+          });
+          const resultadosCorreo = await Promise.allSettled(
+            correosLista.map(correo => {
+              const formData = new FormData();
+              formData.append('toEmail', correo);
+              formData.append('toName', clienteSeleccionado?.razonSocial ?? 'Cliente');
+              formData.append('subject', `Tu ${esBoleta ? 'boleta' : 'factura'} ${serieNum}`);
+              formData.append('body', `Adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica.`);
+              formData.append('tipo', esBoleta ? '3' : '1');
+              formData.append('comprobanteJson', comprobanteJson);
+              formData.append('adjunto', pdfFile);
+              return fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+                { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
+              ).then(res => { if (!res.ok) throw new Error(`Error correo ${correo}`); });
+            })
+          );
+          const fallidosCorreo = resultadosCorreo.filter(r => r.status === 'rejected').length;
+          if (fallidosCorreo === correosLista.length) showToast('Error al enviar por correo', 'error');
+          else if (fallidosCorreo > 0) showToast(`Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`, 'error');
+          else showToast(correosLista.length > 1 ? `Comprobante enviado a ${correosLista.length} correos` : 'Comprobante enviado por correo', 'success');
         }
 
         if (enviarWhatsapp && telefonoCliente) {
@@ -857,19 +903,26 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
             });
             if (!resUpload.ok) throw new Error('No se pudo subir el PDF');
             const fileUrl = (await resUpload.json()).datos.url;
-            const numeroFormateado = telefonoCliente.startsWith('51') ? telefonoCliente : `51${telefonoCliente}`;
-            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-api-key': whatsappApiKey },
-              body: JSON.stringify({
-                phone: numeroFormateado, type: 'documento', file_url: fileUrl,
-                filename: `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
-                mime_type: 'application/pdf',
-                text: `Estimado(a) ${clienteSeleccionado?.razonSocial ?? ''}, adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica ${serieNum}.`,
-              }),
-            });
-            if (!resWsp.ok) throw new Error('Error al enviar por WhatsApp');
-            showToast('Documento enviado por WhatsApp', 'success');
+            const telefonosLista = telefonoCliente.split(',').map(s => s.trim()).filter(Boolean);
+            const resultadosWsp = await Promise.allSettled(
+              telefonosLista.map(num => {
+                const numeroFormateado = num.startsWith('51') ? num : `51${num}`;
+                return fetch(`${whatsappBase}/api/send/single`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-api-key': whatsappApiKey },
+                  body: JSON.stringify({
+                    phone: numeroFormateado, type: 'documento', file_url: fileUrl,
+                    filename: `${empresa?.numeroDocumento}-${esBoleta ? 'Boleta' : 'Factura'}-${serieNum}.pdf`,
+                    mime_type: 'application/pdf',
+                    text: `Estimado(a) ${clienteSeleccionado?.razonSocial ?? ''}, adjuntamos su ${esBoleta ? 'boleta de venta' : 'factura'} electrónica ${serieNum}.`,
+                  }),
+                }).then(res => { if (!res.ok) throw new Error(`Error WhatsApp ${num}`); });
+              })
+            );
+            const fallidosWsp = resultadosWsp.filter(r => r.status === 'rejected').length;
+            if (fallidosWsp === telefonosLista.length) showToast('Error al enviar por WhatsApp', 'error');
+            else if (fallidosWsp > 0) showToast(`WhatsApp enviado, pero falló ${fallidosWsp} número(s)`, 'error');
+            else showToast(telefonosLista.length > 1 ? `Comprobante enviado a ${telefonosLista.length} números` : 'Documento enviado por WhatsApp', 'success');
           } catch { showToast('Error al enviar por WhatsApp', 'error'); }
         }
       }
@@ -921,6 +974,19 @@ export default function EmisionRapidaPage({ tipoExterno }: { tipoExterno?: TipoC
     }
   };
 
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
+  };
+
 const resetForm = () => {
   sharedVentaStore.clear(); // Limpiar persistencia al reiniciar
   // ── Items ──────────────────────────────────────
@@ -954,9 +1020,6 @@ const resetForm = () => {
 
   //Envio por resumen
   setEnviarEnResumen(false);
-
-  setComprobanteRechazado(false);
-  setRechazadoPorSunat(false);
 };
 
   const descargarPdf = async () => {
@@ -1022,15 +1085,15 @@ const imprimirPdf = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* ── Columna izquierda ── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 ">
 
           {/* ── Datos del Cliente ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-            <div className="flex items-center gap-2">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-2">
+            <div className="flex items-center gap-2 ">
               <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-sm"><UserRound className="w-4 h-4 text-brand-blue" /></div>
               <h3 className="text-sm font-bold text-gray-800">Datos del Cliente</h3>
               {tipo === 'boleta' && (
-                <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none">
+                <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none ">
                   <input type="checkbox" checked={clienteVarios} onChange={e => setClienteVarios(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
                   <span className="text-xs text-gray-500">Clientes Varios</span>
                 </label>
@@ -1040,14 +1103,14 @@ const imprimirPdf = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Tipo doc + búsqueda */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">
                   {tipo === 'factura' ? 'RUC / CE' : 'Tipo y Nº Documento'}
                 </label>
                 <div className="flex gap-2">
                   {tipo === 'boleta' ? (
                     <select value={tipoDoc} onChange={e => { setTipoDoc(e.target.value); setBusqueda(''); setClienteSeleccionado(null); setErrorVisible(false); }}
                       disabled={clienteVarios}
-                      className="w-1/3 py-2.5 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue disabled:opacity-50">
+                      className="w-1/3 py-2 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue disabled:opacity-50">
                       <option value="00" disabled hidden>—</option>
                       <option value="01">DNI</option>
                       <option value="06">RUC</option>
@@ -1055,7 +1118,7 @@ const imprimirPdf = () => {
                     </select>
                   ) : (
                     <select value={tipoDoc} onChange={e => { setTipoDoc(e.target.value); setBusqueda(''); setClienteSeleccionado(null); }}
-                      className="w-1/3 py-2.5 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
+                      className="w-1/3 py-2 px-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
                       <option value="06">RUC</option>
                       <option value="04">CE</option>
                     </select>
@@ -1078,14 +1141,14 @@ const imprimirPdf = () => {
                       onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                       maxLength={tipoDoc === '01' ? 8 : tipoDoc === '06' ? 11 : 12}
                       placeholder={tipoDoc === '06' ? '11 dígitos RUC' : tipoDoc === '01' ? '8 dígitos DNI' : 'Nº documento'}
-                      className="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 transition-all disabled:opacity-50"
+                      className="w-full pl-4 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 transition-all disabled:opacity-50"
                     />
                     {loadingCli && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />}
                     {showDropdown && clientesFiltrados.length > 0 && !clienteVarios && (
                       <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {clientesFiltrados.map(c => (
                           <button key={c.clienteId} type="button" onMouseDown={() => seleccionarDeLista(c)}
-                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0">
                             <span className="text-xs text-gray-800">{c.numeroDocumento} — {c.razonSocialNombre}</span>
                           </button>
                         ))}
@@ -1094,6 +1157,7 @@ const imprimirPdf = () => {
                   </div>
                 </div>
                 {/* Razón social */}
+                <div className="flex items-center gap-2">
                   <input type="text"
                     disabled={clienteVarios || !noEncontrado}
                     value={clienteVarios ? 'Clientes Varios' : (clienteSeleccionado?.razonSocial ?? clienteManual)}
@@ -1110,53 +1174,67 @@ const imprimirPdf = () => {
                       });
                     }}
                     placeholder="Nombre / Razón social"
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
+                    className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
                   />
+                  {!clienteVarios &&
+                    clienteSeleccionado?.clienteId === null &&
+                    clienteSeleccionado?.razonSocial && (
+                      <button
+                        type="button"
+                        onClick={() => setShowModalCliente(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center bg-brand-blue hover:bg-blue-700 text-white rounded-full text-lg font-bold transition-colors"
+                        title="Guardar cliente"
+                      >
+                        +
+                      </button>
+                    )}
+                </div>
                 {errorCli && errorVisible && <p className="text-xs text-red-500">{errorCli} Digitar nombre manualmente.</p>}
               </div>
 
               {/* Correo y teléfono */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Contacto</label>
-                <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Contacto</label>
+                <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2
                   ${enviarCorreo && !correoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
-                  <input type="email" value={correoCliente}
+                  <input type="text" value={correoCliente}
                     onChange={e => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
                     disabled={!clienteSeleccionado || clienteVarios}
-                    placeholder="Correo del cliente"
+                    placeholder="correo@cliente.com, otro@email.com"
                     className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
                   <label className="flex items-center gap-1 shrink-0 cursor-pointer">
                     <input type="checkbox" checked={enviarCorreo} onChange={e => setEnviarCorreo(e.target.checked)} disabled={!correoCliente} className="w-3.5 h-3.5 accent-brand-blue" />
                     <span className="text-xs text-gray-500">Enviar</span>
                   </label>
                 </div>
-              <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2.5
-                  ${enviarWhatsapp && !telefonoCliente ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
-                  <input type="tel" value={telefonoCliente}
-                    onChange={e => {
-                      const soloNumeros = e.target.value.replace(/\D/g, '');
-                      setTelefonoCliente(soloNumeros);
-                      if (soloNumeros.length !== 9) setEnviarWhatsapp(false);
-                    }}
-                    disabled={!clienteSeleccionado || clienteVarios}
-                    maxLength={9}
-                    placeholder="Teléfono / WhatsApp"
-                    className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" 
-                  />
-                  <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                    <input type="checkbox" checked={enviarWhatsapp} onChange={e => setEnviarWhatsapp(e.target.checked)} disabled={telefonoCliente.length !== 9} className="w-3.5 h-3.5 accent-brand-blue" />
-                    <span className="text-xs text-gray-500">Enviar</span>
-                  </label>
+                <div className="space-y-1">
+                  <div className={`flex items-center gap-1.5 bg-gray-50 border rounded-xl px-3 py-2 ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                    <input type="tel" value={telefonoCliente} placeholder="9XXXXXXXX, 9XXXXXXXX"
+                      disabled={!clienteSeleccionado || clienteVarios}
+                      onChange={(e) => {
+                        const s = e.target.value.replace(/[^\d,]/g, '');
+                        setTelefonoCliente(s);
+                        const nums = s.split(',').map(x => x.trim()).filter(Boolean);
+                        if (!nums.length || !nums.every(n => n.startsWith('9') && n.length === 9)) setEnviarWhatsapp(false);
+                      }}
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40" />
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={enviarWhatsapp}
+                        disabled={!telefonoCliente || !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9)}
+                        onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                      <span className="text-xs text-gray-500">Enviar</span>
+                    </label>
+                  </div>
+                  {telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) && (
+                    <p className="text-[10px] text-red-500 pl-1 mt-0.5">Cada número debe empezar con 9 y tener 9 dígitos</p>
+                  )}
                 </div>
-                {telefonoCliente.length > 0 && telefonoCliente.length < 9 && (
-                  <p className="text-[10px] text-red-500 px-1">El teléfono debe tener 9 dígitos ({telefonoCliente.length}/9)</p>
-                )}
               </div>
             </div>
           </div>
 
           {/* ── Detalle de Venta ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"> <ClipboardList className="w-4 h-4 text-brand-blue" /> </div>
@@ -1296,9 +1374,8 @@ const imprimirPdf = () => {
                               <select value={item.porcentajeIGV}
                                 onChange={e => actualizarCampo(i, 'porcentajeIGV', Number(e.target.value))}
                                 className="w-full py-1.5 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue">
-                                <option value={18}>18%</option>
-                                <option value={10.5}>10.5%</option>
-                                <option value={0}>0%</option>
+                                <option value={18}>18</option>
+                                <option value={10.5}>10.5</option>
                               </select>
                             )}
                           </td>
@@ -1331,7 +1408,7 @@ const imprimirPdf = () => {
             </div>
 
             {/* Bolsa ICBPER */}
-            <div className="border border-amber-100 rounded-xl p-3 bg-amber-50/60 space-y-3">
+            <div className="border border-amber-100 rounded-xl p-2 bg-amber-50/60 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-amber-800">¿Desea bolsa plástica?</span>
@@ -1381,7 +1458,7 @@ const imprimirPdf = () => {
             {isSuperAdmin && (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sucursal</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Sucursal</label>
                   {loadingSucursales && (
                     <div className="w-3 h-3 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
                   )}
@@ -1427,32 +1504,34 @@ const imprimirPdf = () => {
 
           {/* Serie destacada */}
 
-
 <div className={cn(
-   "flex items-center gap-2.5 px-3 py-2 rounded-xl border w-full",
+  "flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm",
   isSuperAdmin && !sucursalActual
-    ? "bg-amber-50 border-amber-100"
+    ? "bg-amber-50 border-amber-200"
     : serie
-    ? "bg-green-50 border-green-100"
-    : "bg-gray-50 border-gray-100"
+    ? "bg-green-50 border-green-300"
+    : "bg-gray-50 border-gray-200"
 )}>
-  {isSuperAdmin && !sucursalActual
-    ? <span className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-        <Building2 className="w-4 h-4 shrink-0" />
-        Elige una sucursal para continuar
+  {isSuperAdmin && !sucursalActual ? (
+    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+      <Building2 className="w-3.5 h-3.5" />
+      <span>Elige una sucursal</span>
+    </span>
+  ) : loadingSucursal ? (
+    <span className="text-gray-400 text-xs">Cargando...</span>
+  ) : !serie ? (
+    <span className="text-xs text-gray-400">Sin serie</span>
+  ) : (
+    <>
+      <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+        {tipo === 'boleta' ? 'Boleta:' : 'Factura:'}
+      </p>
+      <span className="text-[12px] font-mono font-semibold text-gray-800">
+        {serie}-{String(correlativoActual ?? 1).padStart(8, '0')}
       </span>
-    : loadingSucursal
-    ? <span className="text-gray-300 animate-pulse text-xs">Cargando...</span>
-    : !serie
-    ? <span className="text-xs font-medium text-gray-400">Sin serie</span>
-    : <>
-        <Hash className="w-4 h-4 text-green-600 shrink-0" />
-        <span className="text-[14px] font-bold text-gray-700">{serie}-{String(correlativoActual ?? 1).padStart(8, '0')}</span>
-      </>
-  }
+    </>
+  )}
 </div>
-
-
 
 
           {/* ── Medio de Pago / Moneda ── */}
@@ -1467,7 +1546,7 @@ const imprimirPdf = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Medio de Pago</label>
                 <select value={medioPago} onChange={e => setMedioPago(e.target.value)}
-                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
+                  className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
                   {MEDIOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
@@ -1476,7 +1555,7 @@ const imprimirPdf = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Moneda</label>
                 <select value={tipoMoneda} onChange={e => setTipoMoneda(e.target.value)}
-                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
+                  className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue">
                   <option value="PEN">PEN — Soles</option>
                   <option value="USD">USD — Dólares ({tipoCambio.toFixed(2)})</option>
                 </select>
@@ -1532,33 +1611,17 @@ const imprimirPdf = () => {
 
             {/* Botón emitir */}
             <button type="button"
-              onClick={
-                emitido
-                  ? () => resetForm()
-                  : comprobanteRechazado
-                    ? reintentarEnvio
-                    : rechazadoPorSunat
-                      ? () => resetForm()
-                      : emitirComprobante
-              }
-              disabled={
-                emitiendo ||
-                (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
-              }
-              className={`w-full py-2.5 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
-                ${emitiendo || (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !puedeEmitir)
+              onClick={emitido ? () => resetForm() : emitirComprobante}
+              disabled={emitiendo || (!emitido && !puedeEmitir)}
+              className={`w-full py-2 bg-brand-blue text-white font-bold rounded-xl text-md transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-100
+                ${emitiendo || (!emitido && !puedeEmitir)
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-blue-700 hover:shadow-blue-200 cursor-pointer'}`}>
               {emitiendo ? (
-                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {comprobanteRechazado ? 'Reenviando...' : 'Emitiendo...'}</>
+                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Emitiendo...</>
               ) : emitido
                   ? `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
-                  : comprobanteRechazado
-                    ? '🔄 Reintentar envío a SUNAT'
-                    : rechazadoPorSunat
-                      ? `Nueva ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
-                      : `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
+                  : `Emitir ${tipo === 'boleta' ? 'Boleta' : 'Factura'}`
               }
             </button>
 
@@ -1646,6 +1709,23 @@ const imprimirPdf = () => {
           </div>
         </div>
       </div>
+
+      {showModalCliente && clienteSeleccionado && !clienteVarios && (
+        <ModalGuardarClienteBoleta
+          cliente={{
+            numeroDocumento: clienteSeleccionado.numeroDocumento ?? "",
+            razonSocial: clienteSeleccionado.razonSocial ?? "",
+            tipoDocumento: clienteSeleccionado.tipoDocumento ?? "",
+            ubigeo: clienteSeleccionado.ubigeo ?? "",
+            direccionLineal: clienteSeleccionado.direccionLineal ?? "",
+            departamento: clienteSeleccionado.departamento ?? "",
+            provincia: clienteSeleccionado.provincia ?? "",
+            distrito: clienteSeleccionado.distrito ?? "",
+          }}
+          onGuardar={guardarCliente}
+          onCerrar={() => setShowModalCliente(false)}
+        />
+      )}
     </div>
   );
 }

@@ -254,19 +254,6 @@ export const AgregarCliente: React.FC<AgregarClienteProps> = ({
         showError={!!errors.razonSocialNombre}
       />
 
-      {nuevoCliente.tipoDocumentoId === "06" && (
-        <InputBase
-          label="Nombre Comercial"
-          labelOptional="(opcional)"
-          value={nuevoCliente.nombreComercial}
-          onChange={(e) =>
-            setNuevoCliente((f: any) => ({...f, nombreComercial: e.target.value}))
-          }
-          placeholder="Ej: Aceros del Norte"
-          showError={false}
-        />
-      )}
-
       <InputBase
         label="Correo Electrónico"
         labelOptional="(opcional)"

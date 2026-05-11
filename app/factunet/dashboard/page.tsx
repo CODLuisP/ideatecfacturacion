@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   Eye,
   Plus,
+  TrendingDown,
+  TrendingUp,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -37,6 +40,7 @@ import { useDashboardSucursal } from "./gestionDashboard/UseDashboardSucursal";
 import { Skeleton } from "@/app/components/ui/Skeleton";
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { DropdownSucursal } from "@/app/components/ui/DropdownSucursal";
+import { NotificacionesSunatModal } from "@/app/components/modalnotificacionesSunat/NotificacionesSunatModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -72,7 +76,7 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     time: "Hace 1 hora",
     type: "warning",
     detail:
-      "Las boletas B001-00853, B001-00851 y B001-00849 no han podido enviarse automáticamente.",
+      "Las boletas B001-00853, B001-00851 y B001-00849 no han podido enviarse automáticamente; intente reenviarlas desde el módulo de Comprobantes.",
     fecha: "15/01/2025 08:45",
   },
   {
@@ -86,16 +90,6 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     fecha: "15/01/2025 00:00",
   },
   {
-    id: 4,
-    title: "Sincronización OSE",
-    desc: "Sincronización completada con Digiflow.",
-    time: "Hace 2 horas",
-    type: "success",
-    detail:
-      "Se completó la sincronización masiva con el OSE Digiflow. 47 comprobantes enviados, 47 aceptados.",
-    fecha: "15/01/2025 07:00",
-  },
-  {
     id: 5,
     title: "Factura Rechazada",
     desc: "F001-00122 rechazada por SUNAT (2329).",
@@ -104,15 +98,6 @@ const ALL_NOTIFICACIONES: Notificacion[] = [
     detail: "La factura F001-00122 fue rechazada por SUNAT con error 2329.",
     fecha: "14/01/2025 22:15",
     comprobante: "F001-00122",
-  },
-  {
-    id: 6,
-    title: "Nuevo Periodo Contable",
-    desc: "Inicio de periodo Enero 2025.",
-    time: "Hace 1 día",
-    type: "info",
-    detail: "Se ha iniciado automáticamente el periodo contable Enero 2025.",
-    fecha: "01/01/2025 00:00",
   },
 ];
 
@@ -215,174 +200,209 @@ const ModalHeader: React.FC<{
   </div>
 );
 
-// ─── Modal: Todas las Alertas SUNAT ───────────────────────────────────────────
+// ─── Card: Desglose de Notas ───────────────────────────────────────────────────
 
-const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [selected, setSelected] = useState<Notificacion | null>(
-    ALL_NOTIFICACIONES[0],
-  );
+const DesgloseNotasCard: React.FC<{
+  dashboard: import("./gestionDashboard/Dashboard").DashboardData | null;
+  loading: boolean;
+}> = ({ dashboard, loading }) => {
+  if (loading) {
+    return (
+      <Card>
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-3 w-64" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="p-4 rounded-xl border border-gray-100 space-y-2"
+            >
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
 
-  const iconConfig = {
-    success: {
-      icon: <CheckCircle2 size={16} />,
-      dot: "bg-emerald-500",
-      badge: "bg-emerald-50 text-emerald-700",
-      label: "Éxito",
-    },
-    warning: {
-      icon: <AlertTriangle size={16} />,
-      dot: "bg-amber-500",
-      badge: "bg-amber-50 text-amber-700",
-      label: "Advertencia",
-    },
-    error: {
-      icon: <XCircle size={16} />,
-      dot: "bg-rose-500",
-      badge: "bg-rose-50 text-rose-700",
-      label: "Error",
-    },
-    info: {
-      icon: <Bell size={16} />,
-      dot: "bg-blue-500",
-      badge: "bg-blue-50 text-blue-700",
-      label: "Info",
-    },
-  };
+  const ncDia = dashboard?.totalNotasCreditoDelDia ?? 0;
+  const ncOtras = dashboard?.totalNotasCreditoOtrasFechas ?? 0;
+  const ndDia = dashboard?.totalNotasDebitoDelDia ?? 0;
+  const ndOtras = dashboard?.totalNotasDebitoOtrasFechas ?? 0;
+  const hayNotasOtrasFechas = ncOtras > 0 || ndOtras > 0;
 
   return (
-    <Modal open onClose={onClose} wide>
-      <ModalHeader
-        title="Notificaciones SUNAT"
-        subtitle="Historial completo de alertas y eventos"
-        onClose={onClose}
-        icon={<Bell size={18} />}
-        iconColor="bg-red-100 text-red-600"
-      />
-      <div
-        className="flex flex-1 overflow-hidden"
-        style={{ minHeight: 0, height: "520px" }}
-      >
-        <div className="w-[42%] border-r border-slate-100 overflow-y-auto shrink-0">
-          {ALL_NOTIFICACIONES.map((notif) => {
-            const cfg = iconConfig[notif.type];
-            return (
-              <button
-                key={notif.id}
-                onClick={() => setSelected(notif)}
-                className={cn(
-                  "w-full text-left flex gap-3 p-4 border-b border-slate-50 transition-colors",
-                  selected?.id === notif.id
-                    ? "bg-blue-50 border-l-2 border-l-blue-600"
-                    : "hover:bg-slate-50 border-l-2 border-l-transparent",
-                )}
-              >
-                <div className={cn("w-2 h-2 rounded-full mt-1.5 shrink-0", cfg.dot)} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-bold text-slate-900 leading-tight">
-                      {notif.title}
-                    </p>
-                    <span
-                      className={cn(
-                        "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                        cfg.badge,
-                      )}
-                    >
-                      {cfg.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
-                    {notif.desc}
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-1 uppercase font-medium">
-                    {notif.time}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+    <Card
+      title="Desglose de Notas"
+      subtitle="Impacto de notas de crédito y débito según fecha del documento afectado"
+    >
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+        {/* NC del día */}
+        <div className="p-2 rounded-xl border border-rose-100 bg-rose-50/50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 rounded-lg bg-rose-100">
+              <TrendingDown size={14} className="text-rose-600" />
+            </div>
+            <p className="text-xs font-semibold text-rose-700 uppercase tracking-wide">
+              NC · Día actual
+            </p>
+          </div>
+          <p className="text-lg font-bold text-rose-700">
+            {formatMoneda(ncDia)}
+          </p>
+          <p className="text-[11px] text-rose-500 mt-1">
+            Afectan documentos emitidos hoy
+          </p>
         </div>
 
-        {selected ? (
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
-            <div className="flex items-start gap-3">
-              <div
-                className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                  {
-                    "bg-emerald-100 text-emerald-600": selected.type === "success",
-                    "bg-amber-100 text-amber-600": selected.type === "warning",
-                    "bg-rose-100 text-rose-600": selected.type === "error",
-                    "bg-blue-100 text-blue-600": selected.type === "info",
-                  },
-                )}
-              >
-                {iconConfig[selected.type].icon}
-              </div>
-              <div>
-                <h4 className="text-base font-bold text-slate-900">{selected.title}</h4>
-                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                  <Calendar size={11} /> {selected.fecha}
-                </p>
-              </div>
+        {/* ND del día */}
+        <div className="p-2 rounded-xl border border-emerald-100 bg-emerald-50/50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 rounded-lg bg-emerald-100">
+              <TrendingUp size={14} className="text-emerald-600" />
             </div>
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-sm text-slate-700 leading-relaxed">{selected.detail}</p>
+            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
+              ND · Día actual
+            </p>
+          </div>
+          <p className="text-lg font-bold text-emerald-700">
+            {formatMoneda(ndDia)}
+          </p>
+          <p className="text-[11px] text-emerald-500 mt-1">
+            Afectan documentos emitidos hoy
+          </p>
+        </div>
+
+        {/* NC otras fechas */}
+        <div
+          className={cn(
+            "p-2 rounded-xl border",
+            hayNotasOtrasFechas
+              ? "border-amber-100 bg-amber-50/50"
+              : "border-gray-100 bg-gray-50/50",
+          )}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className={cn(
+                "p-1.5 rounded-lg",
+                hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100",
+              )}
+            >
+              <ArrowLeftRight
+                size={14}
+                className={
+                  hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"
+                }
+              />
             </div>
-            {selected.comprobante && (
-              <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/50">
-                <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">
-                  Comprobante Relacionado
-                </p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-blue-600" />
-                    <span className="text-sm font-bold text-blue-800">
-                      {selected.comprobante}
-                    </span>
-                  </div>
-                  <button className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-200 px-2.5 py-1.5 rounded-lg transition-colors">
-                    <Eye size={12} /> Ver comprobante
-                  </button>
-                </div>
-              </div>
-            )}
-            {selected.type === "error" && (
-              <div>
-                <p className="text-xs font-bold text-slate-700 mb-2">
-                  Acciones recomendadas
-                </p>
-                <div className="space-y-2">
-                  {selected.id === 3 ? (
-                    <>
-                      <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-lg transition-colors">
-                        <ShieldCheck size={14} /> Renovar certificado digital
-                      </button>
-                      <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg transition-colors">
-                        <Send size={14} /> Contactar soporte técnico
-                      </button>
-                    </>
-                  ) : (
-                    <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-lg transition-colors">
-                      <RotateCcw size={14} /> Corregir y reemitir comprobante
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {selected.type === "warning" && (
-              <button className="w-full flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors">
-                <Send size={14} /> Enviar comprobantes pendientes
-              </button>
-            )}
+            <p
+              className={cn(
+                "text-xs font-semibold uppercase tracking-wide",
+                hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+              )}
+            >
+              NC · Otras fechas
+            </p>
           </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-            Selecciona una notificación
+          <p
+            className={cn(
+              "text-lg font-bold",
+              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+            )}
+          >
+            {formatMoneda(ncOtras)}
+          </p>
+          <p
+            className={cn(
+              "text-[11px] mt-1",
+              hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400",
+            )}
+          >
+            Afectan documentos de días anteriores
+          </p>
+        </div>
+
+        {/* ND otras fechas */}
+        <div
+          className={cn(
+            "p-2 rounded-xl border",
+            hayNotasOtrasFechas
+              ? "border-amber-100 bg-amber-50/50"
+              : "border-gray-100 bg-gray-50/50",
+          )}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className={cn(
+                "p-1.5 rounded-lg",
+                hayNotasOtrasFechas ? "bg-amber-100" : "bg-gray-100",
+              )}
+            >
+              <ArrowLeftRight
+                size={14}
+                className={
+                  hayNotasOtrasFechas ? "text-amber-600" : "text-gray-400"
+                }
+              />
+            </div>
+            <p
+              className={cn(
+                "text-xs font-semibold uppercase tracking-wide",
+                hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+              )}
+            >
+              ND · Otras fechas
+            </p>
           </div>
-        )}
+          <p
+            className={cn(
+              "text-lg font-bold",
+              hayNotasOtrasFechas ? "text-amber-700" : "text-gray-400",
+            )}
+          >
+            {formatMoneda(ndOtras)}
+          </p>
+          <p
+            className={cn(
+              "text-[11px] mt-1",
+              hayNotasOtrasFechas ? "text-amber-500" : "text-gray-400",
+            )}
+          >
+            Afectan documentos de días anteriores
+          </p>
+        </div>
       </div>
-    </Modal>
+
+      {/* Resumen neto */}
+      <div className="mt-4 p-2 rounded-xl border border-blue-100 bg-blue-50/50 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+            Ventas Netas del Día
+          </p>
+          <p className="text-[11px] text-blue-500 mt-0.5">
+            Ventas brutas + ND del día − NC del día
+          </p>
+        </div>
+        <p className="text-xl font-bold text-blue-700">
+          {formatMoneda(dashboard?.ventasNetas ?? 0)}
+        </p>
+      </div>
+
+      {hayNotasOtrasFechas && (
+        <p className="text-[11px] text-amber-600 mt-3 flex items-center gap-1">
+          <AlertTriangle size={11} />
+          Existen notas que afectan documentos de días anteriores y no impactan
+          las ventas netas de hoy.
+        </p>
+      )}
+    </Card>
   );
 };
 
@@ -390,47 +410,69 @@ const TodasAlertasModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
 
   const hookEmpresa = useDashboardEmpresa();
   const hookSucursal = useDashboardSucursal();
   const { sucursales } = useSucursalRuc(isSuperAdmin);
 
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<
+    number | null
+  >(null);
   const [showTodasAlertas, setShowTodasAlertas] = useState(false);
   const [fecha, setFecha] = useState<string>(getFechaHoy());
 
-  // ─── Dashboard activo según contexto ──────────────────────────────
   const { dashboard, loading, error } = useMemo(() => {
     if (isSuperAdmin && sucursalSeleccionada) return hookSucursal;
     if (isSuperAdmin) return hookEmpresa;
     return hookSucursal;
   }, [isSuperAdmin, sucursalSeleccionada, hookEmpresa, hookSucursal]);
 
-  // ─── Fetch centralizado ────────────────────────────────────────────
+  const userRuc = user?.ruc;
+  const userSucursalID = user?.sucursalID;
+
+  const fetchDashboardSucursal = hookSucursal.fetchDashboard;
+  const fetchDashboardEmpresa = hookEmpresa.fetchDashboard;
+
   const fetchData = useCallback(
     (fechaParam: string, sucursalParam: number | null) => {
-      if (!user) return;
+      if (!userRuc) return;
       if (isSuperAdmin) {
         if (sucursalParam) {
-          hookSucursal.fetchDashboard({ sucursalId: sucursalParam, fecha: fechaParam, limite: 10 });
+          fetchDashboardSucursal({
+            sucursalId: sucursalParam,
+            fecha: fechaParam,
+            limite: 10,
+          });
         } else {
-          hookEmpresa.fetchDashboard({ ruc: user.ruc, fecha: fechaParam, limite: 10 });
+          fetchDashboardEmpresa({
+            ruc: userRuc,
+            fecha: fechaParam,
+            limite: 10,
+          });
         }
       } else {
-        hookSucursal.fetchDashboard({ sucursalId: Number(user.sucursalID), fecha: fechaParam, limite: 10 });
+        fetchDashboardSucursal({
+          sucursalId: Number(userSucursalID),
+          fecha: fechaParam,
+          limite: 10,
+        });
       }
     },
-    [user, isSuperAdmin],
+    [
+      userRuc,
+      userSucursalID,
+      isSuperAdmin,
+      fetchDashboardSucursal,
+      fetchDashboardEmpresa,
+    ],
   );
 
-  // ─── Carga inicial ─────────────────────────────────────────────────
   useEffect(() => {
     fetchData(fecha, sucursalSeleccionada);
-  }, [user]);
+  }, [fetchData, fecha, sucursalSeleccionada]);
 
-  // ─── Handler: cambio de sucursal ──────────────────────────────────
   const handleSucursalChange = (id: number | null) => {
     if (id === null) hookSucursal.reset();
     else hookEmpresa.reset();
@@ -438,13 +480,11 @@ export default function DashboardPage() {
     fetchData(fecha, id);
   };
 
-  // ─── Handler: cambio de fecha ─────────────────────────────────────
   const handleFechaChange = (nuevaFecha: string) => {
     setFecha(nuevaFecha);
     fetchData(nuevaFecha, sucursalSeleccionada);
   };
 
-  // ─── Chart data (7 días hacia atrás desde `fecha`) ────────────────
   const chartData = useMemo(() => {
     const dias: { name: string; sales: number }[] = [];
     const base = new Date(fecha + "T00:00:00");
@@ -456,17 +496,83 @@ export default function DashboardPage() {
         r.fecha.startsWith(fechaStr),
       );
       dias.push({
-        name: d.toLocaleDateString("es-PE", { weekday: "short", day: "2-digit" }),
+        name: d.toLocaleDateString("es-PE", {
+          weekday: "short",
+          day: "2-digit",
+        }),
         sales: encontrado ? Number(encontrado.totalVentas.toFixed(2)) : 0,
       });
     }
     return dias;
   }, [dashboard?.rendimientoVentas, fecha]);
 
+  // ─── KPIs ─────────────────────────────────────────────────────────
+  const kpis = [
+    {
+      label: "Ventas del Día",
+      value: formatMoneda(dashboard?.ventasDelDia ?? 0),
+      icon: BarChart3,
+      color: "text-brand-red",
+      bg: "bg-red-50",
+    },
+    {
+      label: "Ventas Netas",
+      value: formatMoneda(dashboard?.ventasNetas ?? 0),
+      icon: TrendingUp,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+    },
+    {
+      label: "Facturas Emitidas",
+      value: String(dashboard?.facturasEmitidas ?? 0),
+      icon: FileText,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
+      label: "Boletas Emitidas",
+      value: String(dashboard?.boletasEmitidas ?? 0),
+      icon: FileText,
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+    },
+    {
+      label: "N. de Crédito",
+      value: String(dashboard?.notasCreditoEmitidas ?? 0),
+      icon: TrendingDown,
+      color: "text-rose-600",
+      bg: "bg-rose-50",
+    },
+    {
+      label: "N. de Débito",
+      value: String(dashboard?.notasDebitoEmitidas ?? 0),
+      icon: FileText,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+    },
+    {
+      label: "Estado SUNAT",
+      value: "Conectado",
+      icon: Zap,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+  ];
+
+  const isPageLoading = loading || isAuthLoading || (!dashboard && !error);
+
   return (
     <>
       {showTodasAlertas && (
-        <TodasAlertasModal onClose={() => setShowTodasAlertas(false)} />
+        <NotificacionesSunatModal
+          onClose={() => setShowTodasAlertas(false)}
+          sucursalId={
+            isSuperAdmin ? sucursalSeleccionada : Number(user?.sucursalID)
+          }
+          empresaRuc={
+            isSuperAdmin && !sucursalSeleccionada ? user?.ruc : undefined
+          }
+        />
       )}
 
       {/* ─── Header ─────────────────────────────────────────────────── */}
@@ -481,7 +587,7 @@ export default function DashboardPage() {
           )}
           <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2.5 hover:border-gray-300 hover:shadow-md">
             <Calendar size={14} className="text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-500 font-medium">Fecha</span>
+            <span className="text-[14px] text-gray-800 font-medium">Fecha</span>
             <input
               type="date"
               value={fecha}
@@ -504,7 +610,9 @@ export default function DashboardPage() {
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="text-sm font-bold text-red-900">Error al cargar datos</p>
+              <p className="text-sm font-bold text-red-900">
+                Error al cargar datos
+              </p>
               <p className="text-xs text-red-600 mt-0.5">{error}</p>
             </div>
           </div>
@@ -519,10 +627,10 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-4 animate-in fade-in duration-500">
-        {/* ─── KPI Grid ───────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {loading
-            ? Array.from({ length: 6 }).map((_, i) => (
+        {/* ─── KPI Grid (7 cards) ─────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          {isPageLoading
+            ? Array.from({ length: 7 }).map((_, i) => (
                 <Card key={i} className="p-0">
                   <div className="p-3 flex items-center gap-3">
                     <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
@@ -533,60 +641,17 @@ export default function DashboardPage() {
                   </div>
                 </Card>
               ))
-            : [
-                {
-                  label: "Ventas del Día",
-                  value: formatMoneda(dashboard?.ventasDelDia ?? 0),
-                  icon: BarChart3,
-                  color: "text-brand-red",
-                  bg: "bg-red-50",
-                },
-                {
-                  label: "Facturas Emitidas",
-                  value: String(dashboard?.facturasEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-emerald-600",
-                  bg: "bg-emerald-50",
-                },
-                {
-                  label: "Boletas Emitidas",
-                  value: String(dashboard?.boletasEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-purple-600",
-                  bg: "bg-purple-50",
-                },
-                {
-                  label: "Notas de Crédito",
-                  value: String(dashboard?.notasCreditoEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-blue-600",
-                  bg: "bg-blue-50",
-                },
-                {
-                  label: "Notas de Débito",
-                  value: String(dashboard?.notasDebitoEmitidas ?? 0),
-                  icon: FileText,
-                  color: "text-orange-600",
-                  bg: "bg-orange-50",
-                },
-                {
-                  label: "Estado SUNAT",
-                  value: "Conectado",
-                  icon: Zap,
-                  color: "text-amber-600",
-                  bg: "bg-amber-50",
-                },
-              ].map((kpi, i) => (
+            : kpis.map((kpi, i) => (
                 <Card key={i} className="p-0">
-                  <div className="p-3 flex items-center gap-3">
-                    <div className={cn("p-2.5 rounded-xl shrink-0", kpi.bg)}>
+                  <div className="p-1 flex items-center gap-3">
+                    <div className={cn("p-2 rounded-xl shrink-0", kpi.bg)}>
                       <kpi.icon className={cn("w-5 h-5", kpi.color)} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-tight">
+                      <p className="text-[12px] font-medium text-gray-700 uppercase">
                         {kpi.label}
                       </p>
-                      <p className="text-lg font-bold text-gray-900 mt-0.5 truncate">
+                      <p className="text-[15px] font-bold text-gray-900 mt-0.5 truncate">
                         {kpi.value}
                       </p>
                     </div>
@@ -595,9 +660,12 @@ export default function DashboardPage() {
               ))}
         </div>
 
+        {/* ─── Desglose de Notas ──────────────────────────────────────── */}
+        <DesgloseNotasCard dashboard={dashboard} loading={isPageLoading} />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ─── Gráfico de ventas ──────────────────────────────────────── */}
-          {loading ? (
+          {isPageLoading ? (
             <Card className="lg:col-span-2">
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-50">
                 <div className="space-y-2">
@@ -624,12 +692,30 @@ export default function DashboardPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
                       <defs>
-                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0052CC" stopOpacity={0.1} />
-                          <stop offset="95%" stopColor="#0052CC" stopOpacity={0} />
+                        <linearGradient
+                          id="colorSales"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#0052CC"
+                            stopOpacity={0.1}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#0052CC"
+                            stopOpacity={0}
+                          />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="#f0f0f0"
+                      />
                       <XAxis
                         dataKey="name"
                         axisLine={false}
@@ -693,37 +779,68 @@ export default function DashboardPage() {
               </div>
             </Card>
           ) : (
+            // ─── Notificaciones SUNAT ───────────────────────────────────────────────────
             <Card
               title="Notificaciones SUNAT"
               subtitle="Estado de comprobantes y alertas"
               className="border-t-4 border-t-brand-red"
             >
-              <div className="space-y-4 mt-2">
-                {ALL_NOTIFICACIONES.slice(0, 3).map((notif) => (
-                  <div
-                    key={notif.id}
-                    className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer border border-transparent hover:border-gray-100"
-                    onClick={() => setShowTodasAlertas(true)}
-                  >
-                    <div
-                      className={cn(
-                        "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                        notif.type === "success"
-                          ? "bg-emerald-500"
-                          : notif.type === "warning"
-                            ? "bg-amber-500"
-                            : "bg-rose-500",
-                      )}
-                    />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">{notif.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{notif.desc}</p>
-                      <p className="text-[10px] font-medium text-gray-400 mt-1 uppercase">
-                        {notif.time}
-                      </p>
-                    </div>
+              <div className="space-y-2 mt-2">
+                {/* Aceptados */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-emerald-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Aceptados del día
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Todos los comprobantes que SUNAT aceptó correctamente hoy.
+                    </p>
                   </div>
-                ))}
+                </div>
+
+                {/* Rechazados */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-rose-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Rechazados del día
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Comprobantes que SUNAT rechazó hoy. Revisa el código de
+                      error y corrige antes de reenviar.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pendientes */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-amber-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Pendientes de envío
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Comprobantes emitidos hoy que aún no han recibido
+                      respuesta de SUNAT.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Certificado */}
+                <div className="flex gap-3 p-3 rounded-lg border border-transparent">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-blue-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Certificado digital
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      Vigencia de tu certificado de firma electrónica. Te
+                      alertamos si está por vencer.
+                    </p>
+                  </div>
+                </div>
+
                 <Button
                   variant="outline"
                   className="w-full mt-2"
@@ -784,11 +901,17 @@ export default function DashboardPage() {
               </Button>
             }
           >
-            <div className="overflow-x-auto -mx-6">
+            <div className="overflow-x-auto mx-0">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50">
-                    {["ID Comprobante", "Cliente", "Fecha", "Total", "Estado"].map((h) => (
+                    {[
+                      "ID Comprobante",
+                      "Cliente",
+                      "Fecha",
+                      "Total",
+                      "Estado",
+                    ].map((h) => (
                       <th
                         key={h}
                         className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -801,13 +924,19 @@ export default function DashboardPage() {
                 <tbody className="divide-y divide-gray-100">
                   {(dashboard?.comprobantesRecientes ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-sm text-gray-400"
+                      >
                         Sin comprobantes recientes
                       </td>
                     </tr>
                   ) : (
                     (dashboard?.comprobantesRecientes ?? []).map((doc, i) => (
-                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                      <tr
+                        key={i}
+                        className="hover:bg-gray-50/50 transition-colors"
+                      >
                         <td className="px-6 py-4">
                           <span className="text-sm font-medium text-brand-blue">
                             {doc.numeroCompleto}

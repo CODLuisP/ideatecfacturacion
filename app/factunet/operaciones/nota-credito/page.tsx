@@ -7,7 +7,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import axios from "axios";
 import { useToast } from "@/app/components/ui/Toast";
 import { useSucursal } from "../boleta/gestionBoletas/useSucursal";
@@ -15,7 +15,7 @@ import { useSucursalRuc } from "../boleta/gestionBoletas/useSucursalRuc";
 import { useEmpresaEmisor } from "../boleta/gestionBoletas/useEmpresaEmisor";
 import { Sucursal } from "../boleta/gestionBoletas/Boleta";
 import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
-import { numeroALetras } from "@/app/components/ui/numeroALetras";
+import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import { ComprobanteObtenido } from "./gestionNotaCredito/Obtenercomprobante";
 import { NotaCredito } from "./gestionNotaCredito/NotacreditoDebito";
 import { useComprobanteRucSerieCorrelativo } from "./gestionNotaCredito/Usecomprobanterucseriecorrelativo";
@@ -43,7 +43,7 @@ interface DetalleEditable {
   codProducto: string | null;
   unidad: string;
   descripcion: string;
-  cantidad: number;
+  cantidad: number | string;
   mtoValorUnitario: number;   // precio sin IGV
   mtoBaseIgv: number;
   porcentajeIgv: number;
@@ -56,7 +56,7 @@ interface DetalleEditable {
   factorIcbper: number;
   _sucursalProductoId?: number | null;
   // Para motivos 04/05/09: monto ingresado CON igv por el usuario
-  _montoConIgv?: number;
+  _montoConIgv?: number | string;
   // Precio venta original del comprobante (máximo a descontar/disminuir)
   _precioVentaOriginal?: number;
 }
@@ -84,17 +84,19 @@ const mapearDetalle = (d: ComprobanteObtenido["details"][0]): DetalleEditable =>
 });
 
 // ── Helper: recalcular fila para motivos 04/05/09 desde monto CON igv ──
-const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): DetalleEditable => {
+const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number | string): DetalleEditable => {
+  const cant = Number(d.cantidad) || 0;
+  const montoNum = Number(montoConIgv) || 0;
   const es10 = d.tipAfeIgv === 10;
   const pct = d.porcentajeIgv || 18;
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
   const mtoValorUnitario = es10
-    ? parseFloat((montoConIgv / (1 + pct / 100)).toFixed(6))
-    : montoConIgv;
-  const mtoBaseIgv = round2(mtoValorUnitario * d.cantidad);
-  const igv = es10 ? round2(montoConIgv * d.cantidad - mtoBaseIgv) : 0;
-  const totalVentaItem = round2(montoConIgv * d.cantidad);
+    ? parseFloat((montoNum / (1 + pct / 100)).toFixed(6))
+    : montoNum;
+  const mtoBaseIgv = round2(mtoValorUnitario * cant);
+  const igv = es10 ? round2(montoNum * cant - mtoBaseIgv) : 0;
+  const totalVentaItem = round2(montoNum * cant);
 
   return {
     ...d,
@@ -110,13 +112,14 @@ const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): De
 
 // ── Helper: recalcular fila normal ───────────────────────────
 const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
+  const cant = Number(d.cantidad) || 0;
   const es15 = d.tipAfeIgv === 15;
   if (es15) {
-    const baseIgv = parseFloat((d.mtoPrecioUnitario / (1 + (d.porcentajeIgv || 18) / 100) * d.cantidad).toFixed(2));
+    const baseIgv = parseFloat((d.mtoPrecioUnitario / (1 + (d.porcentajeIgv || 18) / 100) * cant).toFixed(2));
     return { ...d, mtoValorUnitario: 0, mtoValorVenta: 0, mtoBaseIgv: baseIgv, igv: 0, totalVentaItem: 0 };
   }
   const es10 = d.tipAfeIgv === 10;
-  const baseIgv = parseFloat((d.mtoValorUnitario * d.cantidad).toFixed(2));
+  const baseIgv = parseFloat((d.mtoValorUnitario * cant).toFixed(2));
   const igv = es10 ? parseFloat(((baseIgv * d.porcentajeIgv) / 100).toFixed(2)) : 0;
   const precioConIGV = es10
     ? parseFloat((d.mtoValorUnitario * (1 + d.porcentajeIgv / 100)).toFixed(2))
@@ -127,7 +130,7 @@ const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
     igv,
     mtoValorVenta: baseIgv,
     mtoPrecioUnitario: precioConIGV,
-    totalVentaItem: parseFloat((precioConIGV * d.cantidad).toFixed(2)),
+    totalVentaItem: parseFloat((precioConIGV * cant).toFixed(2)),
   };
 };
 
@@ -185,7 +188,14 @@ const construirDetallesPorMotivo = (
   }
 };
 
-export default function NotaCreditoPage() {
+const obtenerFechaLocal = (offsetDias = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDias);
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
+};
+
+function NotaCreditoContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -212,7 +222,7 @@ export default function NotaCreditoPage() {
   const [errorEmision, setErrorEmision] = useState<string | null>(null);
   const [codMotivo, setCodMotivo] = useState("");
   const [desMotivo, setDesMotivo] = useState("");
-  const [fechaEmision, setFechaEmision] = useState(fechaHora.slice(0, 10));
+  const [fechaEmision, setFechaEmision] = useState(obtenerFechaLocal(0));
   const [detalles, setDetalles] = useState<DetalleEditable[]>([]);
   const [detallesOriginales, setDetallesOriginales] = useState<DetalleEditable[]>([]);
   const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
@@ -292,9 +302,10 @@ export default function NotaCreditoPage() {
     const correlativo = searchParams.get('correlativo')
     if (!serie || !correlativo) return
 
-    // Solo buscar si los inputs ya fueron pre-rellenados
-    if (serieInput === serie && correlativoInput === correlativo) {
-        buscarComprobante(serie, correlativo)
+    if (!comprobante && !loadingComprobante) {
+        setSerieInput(serie);
+        setCorrelativoInput(correlativo);
+        buscarComprobante(serie, correlativo);
     }
   }, [sucursal]) // cuando la sucursal se setee, buscar
 
@@ -371,12 +382,22 @@ export default function NotaCreditoPage() {
     setDetalles((prev) => { const n = [...prev]; n[i] = { ...n[i], descripcion }; return n; });
 
   // ── Actualizar cantidad ───────────────────────────────────────
-  const actualizarCantidad = (i: number, cantidad: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDetalle({ ...n[i], cantidad: Math.max(0, cantidad) }); return n; });
+  const actualizarCantidad = (i: number, cantidad: number | string) =>
+    setDetalles((prev) => { 
+      const n = [...prev]; 
+      const originalCantidad = detallesOriginales[i]?.cantidad ? Number(detallesOriginales[i].cantidad) : Infinity;
+      let val: number | string = cantidad === "" ? "" : Math.min(Math.max(0, Number(cantidad)), originalCantidad);
+      n[i] = recalcularDetalle({ ...n[i], cantidad: val }); 
+      return n; 
+    });
 
   // ── Actualizar monto CON IGV (04/05/09) ──────────────────────
-  const actualizarMontoConIgv = (i: number, montoConIgv: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDesdeMontoConIgv(n[i], Math.max(0, montoConIgv)); return n; });
+  const actualizarMontoConIgv = (i: number, montoConIgv: number | string) =>
+    setDetalles((prev) => { 
+      const n = [...prev]; 
+      n[i] = recalcularDesdeMontoConIgv(n[i], montoConIgv === "" ? "" : Math.max(0, Number(montoConIgv))); 
+      return n; 
+    });
 
   // ── Actualizar precio libre sin IGV (motivo 10) ───────────────
   const actualizarPrecioLibre = (i: number, precio: number) =>
@@ -403,7 +424,10 @@ export default function NotaCreditoPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=${tamano}`,
         { headers: { Authorization: `Bearer ${accessToken}` }, responseType: "blob" },
       );
-      setPdfUrl(URL.createObjectURL(new Blob([res.data], { type: "application/pdf" })));
+      setPdfUrl(prev => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      });
     } catch { showToast("Error al cargar el PDF", "error"); }
     finally { setCargandoPdf(false); }
   };
@@ -421,7 +445,10 @@ export default function NotaCreditoPage() {
       const iframe = document.createElement("iframe");
       iframe.style.display = "none"; iframe.src = url;
       document.body.appendChild(iframe);
-      iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 1000); };
+      iframe.onload = () => { 
+        iframe.contentWindow?.print(); 
+        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000); 
+      };
     } catch { showToast("Error al imprimir", "error"); }
   };
 
@@ -481,13 +508,13 @@ export default function NotaCreditoPage() {
       mtoImpVenta: totales.mtoImpVenta,
       details: detalles.map((d) => ({
         productoId: d.productoId, codProducto: d.codProducto, unidad: d.unidad,
-        descripcion: d.descripcion, cantidad: d.cantidad,
+        descripcion: d.descripcion, cantidad: Number(d.cantidad) || 0,
         mtoValorUnitario: d.mtoValorUnitario, mtoValorVenta: d.mtoValorVenta,
         mtoBaseIgv: d.mtoBaseIgv, porcentajeIgv: d.porcentajeIgv, igv: d.igv,
         tipAfeIgv: d.tipAfeIgv, mtoPrecioUnitario: d.mtoPrecioUnitario,
         totalVentaItem: d.totalVentaItem, icbper: d.icbper, factorIcbper: d.factorIcbper,
       })),
-      legends: [{ code: "1000", value: numeroALetras(totales.mtoImpVenta, moneda) }],
+      legends: [{ code: "1000", value: numeroAlertas(totales.mtoImpVenta, moneda) }],
       usuarioCreacion: Number(user?.id ?? 0),
     };
   };
@@ -515,9 +542,10 @@ export default function NotaCreditoPage() {
     if (codMotivo === "05") {
       for (let i = 0; i < detalles.length; i++) {
         const d = detalles[i];
-        const montoIngresado = d._montoConIgv ?? 0;
-        const totalConCantidad = parseFloat((montoIngresado * d.cantidad).toFixed(2));
-        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * d.cantidad).toFixed(2)) : null;
+        const montoIngresado = Number(d._montoConIgv) || 0;
+        const cant = Number(d.cantidad) || 0;
+        const totalConCantidad = parseFloat((montoIngresado * cant).toFixed(2));
+        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * cant).toFixed(2)) : null;
         if (montoIngresado <= 0) {
           showToast(`El descuento del ítem ${i + 1} debe ser mayor a 0`, "error");
           return false;
@@ -539,9 +567,10 @@ export default function NotaCreditoPage() {
     if (codMotivo === "09") {
       for (let i = 0; i < detalles.length; i++) {
         const d = detalles[i];
-        const montoIngresado = d._montoConIgv ?? 0;
-        const totalConCantidad = parseFloat((montoIngresado * d.cantidad).toFixed(2));
-        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * d.cantidad).toFixed(2)) : null;
+        const montoIngresado = Number(d._montoConIgv) || 0;
+        const cant = Number(d.cantidad) || 0;
+        const totalConCantidad = parseFloat((montoIngresado * cant).toFixed(2));
+        const maxPermitido = d._precioVentaOriginal ? parseFloat((d._precioVentaOriginal * cant).toFixed(2)) : null;
         if (montoIngresado <= 0) {
           showToast(`La disminución del ítem ${i + 1} debe ser mayor a 0`, "error");
           return false;
@@ -554,8 +583,7 @@ export default function NotaCreditoPage() {
     }
 
     if (codMotivo !== "08" && totales.mtoImpVenta <= 0) { showToast("El monto total debe ser mayor a 0", "error"); return false; }
-    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return false; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return false; }
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return false; }
     return true;
   };
 
@@ -574,7 +602,7 @@ const actualizarStockDevolucion = async () => {
       items.map((d) => ({
         productoId: d.productoId,
         sucursalId: sucursalId,
-        cantidad: d.cantidad,
+        cantidad: Number(d.cantidad) || 0,
       })),
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
@@ -587,78 +615,167 @@ const actualizarStockDevolucion = async () => {
     const payload = prepararNotaCredito();
     if (!payload) return;
     setEmitiendo(true); setErrorEmision(null);
-    console.log("Nota de crédito enviada:", payload);
-    
+
     try {
-      const resNC = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, payload, { headers: { Authorization: `Bearer ${accessToken}` } });
+      // ── 1. Guardar en BD ──────────────────────────────────────
+      const resNC = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes`,
+        payload,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const comprobanteId = resNC.data.comprobanteId;
-      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
-      console.log("Respuesta SUNAT notes:", resSunat.data); 
+      setComprobanteIdEmitido(comprobanteId); // ← guardar ANTES de SUNAT
 
-      if (resSunat.data.estadoSunat === "ACEPTADO" || resSunat.data.codigoRespuestaSunat === "0") {
-        showToast(resSunat.data.mensajeRespuestaSunat ?? "Nota de crédito emitida correctamente.", "success");
-        setComprobanteIdEmitido(comprobanteId);
-        await cargarPdf(comprobanteId, tamanoPdf);
-        await actualizarStockDevolucion();
+      // ── 2. Enviar a SUNAT ─────────────────────────────────────
+      await enviarASunat(comprobanteId, payload);
 
-        if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
-          const serieNum = `${payload.serie}-${payload.correlativo}`;
-          try {
-            const resPdf = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`, { headers: { Authorization: `Bearer ${accessToken}` } });
-            if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
-            const pdfFile = new File([await resPdf.blob()], `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`, { type: "application/pdf" });
-
-            if (enviarCorreo && correoCliente) {
-              try {
-                const formData = new FormData();
-                formData.append("toEmail", correoCliente);
-                formData.append("toName", comprobante?.cliente.razonSocial ?? "Cliente");
-                formData.append("subject", `Nota de Crédito Electrónica ${serieNum}`);
-                formData.append("body", "Se emitió la nota de crédito electrónica.");
-                formData.append("tipo", "7");
-                formData.append("comprobanteJson", JSON.stringify({ serieNumero: serieNum, estadoSunat: "ACEPTADO", items: detalles.map((d) => ({ descripcion: d.descripcion, cantidad: d.cantidad, precioUnitario: d.mtoPrecioUnitario })), igv: totales.mtoIGV, total: totales.mtoImpVenta }));
-                formData.append("adjunto", pdfFile);
-                const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-                if (!resCorreo.ok) throw new Error("Error correo");
-                showToast("Nota de crédito enviada por correo", "success");
-              } catch { showToast("Error al enviar por correo", "error"); }
-            }
-
-            if (enviarWhatsapp && telefonoCliente) {
-              try {
-                const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-                const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
-                const uploadForm = new FormData(); uploadForm.append("file", pdfFile);
-                const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
-                if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
-                const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-                const resWsp = await fetch(`${whatsappBase}/api/send/single`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey }, body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${comprobante?.cliente.razonSocial ?? ""}, adjuntamos su nota de crédito electrónica ${serieNum}.` }) });
-                if (!resWsp.ok) throw new Error("Error WhatsApp");
-                showToast("Nota de crédito enviada por WhatsApp", "success");
-              } catch { showToast("Error al enviar por WhatsApp", "error"); }
-            }
-          } catch { showToast("Error al procesar envíos", "error"); }
-        }
-        setEmitido(true);
-      } else {
-        showToast(`Nota de crédito ${payload.serie}-${payload.correlativo} generada pero rechazada por SUNAT`, "error");
-        setEmitido(true);
-      }
-
-      const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      setCorrelativoNCFactura(resSucursal.data.correlativoNotaCreditoFactura ?? null);
-      setCorrelativoNCBoleta(resSucursal.data.correlativoNotaCreditoBoleta ?? null);
     } catch (err: any) {
+      // Solo errores del paso 1 (guardar en BD)
       const data = err?.response?.data;
-      console.error("Error completo:", err?.response);
-      console.error("Data del error:", JSON.stringify(data, null, 2));
       const mensaje = data?.mensaje ?? data?.message ?? data?.title ?? "Error al emitir la nota de crédito";
       const detalle = data?.detalle ?? (data?.errors ? JSON.stringify(data?.errors) : null);
       setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
-      showToast("Error al emitir nota de crédito.", "error");
-    } finally { setEmitiendo(false); } 
+      showToast("Error al generar la nota de crédito.", "error");
+    } finally {
+      setEmitiendo(false);
+    }
+  };
+
+  const enviarASunat = async (comprobanteId: number, payload: NotaCredito) => {
+    try {
+      const resSunat = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (resSunat.data.estadoSunat === "ACEPTADO" || resSunat.data.codigoRespuestaSunat === "0") {
+        // ✅ SUNAT aceptó
+        showToast(resSunat.data.mensajeRespuestaSunat ?? "Nota de crédito emitida correctamente.", "success");
+        await procesarSegundoPlano(comprobanteId, payload);
+        setEmitido(true);
+      } else {
+        // ❌ SUNAT rechazó con respuesta
+        const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+        setErrorEmision(resSunat.data.mensajeRespuestaSunat ?? "Nota de crédito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      }
+    } catch (err: any) {
+      const tieneRespuesta = !!err?.response;
+      const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+
+      if (tieneRespuesta) {
+        // ❌ SUNAT respondió con error HTTP — sin reintento
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+        setErrorEmision(mensaje || "Nota de crédito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      } else {
+        // ❌ SUNAT no responde / timeout — reintento silencioso
+        setErrorEmision("No se pudo conectar con SUNAT.");
+        showToast(`La nota ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
+      }
+    }
+
+    // Actualizar correlativos siempre
+    const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoNCFactura(resSucursal.data.correlativoNotaCreditoFactura ?? null);
+    setCorrelativoNCBoleta(resSucursal.data.correlativoNotaCreditoBoleta ?? null);
+  };
+
+  const procesarSegundoPlano = async (comprobanteId: number, payload: NotaCredito) => {
+    await cargarPdf(comprobanteId, tamanoPdf);
+    await actualizarStockDevolucion();
+
+    if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+      const serieNum = `${payload.serie}-${payload.correlativo}`;
+      try {
+        const resPdf = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
+        const pdfFile = new File(
+          [await resPdf.blob()],
+          `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`,
+          { type: "application/pdf" }
+        );
+
+        if (enviarCorreo && correoCliente) {
+          try {
+            const formData = new FormData();
+            formData.append("toEmail", correoCliente);
+            formData.append("toName", comprobante?.cliente.razonSocial ?? "Cliente");
+            formData.append("subject", `Nota de Crédito Electrónica ${serieNum}`);
+            formData.append("body", "Se emitió la nota de crédito electrónica.");
+            formData.append("tipo", "7");
+            formData.append("comprobanteJson", JSON.stringify({
+              serieNumero: serieNum, estadoSunat: "ACEPTADO",
+              items: detalles.map(d => ({ descripcion: d.descripcion, cantidad: Number(d.cantidad) || 0, precioUnitario: d.mtoPrecioUnitario })),
+              igv: totales.mtoIGV, total: totales.mtoImpVenta,
+            }));
+            formData.append("adjunto", pdfFile);
+            const resCorreo = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+              { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData }
+            );
+            if (!resCorreo.ok) throw new Error("Error correo");
+            showToast("Nota de crédito enviada por correo", "success");
+          } catch { showToast("Error al enviar por correo", "error"); }
+        }
+
+        if (enviarWhatsapp && telefonoCliente) {
+          try {
+            const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+            const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+            const uploadForm = new FormData();
+            uploadForm.append("file", pdfFile);
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+              method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm
+            });
+            if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
+            const fileUrl = (await resUpload.json()).datos.url;
+            const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+              body: JSON.stringify({
+                phone: numeroFormateado, type: "documento", file_url: fileUrl,
+                filename: `${empresa?.numeroDocumento}-NotaCredito-${serieNum}.pdf`,
+                mime_type: "application/pdf",
+                text: `Estimado(a) ${comprobante?.cliente.razonSocial ?? ""}, adjuntamos su nota de crédito electrónica ${serieNum}.`
+              }),
+            });
+            if (!resWsp.ok) throw new Error("Error WhatsApp");
+            showToast("Nota de crédito enviada por WhatsApp", "success");
+          } catch { showToast("Error al enviar por WhatsApp", "error"); }
+        }
+      } catch { showToast("Error al procesar envíos", "error"); }
+    }
+  };
+
+  // ── Reintento silencioso ──────────────────────────────────────
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
   };
 
   // ── Limpiar / reset ──────────────────────────────────────────
@@ -717,14 +834,14 @@ const actualizarStockDevolucion = async () => {
             </div>
           </div>
 
-          <Card title="Datos de la Nota de Crédito" subtitle="Completa la información requerida">
-            <form className="space-y-6">
+          <Card >
+            <form className="space-y-4">
 
               {/* ── Sucursal (superadmin) ── */}
               {isSuperAdmin && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Sucursal</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Sucursal</label>
                     <select
                       value={sucursal?.sucursalId ?? ""}
                       disabled={loadingSucursales || vieneDesdeLista}
@@ -734,11 +851,12 @@ const actualizarStockDevolucion = async () => {
                         if (!sel) return;
                         setSucursal(sel);
                         setSerieInput(""); // resetear serie al cambiar sucursal
+                        setCorrelativoInput(""); // Limpiar correlativo para evitar mezcla de información
                         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
                         setCorrelativoNCFactura(res.data.correlativoNotaCreditoFactura ?? null);
                         setCorrelativoNCBoleta(res.data.correlativoNotaCreditoBoleta ?? null);
                       }}
-                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                      className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                     >
                       <option value="">Seleccionar sucursal</option>
                       {sucursales.map((s: Sucursal) => (
@@ -748,27 +866,73 @@ const actualizarStockDevolucion = async () => {
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo NC</label>
-                    <input type="text" disabled
-                      value={!sucursal ? "Selecciona una sucursal" : serieInput ? `${serieNC}-${correlativoDisplay}` : "Selecciona serie del comprobante"}
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
-                  </div>
+
+       <div className="space-y-1.5">
+  <label className="text-[10px] font-bold text-gray-600 uppercase">
+    Serie y Correlativo NC
+  </label>
+  <div
+    className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl border w-full text-sm ${
+      !sucursal
+        ? "bg-gray-50 border-gray-200"
+        : serieInput
+        ? "bg-green-50 border-green-300"
+        : "bg-gray-50 border-gray-200"
+    }`}
+  >
+    {!sucursal ? (
+      <span className="text-[12px] text-gray-400">Selecciona una sucursal</span>
+    ) : !serieInput ? (
+      <span className="text-[12px] text-gray-400">Selecciona serie del comprobante</span>
+    ) : (
+      <>
+        <p className="text-[12px] font-bold uppercase text-gray-500 tracking-wide">
+          NC
+        </p>
+        <span className="text-[12px] font-mono font-semibold text-gray-800">
+          {serieNC}-{correlativoDisplay}
+        </span>
+      </>
+    )}
+  </div>
+</div>
+
                 </div>
               )}
 
               {/* Admin normal */}
               {!isSuperAdmin && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo NC</label>
-                  <input type="text" disabled
-                    value={loadingSucursal ? "Cargando..." : serieInput ? `${serieNC}-${correlativoDisplay}` : "Selecciona serie del comprobante"}
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Serie y Correlativo NC</label>
+                  <div
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+                      loadingSucursal
+                        ? "bg-gray-50 border-gray-200"
+                        : serieInput
+                        ? "bg-green-50 border-green-300"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    {loadingSucursal ? (
+                      <span className="text-xs text-gray-400">Cargando...</span>
+                    ) : !serieInput ? (
+                      <span className="text-xs text-gray-400">Selecciona serie del comprobante</span>
+                    ) : (
+                      <>
+                        <p className="text-[12px] font-bold uppercase text-gray-500 tracking-wide">
+                          NC
+                        </p>
+                        <span className="text-[12px] font-mono font-semibold text-gray-800">
+                          {serieNC}-{correlativoDisplay}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* ── Buscador ── */}
-              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-4">
+              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-2 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <Search className="w-4 h-4 text-brand-blue" />
@@ -779,12 +943,12 @@ const actualizarStockDevolucion = async () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Serie filtrada por sucursal */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Serie</label>
                     <select
                       value={serieInput}
                       onChange={(e) => { setSerieInput(e.target.value); if (comprobante) limpiarBuscador(); }}
                       disabled={isSuperAdmin && sinSucursal || vieneDesdeLista}
-                      className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:cursor-not-allowed"
+                      className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:cursor-not-allowed"
                     >
                       <option value="">Seleccionar serie</option>
                       {seriesDisponibles.map((s) => (
@@ -795,23 +959,24 @@ const actualizarStockDevolucion = async () => {
 
                   {/* Correlativo con X dentro */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Correlativo</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Correlativo</label>
                     <div className="relative">
                       <input
                         type="text" value={correlativoInput}
                         onChange={(e) => setCorrelativoInput(e.target.value.replace(/\D/g, ""))}
                         placeholder="127" maxLength={10} disabled={vieneDesdeLista}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarComprobante(serieInput, correlativoInput); } }}
-                        className="w-full py-2.5 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full py-2 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       {(correlativoInput || comprobante) && (
                         <button type="button" 
                           onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); if (vieneDesdeLista) {
-                            router.replace('/factunet/operaciones/nota-debito')} setVieneDesdeLista(false)
+                            router.replace('/factunet/operaciones/nota-credito')} setVieneDesdeLista(false)
                           }} 
                           title="Limpiar búsqueda"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
                           <X className="w-3.5 h-3.5" />
+                          
                         </button>
                       )}
                     </div>
@@ -852,7 +1017,7 @@ const actualizarStockDevolucion = async () => {
 
               {/* ── Datos del cliente ── */}
               {comprobante && (
-                <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-3">
+                <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-2 space-y-3">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                       <UserRound className="w-4 h-4 text-brand-blue" />
@@ -861,11 +1026,11 @@ const actualizarStockDevolucion = async () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">{comprobante.cliente.tipoDocumento === "6" ? "RUC" : "DNI / Doc"}</label>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase">{comprobante.cliente.tipoDocumento === "6" ? "RUC" : "DNI / Doc"}</label>
                       <input disabled value={comprobante.cliente.numeroDocumento} className="w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-600 font-mono" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">Razón Social</label>
+                      <label className="text-[10px] font-bold text-gray-600 uppercase">Razón Social</label>
                       <input disabled value={comprobante.cliente.razonSocial} className="w-full py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-600" />
                     </div>
                     {comprobante.cliente.direccionLineal && (
@@ -875,23 +1040,37 @@ const actualizarStockDevolucion = async () => {
                       </div>
                     )}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="email" value={correoCliente} placeholder="Correo del cliente"
-                          onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="email" value={correoCliente} placeholder="Correo del cliente"
+                            onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
-                          onChange={(e) => { const s = e.target.value.replace(/\D/g, ""); setTelefonoCliente(s); if (!s) setEnviarWhatsapp(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
+                            onChange={(e) => { 
+                              const s = e.target.value.replace(/\D/g, ""); 
+                              setTelefonoCliente(s); 
+                              if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                            }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
+                        {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                        )}
+                        {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -901,7 +1080,7 @@ const actualizarStockDevolucion = async () => {
               {/* ── Motivo y fecha ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Motivo</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Motivo</label>
                   <select
                     value={codMotivo}
                     onChange={(e) => {
@@ -910,7 +1089,7 @@ const actualizarStockDevolucion = async () => {
                       const motivo = MOTIVOS_NC.find((m) => m.code === cod);
                       setDesMotivo(motivo?.label ?? "");
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="">Seleccionar motivo</option>
                     {MOTIVOS_NC.map((m) => (
@@ -922,19 +1101,19 @@ const actualizarStockDevolucion = async () => {
                     <div className="space-y-1 pt-1">
                       <label className="text-[10px] font-bold text-gray-400 uppercase">Descripción del motivo</label>
                       <input type="text" value={desMotivo} onChange={(e) => setDesMotivo(e.target.value)}
-                        placeholder="Descripción del motivo..."
-                        className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                        maxLength={250} placeholder="Descripción del motivo..."
+                        className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Emisión</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Fecha de Emisión</label>
                   <input type="date" value={fechaEmision}
-                    max={new Date().toISOString().slice(0, 10)}
-                    min={(() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().slice(0, 10); })()}
+                    max={obtenerFechaLocal(0)}
+                    min={obtenerFechaLocal(-2)}
                     onChange={(e) => setFechaEmision(e.target.value)}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                 </div>
               </div>
 
@@ -991,7 +1170,8 @@ const actualizarStockDevolucion = async () => {
                         ) : (
                           detalles.map((d, i) => {
                             const maxDesc = d._precioVentaOriginal;
-                            const excede = maxDesc && d.totalVentaItem > (maxDesc * d.cantidad) && (codMotivo === "05" || codMotivo === "09");
+                            const cant = Number(d.cantidad) || 0;
+                            const excede = maxDesc && d.totalVentaItem > (maxDesc * cant) && (codMotivo === "05" || codMotivo === "09");
                             return (
                               <tr key={i} className={`hover:bg-gray-50/50 ${d.tipAfeIgv === 15 ? "bg-green-50/30" : ""} ${excede ? "bg-red-50/30" : ""}`}>
                                 <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
@@ -1012,14 +1192,19 @@ const actualizarStockDevolucion = async () => {
                                 {/* Cantidad */}
                                 <td className="px-2 py-1.5">
                                   {puedeEditarCantidad ? (
-                                    <div className="flex items-center gap-1">
-                                      <button type="button" onClick={() => actualizarCantidad(i, d.cantidad - 1)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">−</button>
-                                      <input type="number" min={0} step="0.01" value={d.cantidad}
-                                        onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
-                                        className="w-14 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
-                                      <button type="button" onClick={() => actualizarCantidad(i, d.cantidad + 1)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">+</button>
+                                    <div className="flex flex-col items-center gap-1">
+                                      <div className="flex items-center gap-1">
+                                        <button type="button" onClick={() => actualizarCantidad(i, (Number(d.cantidad)||0) - 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">−</button>
+                                        <input type="number" min={0} max={detallesOriginales[i]?.cantidad ? Number(detallesOriginales[i].cantidad) : undefined} step="0.01" value={d.cantidad}
+                                          onChange={(e) => actualizarCantidad(i, e.target.value)}
+                                          className="w-14 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
+                                        <button type="button" onClick={() => actualizarCantidad(i, (Number(d.cantidad)||0) + 1)}
+                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">+</button>
+                                      </div>
+                                      {detallesOriginales[i]?.cantidad && (
+                                        <span className="text-[9px] text-gray-400">Máx: {detallesOriginales[i].cantidad}</span>
+                                      )}
                                     </div>
                                   ) : (
                                     <span className="text-xs text-gray-700 text-center block">{d.cantidad}</span>
@@ -1036,8 +1221,8 @@ const actualizarStockDevolucion = async () => {
                                   ) : puedeIngresarMontoConIgv ? (
                                     // Motivos 04/05/09: monto CON igv
                                     <div className="space-y-0.5">
-                                      <input type="number" min={0} step="0.01" value={d._montoConIgv ?? 0}
-                                        onChange={(e) => actualizarMontoConIgv(i, Number(e.target.value))}
+                                      <input type="number" min={0} step="0.01" value={d._montoConIgv ?? ""}
+                                        onChange={(e) => actualizarMontoConIgv(i, e.target.value)}
                                         className={`w-full py-1 px-1 border rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono ${excede ? "border-red-400 bg-red-50" : "border-gray-200 bg-gray-50"}`} />
                                       {/* Máximo permitido debajo del input */}
                                       {maxDesc !== undefined && (
@@ -1235,23 +1420,22 @@ const actualizarStockDevolucion = async () => {
                 )}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2 rounded-lg transition-all duration-200">
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
                   <button type="button"
                     onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `${empresa?.numeroDocumento}-07-${serieNC}-${correlativoDisplay}.pdf`; a.click(); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2 rounded-lg transition-all duration-200 shadow-sm">
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
                   <button type="button" onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2 rounded-lg transition-all duration-200 shadow-sm">
                     <Printer className="w-3.5 h-3.5" /> Imprimir
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <div className="p-4 rounded-full bg-white shadow-sm">
+<div className="h-48 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">                <div className="p-4 rounded-full bg-white shadow-sm">
                   <Printer className="w-8 h-8 text-gray-400" />
                 </div>
                 <div>
@@ -1290,5 +1474,13 @@ const actualizarStockDevolucion = async () => {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NotaCreditoPage() {
+  return (
+    <Suspense fallback={null}>
+      <NotaCreditoContent />
+    </Suspense>
   );
 }

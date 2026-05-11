@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { RefreshCw, FileText, X, CheckCircle2, Eye, Download, ChevronDown, Building2, Calendar, Hash, AlertCircle } from 'lucide-react';
+import { RefreshCw, FileText, X, CheckCircle2, Eye, Download, ChevronDown, Building2, Calendar, Hash, AlertCircle, Ban } from 'lucide-react';
 import { cn } from '@/app/utils/cn';
 import { Comprobante } from '@/app/factunet/comprobantes/gestionComprobantes/Comprobante';
 import { padCorrelativo, COLORS, TIPO_PAGO_MAP, tipoLabel, formatFecha, TIPO_GUIA_MAP, limpiarMensajeSunat, PDF_SIZES } from '@/app/factunet/comprobantes/gestionComprobantes/helpers';
@@ -83,8 +83,11 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
     }, [comprobante, ruc, accessToken]);
 
     const colorEstado = COLORS.sunat[comprobante.estadoSunat as keyof typeof COLORS.sunat]?.badge ?? COLORS.sunat.PENDIENTE.badge;
-    const iconoEstado = comprobante.estadoSunat === 'ACEPTADO' ? <CheckCircle2 size={15} /> : comprobante.estadoSunat === 'RECHAZADO' ? <X size={15} /> : <RefreshCw size={15} />;
-
+    const iconoEstado = 
+        comprobante.estadoSunat === 'ACEPTADO' ? <CheckCircle2 size={15} /> :
+        comprobante.estadoSunat === 'RECHAZADO' ? <X size={15} /> :
+        comprobante.estadoSunat === 'ANULADO' ? <Ban size={15} /> :
+        <RefreshCw size={15} />;
     const tieneDetraccion = comprobante.detracciones?.length > 0;
     const tieneCuotas = comprobante.cuotas?.length > 0;
     const tienePagos = comprobante.pagos?.length > 0;
@@ -95,7 +98,7 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
     const detallesFiltrados = comprobante.details ?? [];
 
     return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 min-h-screen h-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 min-h-screen h-full">
 
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col animate-in zoom-in-95 duration-200" style={{ maxHeight: '90vh' }}>
 
@@ -131,14 +134,25 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
                             {/* Estado SUNAT */}
                             <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold", colorEstado)}>
-                                    {iconoEstado} Estado SUNAT: {comprobante.estadoSunat === 'ACEPTADO' ? 'Aceptado' : comprobante.estadoSunat === 'RECHAZADO' ? 'Rechazado' : 'Pendiente'}
+                                    {iconoEstado} Estado SUNAT: {
+                                        comprobante.estadoSunat === 'ACEPTADO' ? 'Aceptado' :
+                                        comprobante.estadoSunat === 'RECHAZADO' ? 'Rechazado' :
+                                        comprobante.estadoSunat === 'ANULADO' ? 'Anulado' :
+                                        'Pendiente'
+                                    }
                                 </div>
                                 {nombreSucursal && (
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200">
+                                    <div className="inline-flex items-center gap-1.5 px-3 rounded-full border text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200">
                                         <Building2 size={11} /> Sucursal: {nombreSucursal}
                                     </div>
                                 )}
                             </div>
+
+                            {comprobante.mensajeRespuestaSunat && (
+                                <p className={cn("text-xs rounded-xl px-3 py-1.5", comprobante.estadoSunat === 'ACEPTADO' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600')}>
+                                    {limpiarMensajeSunat(comprobante.mensajeRespuestaSunat)}
+                                </p>
+                            )}
 
                             {/* Info básica */}
                             <div className="grid grid-cols-2 gap-3">
@@ -382,12 +396,6 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
                                         </div>
                                     )}
                                 </div>
-                            )}
-
-                            {comprobante.mensajeRespuestaSunat && (
-                                <p className={cn("text-xs rounded-xl px-3 py-1.5", comprobante.estadoSunat === 'ACEPTADO' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600')}>
-                                    {limpiarMensajeSunat(comprobante.mensajeRespuestaSunat)}
-                                </p>
                             )}
                         </>
                     )}

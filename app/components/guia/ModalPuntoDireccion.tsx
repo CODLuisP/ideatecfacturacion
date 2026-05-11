@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { useAuth } from "@/context/AuthContext";
+import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
 
 // — JSON estático de ubigeos
 import departamentosData from "@/app/components/data/ubigeo/ubigeo_departamentos.json";
@@ -133,22 +134,21 @@ export default function ModalPuntoDireccion({
     fetchEmpresa();
   }, [opcion, user?.ruc, accessToken]);
 
-  // ── Opción 2: Consultar RUC tercero en apisperu ───────────────────────────
+  // handleTerceroRuc actualizado
   const handleTerceroRuc = async (val: string) => {
     setTerceroRuc(val);
     setTerceroData(null);
     setTerceroDireccionEditable("");
+    setTerceroHint(null);
+
     if (val.length === 11) {
       setLoadingTercero(true);
       setTerceroHint({ text: "Consultando RUC...", color: "#185FA5" });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/ruc/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
-        if (data.ruc) {
+        const data = await consultaRuc(val);
+        if (data) {
           setTerceroData(data);
-          setTerceroDireccionEditable(data.direccion ?? "");
+          setTerceroDireccionEditable(data.direccionLineal ?? "");
           setTerceroHint({ text: `✓ ${data.razonSocial}`, color: "#15803d" });
         } else {
           setTerceroHint({ text: "RUC no encontrado", color: "#DC2626" });
@@ -160,8 +160,6 @@ export default function ModalPuntoDireccion({
       }
     } else if (val.length > 0) {
       setTerceroHint({ text: `${val.length}/11 dígitos`, color: "#B45309" });
-    } else {
-      setTerceroHint(null);
     }
   };
 
@@ -212,12 +210,12 @@ export default function ModalPuntoDireccion({
       resultado = {
         tipo: "tercero",
         ubigeo: terceroData.ubigeo ?? "",
-        direccionLineal: terceroDireccionEditable.trim(), // ← cambia esto
+        direccionLineal: terceroDireccionEditable.trim(),
         departamento: terceroData.departamento ?? "",
         provincia: terceroData.provincia ?? "",
         distrito: terceroData.distrito ?? "",
         tipoDireccion: "DOMICILIO FISCAL",
-        resumen: `${terceroData.razonSocial} — ${terceroDireccionEditable.trim()}`, // ← y esto
+        resumen: `${terceroData.razonSocial} — ${terceroDireccionEditable.trim()}`,
       };
     } else {
       // Otra dirección

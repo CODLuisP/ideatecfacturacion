@@ -7,7 +7,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import axios from "axios";
 import { useToast } from "@/app/components/ui/Toast";
 import { useSucursal } from "../boleta/gestionBoletas/useSucursal";
@@ -15,7 +15,7 @@ import { useSucursalRuc } from "../boleta/gestionBoletas/useSucursalRuc";
 import { useEmpresaEmisor } from "../boleta/gestionBoletas/useEmpresaEmisor";
 import { Sucursal } from "../boleta/gestionBoletas/Boleta";
 import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
-import { numeroALetras } from "@/app/components/ui/numeroALetras";
+import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import { NotaCredito } from "../nota-credito/gestionNotaCredito/NotacreditoDebito";
 import { useComprobanteRucSerieCorrelativo } from "../nota-credito/gestionNotaCredito/Usecomprobanterucseriecorrelativo";
 import { useSearchParams } from 'next/navigation'
@@ -27,13 +27,22 @@ const MOTIVOS_ND = [
   { code: "03", label: "Penalidades / otros conceptos" },
 ];
 
+// ── Helper: obtener fecha local ──────────────────────────────
+const obtenerFechaLocal = (offsetDias = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDias);
+  const offsetMinutos = d.getTimezoneOffset();
+  const fechaLocal = new Date(d.getTime() - offsetMinutos * 60000);
+  return fechaLocal.toISOString().slice(0, 10);
+};
+
 // ── Interface local para detalles editables ──────────────────
 interface DetalleEditable {
   productoId: number;
   codProducto: string | null;
   unidad: string;
   descripcion: string;
-  cantidad: number;
+  cantidad: number | string;
   mtoValorUnitario: number;
   mtoBaseIgv: number;
   porcentajeIgv: number;
@@ -44,26 +53,28 @@ interface DetalleEditable {
   totalVentaItem: number;
   icbper: number;
   factorIcbper: number;
-  _montoConIgv?: number;
+  _montoConIgv?: number | string;
   _precioVentaOriginal?: number; // precio unitario con IGV original (referencia motivo 02)
 }
 
 // ── Helper: recalcular desde monto CON IGV ───────────────────
-const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): DetalleEditable => {
+const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgvRaw: number | string): DetalleEditable => {
+  const montoConIgv = Number(montoConIgvRaw) || 0;
   const es10 = d.tipAfeIgv === 10;
   const pct = d.porcentajeIgv || 18;
   const round2 = (n: number) => Math.round(n * 100) / 100;
+  const numCant = Number(d.cantidad) || 0;
   
   const mtoValorUnitario = es10
     ? parseFloat((montoConIgv / (1 + pct / 100)).toFixed(6))
     : montoConIgv;
-  const mtoBaseIgv = round2(mtoValorUnitario * d.cantidad);
-  const igv = es10 ? round2(montoConIgv * d.cantidad - mtoBaseIgv) : 0;
-  const totalVentaItem = round2(montoConIgv * d.cantidad);
+  const mtoBaseIgv = round2(mtoValorUnitario * numCant);
+  const igv = es10 ? round2(montoConIgv * numCant - mtoBaseIgv) : 0;
+  const totalVentaItem = round2(montoConIgv * numCant);
 
   return {
     ...d,
-    _montoConIgv: montoConIgv,
+    _montoConIgv: montoConIgvRaw,
     mtoValorUnitario,
     mtoBaseIgv,
     igv,
@@ -76,7 +87,8 @@ const recalcularDesdeMontoConIgv = (d: DetalleEditable, montoConIgv: number): De
 // ── Helper: recalcular fila normal ───────────────────────────
 const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
   const es10 = d.tipAfeIgv === 10;
-  const baseIgv = parseFloat((d.mtoValorUnitario * d.cantidad).toFixed(2));
+  const numCant = Number(d.cantidad) || 0;
+  const baseIgv = parseFloat((d.mtoValorUnitario * numCant).toFixed(2));
   const igv = es10 ? parseFloat(((baseIgv * d.porcentajeIgv) / 100).toFixed(2)) : 0;
   const precioConIGV = es10
     ? parseFloat((d.mtoValorUnitario * (1 + d.porcentajeIgv / 100)).toFixed(2))
@@ -87,7 +99,7 @@ const recalcularDetalle = (d: DetalleEditable): DetalleEditable => {
     igv,
     mtoValorVenta: baseIgv,
     mtoPrecioUnitario: precioConIGV,
-    totalVentaItem: parseFloat((precioConIGV * d.cantidad).toFixed(2)),
+    totalVentaItem: parseFloat((precioConIGV * numCant).toFixed(2)),
   };
 };
 
@@ -138,7 +150,7 @@ const construirDetallesPorMotivo = (
   }
 };
 
-export default function NotaDebitoPage() {
+function NotaDebitoContent() {
   const searchParams = useSearchParams()
   const { showToast } = useToast();
   const router = useRouter();
@@ -297,8 +309,10 @@ export default function NotaDebitoPage() {
     const correlativo = searchParams.get('correlativo')
     if (!serie || !correlativo) return
 
-    if (serieInput === serie && correlativoInput === correlativo) {
-        buscarComprobante(serie, correlativo)
+    if (!loadingComprobante && !comprobante) {
+      setSerieInput(serie);
+      setCorrelativoInput(correlativo);
+      buscarComprobante(serie, correlativo);
     }
   }, [sucursal])
 
@@ -336,11 +350,11 @@ export default function NotaDebitoPage() {
   const actualizarDescripcion = (i: number, descripcion: string) =>
     setDetalles((prev) => { const n = [...prev]; n[i] = { ...n[i], descripcion }; return n; });
 
-  const actualizarMontoConIgv = (i: number, montoConIgv: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDesdeMontoConIgv(n[i], Math.max(0, montoConIgv)); return n; });
+  const actualizarMontoConIgv = (i: number, montoConIgv: number | string) =>
+    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDesdeMontoConIgv(n[i], montoConIgv); return n; });
 
-  const actualizarCantidad = (i: number, cantidad: number) =>
-    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDetalle({ ...n[i], cantidad: Math.max(1, cantidad) }); return n; });
+  const actualizarCantidad = (i: number, cantidad: number | string) =>
+    setDetalles((prev) => { const n = [...prev]; n[i] = recalcularDetalle({ ...n[i], cantidad }); return n; });
 
   const eliminarDetalle = (i: number) => setDetalles((prev) => prev.filter((_, idx) => idx !== i));
   const agregarDetalle = () => setDetalles((prev) => [...prev, itemVacio("", detallesOriginales[0]?.porcentajeIgv ?? 18)]);
@@ -373,12 +387,13 @@ export default function NotaDebitoPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=${tamano}`,
         { headers: { Authorization: `Bearer ${accessToken}` }, responseType: "blob" },
       );
-      setPdfUrl(URL.createObjectURL(new Blob([res.data], { type: "application/pdf" })));
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
     } catch { showToast("Error al cargar el PDF", "error"); }
     finally { setCargandoPdf(false); }
   };
 
-  useEffect(() => { if (!comprobanteIdEmitido) return; cargarPdf(comprobanteIdEmitido, tamanoPdf); }, [tamanoPdf, comprobanteIdEmitido]);
+  useEffect(() => { if (!comprobanteIdEmitido) return; cargarPdf(comprobanteIdEmitido, tamanoPdf); }, [tamanoPdf]);
 
   const imprimirPdf = async () => {
     if (!comprobanteIdEmitido) return;
@@ -391,7 +406,7 @@ export default function NotaDebitoPage() {
       const iframe = document.createElement("iframe");
       iframe.style.display = "none"; iframe.src = url;
       document.body.appendChild(iframe);
-      iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 1000); };
+      iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000); };
     } catch { showToast("Error al imprimir", "error"); }
   };
 
@@ -451,13 +466,13 @@ export default function NotaDebitoPage() {
       mtoImpVenta: totales.mtoImpVenta,
       details: detalles.map((d) => ({
         productoId: d.productoId, codProducto: d.codProducto, unidad: d.unidad,
-        descripcion: d.descripcion, cantidad: d.cantidad,
+        descripcion: d.descripcion, cantidad: Number(d.cantidad) || 0,
         mtoValorUnitario: d.mtoValorUnitario, mtoValorVenta: d.mtoValorVenta,
         mtoBaseIgv: d.mtoBaseIgv, porcentajeIgv: d.porcentajeIgv, igv: d.igv,
         tipAfeIgv: d.tipAfeIgv, mtoPrecioUnitario: d.mtoPrecioUnitario,
         totalVentaItem: d.totalVentaItem, icbper: d.icbper, factorIcbper: d.factorIcbper,
       })),
-      legends: [{ code: "1000", value: numeroALetras(totales.mtoImpVenta, moneda) }],
+      legends: [{ code: "1000", value: numeroAlertas(totales.mtoImpVenta, moneda) }],
       usuarioCreacion: Number(user?.id ?? 0),
     };
   };
@@ -476,7 +491,6 @@ export default function NotaDebitoPage() {
     if (sinMonto !== -1) { showToast(`El ítem ${sinMonto + 1} debe tener un monto mayor a 0`, "error"); return false; }
     if (totales.mtoImpVenta <= 0) { showToast("El monto total debe ser mayor a 0", "error"); return false; }
     if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return false; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return false; }
     return true;
   };
 
@@ -486,16 +500,43 @@ export default function NotaDebitoPage() {
     const payload = prepararNotaDebito();
     if (!payload) return;
     setEmitiendo(true); setErrorEmision(null);
-    console.log("Nota de débito enviada:", payload);
+
     try {
-      const resND = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, payload, { headers: { Authorization: `Bearer ${accessToken}` } });
+      // ── 1. Guardar en BD ──────────────────────────────────────
+      const resND = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes`,
+        payload,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const comprobanteId = resND.data.comprobanteId;
-      const resSunat = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`, null, { headers: { Authorization: `Bearer ${accessToken}` } });
-      console.log("Respuesta SUNAT notes:", resSunat.data);
+      setComprobanteIdEmitido(comprobanteId); // ← guardar ANTES de SUNAT
+
+      // ── 2. Enviar a SUNAT ─────────────────────────────────────
+      await enviarASunat(comprobanteId, payload);
+
+    } catch (err: any) {
+      // Solo errores del paso 1 (guardar en BD)
+      const data = err?.response?.data;
+      const mensaje = data?.mensaje ?? data?.message ?? data?.title ?? "Error al emitir la nota de débito";
+      const detalle = data?.detalle ?? (data?.errors ? JSON.stringify(data?.errors) : null);
+      setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
+      showToast("Error al emitir nota de débito.", "error");
+    } finally {
+      setEmitiendo(false);
+    }
+  };
+
+  const enviarASunat = async (comprobanteId: number, payload: NotaCredito) => {
+    try {
+      const resSunat = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
 
       if (resSunat.data.estadoSunat === "ACEPTADO" || resSunat.data.codigoRespuestaSunat === "0") {
+        // ✅ SUNAT aceptó — lógica original intacta
         showToast(resSunat.data.mensajeRespuestaSunat ?? "Nota de débito emitida correctamente.", "success");
-        setComprobanteIdEmitido(comprobanteId);
         await cargarPdf(comprobanteId, tamanoPdf);
 
         if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
@@ -529,7 +570,7 @@ export default function NotaDebitoPage() {
                 const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
                 if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
                 const fileUrl = (await resUpload.json()).datos.url;
-                const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
+                const numeroFormateado = `51${telefonoCliente}`;
                 const resWsp = await fetch(`${whatsappBase}/api/send/single`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey }, body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-NotaDebito-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${comprobante?.cliente.razonSocial ?? ""}, adjuntamos su nota de débito electrónica ${serieNum}.` }) });
                 if (!resWsp.ok) throw new Error("Error WhatsApp");
                 showToast("Nota de débito enviada por WhatsApp", "success");
@@ -538,25 +579,59 @@ export default function NotaDebitoPage() {
           } catch { showToast("Error al procesar envíos", "error"); }
         }
         setEmitido(true);
-      } else {
-        showToast(`Nota de débito ${payload.serie}-${payload.correlativo} generada pero rechazada por SUNAT`, "error");
-        setEmitido(true);
-      }
 
-      const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-      const resSucursal = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      setCorrelativoNDFactura(resSucursal.data.correlativoNotaDebitoFactura ?? null);
-      setCorrelativoNDBoleta(resSucursal.data.correlativoNotaDebitoBoleta ?? null);
+      } else {
+        //  SUNAT rechazó con respuesta
+        const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+        setErrorEmision(resSunat.data.mensajeRespuestaSunat ?? "Nota de débito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      }
     } catch (err: any) {
-      const data = err?.response?.data;
-      console.error("Error completo:", err?.response);
-      console.error("Data del error:", JSON.stringify(data, null, 2));
-      const mensaje = data?.mensaje ?? data?.message ?? data?.title ?? "Error al emitir la nota de débito";
-      const detalle = data?.detalle ?? (data?.errors ? JSON.stringify(data?.errors) : null);
-      setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
-      showToast("Error al emitir nota de débito.", "error");
-    } finally { setEmitiendo(false); }
+      const tieneRespuesta = !!err?.response;
+      const serieCorrelativo = `${payload.serie}-${payload.correlativo}`;
+
+      if (tieneRespuesta) {
+        //  SUNAT respondió con error HTTP — sin reintento
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+        setErrorEmision(mensaje || "Nota de débito rechazada por SUNAT");
+        showToast(`La nota ${serieCorrelativo} fue rechazada por SUNAT.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+      } else {
+        //  SUNAT no responde / timeout — reintento silencioso
+        setErrorEmision("No se pudo conectar con SUNAT.");
+        showToast(`La nota ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        setEmitido(true);
+        await cargarPdf(comprobanteId, tamanoPdf);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
+      }
+    }
+
+    // Actualizar correlativos siempre
+    const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
+    const resSucursal = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    setCorrelativoNDFactura(resSucursal.data.correlativoNotaDebitoFactura ?? null);
+    setCorrelativoNDBoleta(resSucursal.data.correlativoNotaDebitoBoleta ?? null);
   };
+
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${comprobanteId}/send`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
+  };
+
 
   // ── Limpiar / reset ──────────────────────────────────────────
   const limpiarBuscador = () => {
@@ -594,24 +669,28 @@ export default function NotaDebitoPage() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Header */}
-          <div className="flex items-center gap-4 mb-2">
-            <Button variant="ghost" onClick={() => router.push("/factunet/operaciones")} className="h-10 w-10 p-0 rounded-full">
-              <ChevronLeft className="w-6 h-6" />
-            </Button>
+          <div className="flex items-center gap-4">
+           <Button
+            variant="ghost"
+            onClick={() => router.push("/factunet/operaciones")}
+            className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Nueva Nota de Débito</h3>
               <p className="text-sm text-gray-500">Regresar a selección de comprobante</p>
             </div>
           </div>
 
-          <Card title="Datos de la Nota de Débito" subtitle="Completa la información requerida">
-            <form className="space-y-6">
+          <Card >
+            <form className="space-y-6 ">
 
               {/* ── Sucursal (superadmin) ── */}
               {isSuperAdmin && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Sucursal</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Sucursal</label>
                     <select
                       value={sucursal?.sucursalId ?? ""}
                       disabled={loadingSucursales || vieneDesdeLista}
@@ -619,12 +698,12 @@ export default function NotaDebitoPage() {
                         if (!e.target.value) { setSucursal(null); setCorrelativoNDFactura(null); setCorrelativoNDBoleta(null); setSerieInput(""); return; }
                         const sel = sucursales.find((s: Sucursal) => s.sucursalId === Number(e.target.value));
                         if (!sel) return;
-                        setSucursal(sel); setSerieInput("");
+                        setSucursal(sel); setSerieInput(""); setCorrelativoInput("");
                         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`, { headers: { Authorization: `Bearer ${accessToken}` } });
                         setCorrelativoNDFactura(res.data.correlativoNotaDebitoFactura ?? null);
                         setCorrelativoNDBoleta(res.data.correlativoNotaDebitoBoleta ?? null);
                       }}
-                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                      className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                     >
                       <option value="">Seleccionar sucursal</option>
                       {sucursales.map((s: Sucursal) => (
@@ -635,10 +714,33 @@ export default function NotaDebitoPage() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo ND</label>
-                    <input type="text" disabled
-                      value={!sucursal ? "Selecciona una sucursal" : serieInput ? `${serieND}-${correlativoDisplay}` : "Selecciona serie del comprobante"}
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">
+                      Serie y Correlativo ND
+                    </label>
+                    <div
+                      className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl border w-full text-sm ${
+                        !sucursal
+                          ? "bg-gray-50 border-gray-200"
+                          : serieInput
+                          ? "bg-green-50 border-green-300"
+                          : "bg-gray-50 border-gray-200"
+                      }`}
+                    >
+                      {!sucursal ? (
+      <span className="text-[12px] text-gray-400">Selecciona una sucursal</span>
+                      ) : !serieInput ? (
+                        <span className="text-[12px] text-gray-400">Selecciona serie del comprobante</span>
+                      ) : (
+                        <>
+                          <p className="text-[12px] font-bold uppercase text-gray-500 tracking-wide">
+                            ND
+                          </p>
+                          <span className="text-[12px] font-mono font-semibold text-gray-800">
+                            {serieND}-{correlativoDisplay}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -646,15 +748,36 @@ export default function NotaDebitoPage() {
               {/* Admin normal */}
               {!isSuperAdmin && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Serie y Correlativo ND</label>
-                  <input type="text" disabled
-                    value={loadingSucursal ? "Cargando..." : serieInput ? `${serieND}-${correlativoDisplay}` : "Selecciona serie del comprobante"}
-                    className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm" />
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Serie y Correlativo ND</label>
+                  <div
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+                      loadingSucursal
+                        ? "bg-gray-50 border-gray-200"
+                        : serieInput
+                        ? "bg-green-50 border-green-300"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    {loadingSucursal ? (
+                      <span className="text-xs text-gray-400">Cargando...</span>
+                    ) : !serieInput ? (
+                      <span className="text-xs text-gray-400">Selecciona serie del comprobante</span>
+                    ) : (
+                      <>
+                        <p className="text-[12px] font-bold uppercase text-gray-500 tracking-wide">
+                          ND
+                        </p>
+                        <span className="text-[12px] font-mono font-semibold text-gray-800">
+                          {serieND}-{correlativoDisplay}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* ── Buscador ── */}
-              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-4">
+              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-2 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <Search className="w-4 h-4 text-brand-blue" />
@@ -664,12 +787,12 @@ export default function NotaDebitoPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Serie</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Serie</label>
                     <select
                       value={serieInput}
                       onChange={(e) => { setSerieInput(e.target.value); if (comprobante) limpiarBuscador(); }}
                       disabled={isSuperAdmin && sinSucursal || vieneDesdeLista}
-                      className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50"
+                      className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono disabled:opacity-50"
                     >
                       <option value="">Seleccionar serie</option>
                       {seriesDisponibles.map((s) => (
@@ -679,20 +802,20 @@ export default function NotaDebitoPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Correlativo</label>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">Correlativo</label>
                     <div className="relative">
                       <input
                         type="text" value={correlativoInput}
                         onChange={(e) => setCorrelativoInput(e.target.value.replace(/\D/g, ""))}
                         placeholder="127" maxLength={10} disabled={vieneDesdeLista}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarComprobante(serieInput, correlativoInput); } }}
-                        className="w-full py-2.5 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono"
+                        className="w-full py-2 pl-4 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm font-mono"
                       />
                       {(correlativoInput || comprobante) && (
                         <button type="button" 
                           onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); 
                             if (vieneDesdeLista) {
-                                router.replace('/factunet/operaciones/nota-credito')
+                                router.replace('/factunet/operaciones/nota-debito')
                                 setVieneDesdeLista(false)
                             } }} title="Limpiar"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
@@ -777,23 +900,37 @@ export default function NotaDebitoPage() {
                       </div>
                     )}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="email" value={correoCliente} placeholder="Correo del cliente"
-                          onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="email" value={correoCliente} placeholder="Correo del cliente"
+                            onChange={(e) => { setCorreoCliente(e.target.value); if (!e.target.value) setEnviarCorreo(false); }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarCorreo} disabled={!correoCliente} onChange={(e) => setEnviarCorreo(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5 ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                        <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
-                          onChange={(e) => { const s = e.target.value.replace(/\D/g, ""); setTelefonoCliente(s); if (!s) setEnviarWhatsapp(false); }}
-                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
-                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
-                          <span className="text-xs text-gray-500">Enviar</span>
-                        </label>
+                      <div className="space-y-1">
+                        <div className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 ${(telefonoCliente && (telefonoCliente.length < 9 || !telefonoCliente.startsWith("9"))) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                          <input type="tel" value={telefonoCliente} maxLength={9} placeholder="Teléfono / WhatsApp"
+                            onChange={(e) => { 
+                              const s = e.target.value.replace(/\D/g, ""); 
+                              setTelefonoCliente(s); 
+                              if (!s || s.length < 9 || !s.startsWith("9")) setEnviarWhatsapp(false); 
+                            }}
+                            className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400" />
+                          <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" checked={enviarWhatsapp} disabled={!telefonoCliente || telefonoCliente.length < 9 || !telefonoCliente.startsWith("9")} onChange={(e) => setEnviarWhatsapp(e.target.checked)} className="w-3.5 h-3.5 accent-brand-blue" />
+                            <span className="text-xs text-gray-500">Enviar</span>
+                          </label>
+                        </div>
+                        {telefonoCliente && !telefonoCliente.startsWith("9") && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe empezar con 9</p>
+                        )}
+                        {telefonoCliente && telefonoCliente.startsWith("9") && telefonoCliente.length < 9 && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">Debe tener 9 dígitos</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -803,7 +940,7 @@ export default function NotaDebitoPage() {
               {/* ── Motivo y fecha ── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Motivo</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Motivo</label>
                   <select
                     value={codMotivo}
                     onChange={(e) => {
@@ -813,7 +950,7 @@ export default function NotaDebitoPage() {
                       setDesMotivo(motivo?.label ?? "");
                       setIncluyePenalidad(false);
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="">Seleccionar motivo</option>
                     {MOTIVOS_ND.map((m) => (
@@ -825,8 +962,8 @@ export default function NotaDebitoPage() {
                     <div className="space-y-1 pt-1">
                       <label className="text-[10px] font-bold text-gray-400 uppercase">Descripción del motivo</label>
                       <input type="text" value={desMotivo} onChange={(e) => setDesMotivo(e.target.value)}
-                        placeholder="Descripción del motivo..."
-                        className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                        placeholder="Descripción del motivo..." maxLength={250}
+                        className="w-full py-2 px-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                     </div>
                   )}
 
@@ -841,12 +978,12 @@ export default function NotaDebitoPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Emisión</label>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase">Fecha de Emisión</label>
                   <input type="date" value={fechaEmision}
-                    max={new Date().toISOString().slice(0, 10)}
-                    min={(() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().slice(0, 10); })()}
+                    max={obtenerFechaLocal()}
+                    min={obtenerFechaLocal(-2)}
                     onChange={(e) => setFechaEmision(e.target.value)}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm" />
                 </div>
               </div>
 
@@ -921,12 +1058,12 @@ export default function NotaDebitoPage() {
                               <td className="px-2 py-1.5">
                                 {codMotivo === "03" && !incluyePenalidad ? (
                                   <div className="flex items-center gap-1">
-                                    <button type="button" onClick={() => actualizarCantidad(i, d.cantidad - 1)}
+                                    <button type="button" onClick={() => actualizarCantidad(i, Math.max(1, (Number(d.cantidad) || 0) - 1))}
                                       className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">−</button>
                                     <input type="number" min={1} step="1" value={d.cantidad}
-                                      onChange={(e) => actualizarCantidad(i, Number(e.target.value))}
+                                      onChange={(e) => actualizarCantidad(i, e.target.value === "" ? "" : Number(e.target.value))}
                                       className="w-12 py-1 border border-gray-200 bg-gray-50 rounded-lg text-xs text-center outline-none focus:border-brand-blue" />
-                                    <button type="button" onClick={() => actualizarCantidad(i, d.cantidad + 1)}
+                                    <button type="button" onClick={() => actualizarCantidad(i, (Number(d.cantidad) || 0) + 1)}
                                       className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-md text-gray-600 font-bold">+</button>
                                   </div>
                                 ) : (
@@ -937,8 +1074,8 @@ export default function NotaDebitoPage() {
                               {/* Monto con IGV + precio original debajo (motivo 02) */}
                               <td className="px-2 py-1.5">
                                 <div className="space-y-0.5">
-                                  <input type="number" min={0} step="0.01" value={d._montoConIgv ?? 0}
-                                    onChange={(e) => actualizarMontoConIgv(i, Number(e.target.value))}
+                                  <input type="number" min={0} step="0.01" value={d._montoConIgv ?? ""}
+                                    onChange={(e) => actualizarMontoConIgv(i, e.target.value === "" ? "" : Number(e.target.value))}
                                     disabled={codMotivo === "01" && comprobante?.tipoPago === "Contado"}
                                     className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-right outline-none focus:border-brand-blue font-mono disabled:opacity-50 disabled:cursor-not-allowed" />
                                   {/* Precio venta original — solo motivo 02 */}
@@ -1103,22 +1240,22 @@ export default function NotaDebitoPage() {
                 )}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => window.open(pdfUrl, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-brand-blue hover:bg-blue-600 active:scale-95 shadow-sm py-2 rounded-lg transition-all duration-200">
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
                   <button type="button"
                     onClick={() => { const a = document.createElement("a"); a.href = pdfUrl; a.download = `${empresa?.numeroDocumento}-08-${serieND}-${correlativoDisplay}.pdf`; a.click(); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-500 active:scale-95 border border-green-500 hover:border-emerald-200 py-2 rounded-lg transition-all duration-200 shadow-sm">
                     <Download className="w-3.5 h-3.5" /> Descargar
                   </button>
                   <button type="button" onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2.5 rounded-lg transition-all duration-200 shadow-sm">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 active:scale-95 border border-amber-400 hover:border-amber-200 py-2 rounded-lg transition-all duration-200 shadow-sm">
                     <Printer className="w-3.5 h-3.5" /> Imprimir
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+           <div className="h-48 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                 <div className="p-4 rounded-full bg-white shadow-sm"><Printer className="w-8 h-8 text-gray-400" /></div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
@@ -1156,5 +1293,13 @@ export default function NotaDebitoPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NotaDebitoPage() {
+  return (
+    <Suspense fallback={null}>
+      <NotaDebitoContent />
+    </Suspense>
   );
 }

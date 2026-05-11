@@ -16,7 +16,7 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import {
   Factura,
   FacturaCliente,
@@ -33,7 +33,7 @@ import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { ProductoSucursal } from "../../productos/gestioProductos/Producto";
 import { useProductosSucursal } from "../../productos/gestioProductos/useProductosSucursal";
 import axios from "axios";
-import { numeroALetras } from "@/app/components/ui/numeroALetras";
+import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import { useToast } from "@/app/components/ui/Toast";
 import { useClientesRuc } from "../../clientes/gestionClientes/useClientesRuc";
 import { useEmpresaEmisor } from "../boleta/gestionBoletas/useEmpresaEmisor";
@@ -117,7 +117,7 @@ const MEDIOS_PAGO_DETRACCION = [
 const PRECIOS_BOLSA = { pequeña: 0.1, mediana: 0.2, grande: 0.3 };
 const ICBPER_FACTOR = 0.5;
 
-export default function FacturaPage() {
+function FacturaContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -232,10 +232,6 @@ export default function FacturaPage() {
     observacion: "",
   });
   const [aplicarDetraccion, setAplicarDetraccion] = useState(false);
-
-  //Manejar reenvio sunat
-  const [comprobanteRechazado, setComprobanteRechazado] = useState(false);
-  const [rechazadoPorSunat, setRechazadoPorSunat] = useState(false);
 
   // ── Guías de Remisión ────────────────────────────────────────
   const [showGuias, setShowGuias] = useState(false);
@@ -1072,7 +1068,7 @@ export default function FacturaPage() {
     } else {
       legends.push({
         code: "1000",
-        value: numeroALetras(totales.importeTotal, moneda),
+        value: numeroAlertas(totales.importeTotal, moneda),
       });
     }
     if (aplicarDetraccion) {
@@ -1588,6 +1584,7 @@ export default function FacturaPage() {
 
   // ── Preparar y emitir ────────────────────────────────────────
   const prepararFactura = () => {
+    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return; }
     const esCredito = factura.tipoPago === 'Credito' || factura.tipoPago === 'CreditoInicial';
     const esCreditoInicial = factura.tipoPago === 'CreditoInicial';
 
@@ -1624,6 +1621,7 @@ export default function FacturaPage() {
     };
   };
 
+  // ── Emitir, guardar en BD ────────
   const emitirComprobante = async () => {
     if (!factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) {
       showToast("Debe seleccionar o ingresar un cliente", "error"); return;
@@ -1650,6 +1648,39 @@ export default function FacturaPage() {
     }
     if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return; }
     if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return; }
+
+    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
+    const sumaCuotas = cuotas.reduce((acc, c) => acc + (Number(c.monto) || 0), 0)
+    const pagoInvalido = pagos.some(p => !p.monto || Number(p.monto) <= 0)
+    const cuotaInvalida = cuotas.some(c => !c.monto || Number(c.monto) <= 0)
+    const montoDetraccionAplicada = aplicarDetraccion ? detraccion.montoDetraccion : 0
+
+    if (factura.tipoPago !== 'Credito' && pagoInvalido) {
+      showToast('Todos los montos de pago deben ser mayores a cero', 'error')
+      return
+    }
+    if (factura.tipoPago !== 'Contado' && cuotaInvalida) {
+      showToast('Todos los montos de las cuotas deben ser mayores a cero', 'error')
+      return
+    }
+    if (factura.tipoPago === 'Contado' && Math.abs(sumaPagos - totales.total) > 0.01) {
+      showToast(`Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
+      return
+    }
+    if (factura.tipoPago === 'Credito') {
+      const montoEsperado = parseFloat(Math.max(0, totales.total - montoDetraccionAplicada).toFixed(2))
+      if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
+        showToast(`Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${montoEsperado.toFixed(2)})`, 'error')
+        return
+      }
+    }
+    if (factura.tipoPago === 'CreditoInicial') {
+      const montoEsperado = parseFloat(Math.max(0, totales.total - sumaPagos - montoDetraccionAplicada).toFixed(2))
+      if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
+        showToast(`Pago inicial (${simbolo} ${sumaPagos.toFixed(2)}) + cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${(sumaPagos + sumaCuotas).toFixed(2)} vs ${simbolo} ${totales.total.toFixed(2)})`, 'error')
+        return
+      }
+    }
 
     setEmitiendo(true);
     setErrorEmision(null);
@@ -1693,30 +1724,34 @@ export default function FacturaPage() {
       if (resSunat.data.exitoso) {
         showToast(resSunat.data.mensaje ?? "Factura emitida correctamente.", "success");
         setEmitido(true);
-        setComprobanteRechazado(false);
         procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT rechazó con exitoso: false
+        // SUNAT respondió pero rechazó — sin reintento
+        const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
         setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+        showToast(`La factura ${serieCorrelativo} fue rechazada.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       }
     } catch (err: any) {
       const tieneRespuesta = !!err?.response;
-      const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
-      
+
       if (tieneRespuesta) {
-        // ❌ SUNAT respondió con error HTTP
+        // SUNAT respondió con error HTTP — sin reintento
+        const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
+        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
         setErrorEmision(mensaje || "Comprobante rechazado por SUNAT");
-        setComprobanteRechazado(false);
-        setRechazadoPorSunat(true);
-        showToast("Comprobante rechazado por SUNAT. Corrígelo en la sección Comprobantes.", "error");
+        showToast(`La factura ${serieCorrelativo} fue rechazada.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
       } else {
-        // ❌ SUNAT caída/sin respuesta
-        setErrorEmision("No se pudo conectar con SUNAT. Puedes reintentar el envío.");
-        setComprobanteRechazado(true);
-        showToast("SUNAT no responde. Puedes reintentar.", "error");
+        // SUNAT no responde / timeout — reintento silencioso
+        const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
+        setErrorEmision("No se pudo conectar con SUNAT.");
+        showToast(`La factura ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        setEmitido(true);
+        procesarSegundoPlano(comprobanteId);
+        reintentarEnSegundoPlano(comprobanteId); // ← sin await
       }
     }
   };
@@ -1762,23 +1797,30 @@ export default function FacturaPage() {
         const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, { type: "application/pdf" });
 
         if (enviarCorreo && correoCliente) {
-          try {
-            const formData = new FormData();
-            formData.append("toEmail", correoCliente);
-            formData.append("toName", factura.cliente?.razonSocial ?? "Cliente");
-            formData.append("subject", `Factura Electrónica ${serieNum}`);
-            formData.append("body", "Se emitió la factura electrónica por los productos/servicios indicados.");
-            formData.append("tipo", "1");
-            formData.append("comprobanteJson", JSON.stringify({
-              serieNumero: serieNum, estadoSunat: "ACEPTADO",
-              items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-              igv: totales.igv, total: totales.importeTotal,
-            }));
-            formData.append("adjunto", pdfFile);
-            const resCorreo = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData });
-            if (!resCorreo.ok) throw new Error("Error al enviar correo");
-            showToast("Comprobante enviado por correo", "success");
-          } catch { showToast("Error al enviar por correo", "error"); }
+          const correosLista = correoCliente.split(',').map(s => s.trim()).filter(Boolean);
+          const comprobanteJson = JSON.stringify({
+            serieNumero: serieNum, estadoSunat: "ACEPTADO",
+            items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
+            igv: totales.igv, total: totales.importeTotal,
+          });
+          const resultadosCorreo = await Promise.allSettled(
+            correosLista.map(correo => {
+              const formData = new FormData();
+              formData.append("toEmail", correo);
+              formData.append("toName", factura.cliente?.razonSocial ?? "Cliente");
+              formData.append("subject", `Factura Electrónica ${serieNum}`);
+              formData.append("body", "Se emitió la factura electrónica por los productos/servicios indicados.");
+              formData.append("tipo", "1");
+              formData.append("comprobanteJson", comprobanteJson);
+              formData.append("adjunto", pdfFile);
+              return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData })
+                .then(res => { if (!res.ok) throw new Error(`Error correo ${correo}`); });
+            })
+          );
+          const fallidosCorreo = resultadosCorreo.filter(r => r.status === 'rejected').length;
+          if (fallidosCorreo === correosLista.length) showToast("Error al enviar por correo", "error");
+          else if (fallidosCorreo > 0) showToast(`Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`, "error");
+          else showToast(correosLista.length > 1 ? `Factura enviada a ${correosLista.length} correos` : "Comprobante enviado por correo", "success");
         }
 
         if (enviarWhatsapp && telefonoCliente) {
@@ -1790,14 +1832,21 @@ export default function FacturaPage() {
             const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
             if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
             const fileUrl = (await resUpload.json()).datos.url;
-            const numeroFormateado = telefonoCliente.startsWith("51") ? telefonoCliente : `51${telefonoCliente}`;
-            const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-              body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${factura.cliente?.razonSocial ?? ""}, adjuntamos su factura electrónica ${serieNum}.` }),
-            });
-            if (!resWsp.ok) throw new Error("Error al enviar por WhatsApp");
-            showToast("Comprobante enviado por WhatsApp", "success");
+            const telefonosLista = telefonoCliente.split(',').map(s => s.trim()).filter(Boolean);
+            const resultadosWsp = await Promise.allSettled(
+              telefonosLista.map(num => {
+                const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
+                return fetch(`${whatsappBase}/api/send/single`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
+                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${factura.cliente?.razonSocial ?? ""}, adjuntamos su factura electrónica ${serieNum}.` }),
+                }).then(res => { if (!res.ok) throw new Error(`Error WhatsApp ${num}`); });
+              })
+            );
+            const fallidosWsp = resultadosWsp.filter(r => r.status === 'rejected').length;
+            if (fallidosWsp === telefonosLista.length) showToast("Error al enviar por WhatsApp", "error");
+            else if (fallidosWsp > 0) showToast(`WhatsApp enviado, pero falló ${fallidosWsp} número(s)`, "error");
+            else showToast(telefonosLista.length > 1 ? `Factura enviada a ${telefonosLista.length} números` : "Comprobante enviado por WhatsApp", "success");
           } catch { showToast("Error al enviar por WhatsApp", "error"); }
         }
       } catch { showToast("Error al procesar envíos", "error"); }
@@ -1829,22 +1878,26 @@ export default function FacturaPage() {
     }));
   };
 
-  const reintentarEnvio = async () => {
-    if (!comprobanteIdEmitido) return;
-    setEmitiendo(true);
-    setErrorEmision(null);
-    setComprobanteRechazado(false);
-    await enviarASunat(comprobanteIdEmitido);
-    setEmitiendo(false);
+  // ── Reintento silencioso — solo si SUNAT no responde ────────
+  const reintentarEnSegundoPlano = async (comprobanteId: number) => {
+    await new Promise(res => setTimeout(res, 3000));
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    } catch {
+      // silencioso
+    }
   };
 
   //limpiamos para nueva factura
   const nuevaFactura = () => {
     sharedVentaStore.clear();
-    setComprobanteRechazado(false);
-    setRechazadoPorSunat(false);
     setEmitido(false);
     setPdfA4Url(null);
+    setTamanoPdf("A4");
     setPdfTicketUrl(null);
     setComprobanteIdEmitido(null);
     setErrorEmision(null);
@@ -1933,8 +1986,7 @@ export default function FacturaPage() {
         <div className="lg:col-span-2 space-y-6">
 
           <Card
-            title="Datos del Comprobante"
-            subtitle="Completa la información requerida"
+    
           >
             {cargandoComprobante && (
               <div className="flex items-center pb-3 gap-2 text-xs text-brand-blue">
@@ -1945,105 +1997,10 @@ export default function FacturaPage() {
 
             <form className="space-y-3">
               {/* ── 2. Serie y correlativo ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isSuperAdmin ? (
-                  <>
-                    {/* SuperAdmin col 1: selector sucursal */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Sucursal
-                      </label>
-                      <select
-                        value={sucursal?.sucursalId ?? ""}
-                        disabled={loadingSucursales}
-                        onChange={async (e) => {
-                          if (!e.target.value) {
-                            setSucursal(null);
-                            setCorrelativoActual(null);
-                            setDetalles([]);
-                            setBusquedaProducto([]);
-                            setShowDropdownProducto([]);
-                            setCantidadBolsa(0);
-                            return;
-                          }
-                          const seleccionada = sucursales.find(
-                            (s: Sucursal) =>
-                              s.sucursalId === Number(e.target.value),
-                          );
-                          if (!seleccionada) return;
-                          setSucursal(seleccionada);
-                          setDetalles([]);
-                          setBusquedaProducto([]);
-                          setShowDropdownProducto([]);
-                          setCantidadBolsa(0);
-                          const res = await axios.get(
-                            `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${seleccionada.sucursalId}`,
-                            {
-                              headers: {
-                                Authorization: `Bearer ${accessToken}`,
-                              },
-                            },
-                          );
-                          setCorrelativoActual(res.data.correlativoFactura);
-                          setFactura((prev) => ({
-                            ...prev,
-                            serie: seleccionada.serieFactura,
-                            correlativo: String(
-                              res.data.correlativoFactura,
-                            ).padStart(8, "0"),
-                          }));
-                        }}
-                        className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                      >
-                        <option value="">Seleccionar sucursal</option>
-                        {sucursales.map((s: Sucursal) => (
-                          <option key={s.sucursalId} value={s.sucursalId}>
-                            {s.serieFactura} —{" "}
-                            {s.nombre ?? s.codEstablecimiento}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* SuperAdmin col 2: serie-correlativo */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Serie y Correlativo
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={
-                          !sucursal
-                            ? "Selecciona una sucursal"
-                            : `${serieDisplay}-${correlativoDisplay}`
-                        }
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  // Admin: serie-correlativo en media columna
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Serie y Correlativo
-                    </label>
-                    <input
-                      type="text"
-                      disabled
-                      value={
-                        loadingSucursal
-                          ? "Cargando..."
-                          : `${serieDisplay}-${correlativoDisplay}`
-                      }
-                      className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm"
-                    />
-                  </div>
-                )}
-              </div>
+        
 
               {/* ── 3. Datos del Cliente ── */}
-              <div className="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-4">
+            <div className=" rounded-xl space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <UserRound className="w-4 h-4 text-brand-blue" />
@@ -2056,8 +2013,8 @@ export default function FacturaPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Columna izquierda: Tipo doc + Razón social */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
-                      Tipo y Nº Documento Cliente
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">
+                      Tipo y Nº Documento 
                     </label>
                     <div className="flex gap-2">
                       <select
@@ -2071,7 +2028,7 @@ export default function FacturaPage() {
                             cliente: undefined,
                           }));
                         }}
-                        className="w-1/3 py-2.5 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                        className="w-1/3 py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                       >
                         <option value="06">RUC</option>
                         <option value="04">CE</option>
@@ -2101,7 +2058,7 @@ export default function FacturaPage() {
                           }
                           maxLength={tipoDoc === "06" ? 11 : 12}
                           placeholder="Buscar por RUC o nombre..."
-                          className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+                          className="w-full pl-4 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
                         />
                         {loadingCliente && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
@@ -2138,7 +2095,7 @@ export default function FacturaPage() {
                         disabled
                         value={factura.cliente?.razonSocial ?? ""}
                         placeholder="Razón social"
-                        className="w-full py-2.5 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
+                        className="w-full py-2 px-4 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 text-sm"
                       />
                       {factura.cliente?.clienteId === null &&
                         factura.cliente?.razonSocial && (
@@ -2159,22 +2116,22 @@ export default function FacturaPage() {
 
                   {/* Columna derecha: Correo y Teléfono */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 uppercase">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">
                       Contacto
                     </label>
                     <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
+                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2
                       ${enviarCorreo && !correoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
                     >
                       <input
-                        type="email"
+                        type="text"
                         value={correoCliente}
                         onChange={(e) => {
                           setCorreoCliente(e.target.value);
                           if (!e.target.value) setEnviarCorreo(false);
                         }}
                         disabled={!factura.cliente?.razonSocial}
-                        placeholder="Correo del cliente"
+                        placeholder="correo@cliente.com, otro@email.com"
                         className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
                       />
                       <label className="flex items-center gap-1 shrink-0 cursor-pointer">
@@ -2188,33 +2145,38 @@ export default function FacturaPage() {
                         <span className="text-xs text-gray-500">Enviar</span>
                       </label>
                     </div>
-                    <div
-                      className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2.5
-                      ${enviarWhatsapp && !telefonoCliente ? "border-red-300 bg-red-50" : "border-gray-200"}`}
-                    >
-                      <input
-                        type="tel"
-                        value={telefonoCliente}
-                        onChange={(e) => {
-                          const soloNum = e.target.value.replace(/\D/g, "");
-                          setTelefonoCliente(soloNum);
-                          if (!soloNum) setEnviarWhatsapp(false);
-                        }}
-                        disabled={!factura.cliente?.razonSocial}
-                        maxLength={9}
-                        placeholder="Teléfono / WhatsApp"
-                        className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
-                      />
-                      <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                    <div className="space-y-1">
+                      <div
+                        className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2
+                        ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                      >
                         <input
-                          type="checkbox"
-                          checked={enviarWhatsapp}
-                          onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                          disabled={!telefonoCliente}
-                          className="w-3.5 h-3.5 accent-brand-blue"
+                          type="tel"
+                          value={telefonoCliente}
+                          onChange={(e) => {
+                            const s = e.target.value.replace(/[^\d,]/g, '');
+                            setTelefonoCliente(s);
+                            const nums = s.split(',').map(x => x.trim()).filter(Boolean);
+                            if (!nums.length || !nums.every(n => n.startsWith('9') && n.length === 9)) setEnviarWhatsapp(false);
+                          }}
+                          disabled={!factura.cliente?.razonSocial}
+                          placeholder="9XXXXXXXX, 9XXXXXXXX"
+                          className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder:text-gray-400 disabled:opacity-40"
                         />
-                        <span className="text-xs text-gray-500">Enviar</span>
-                      </label>
+                        <label className="flex items-center gap-1 shrink-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={enviarWhatsapp}
+                            onChange={(e) => setEnviarWhatsapp(e.target.checked)}
+                            disabled={!telefonoCliente || !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9)}
+                            className="w-3.5 h-3.5 accent-brand-blue"
+                          />
+                          <span className="text-xs text-gray-500">Enviar</span>
+                        </label>
+                      </div>
+                      {telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) && (
+                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Cada número debe empezar con 9 y tener 9 dígitos</p>
+                      )}
                     </div>
                   </div>
 
@@ -2234,9 +2196,9 @@ export default function FacturaPage() {
               </div>
 
               {/* ── Fechas ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Fecha y Hora de Emisión
                   </label>
                   <input
@@ -2260,7 +2222,7 @@ export default function FacturaPage() {
                         horaEmision: e.target.value + ":00",
                       }));
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm"
                   />
                   {fechaEmisionEditada && (
                     <button
@@ -2282,12 +2244,9 @@ export default function FacturaPage() {
                     }
                   />
                 </div>
-              </div>
 
-              {/* ── Moneda y Tipo Pago ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Moneda
                   </label>
                   <select
@@ -2345,7 +2304,7 @@ export default function FacturaPage() {
                         );
                       }
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="PEN">PEN - Soles</option>
                     <option value="USD">
@@ -2354,7 +2313,7 @@ export default function FacturaPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Tipo de Pago
                   </label>
                   <select
@@ -2375,22 +2334,28 @@ export default function FacturaPage() {
                       ]);
                       setPagosEditados([false]);
                     }}
-                    className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
                   >
                     <option value="Contado">Contado</option>
                     <option value="Credito">Crédito</option>
                     <option value="CreditoInicial">Crédito con Inicial</option>
                   </select>
                 </div>
+          
+
               </div>
+
+              {/* ── Moneda y Tipo Pago ── */}
+            
+              
 
               {/* ── Pagos ── */}
               {(factura.tipoPago === "Contado" ||
                 factura.tipoPago === "CreditoInicial") &&
                 !totales.soloGratuitas && (
-                  <div className="border border-gray-100 rounded-xl p-4 space-y-4 bg-gray-50/50">
+                  <div className="border border-gray-100 rounded-xl p-2 space-y-4 bg-gray-50/50">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
+                      <label className="text-xs font-bold text-gray-700 uppercase">
                         {factura.tipoPago === "CreditoInicial"
                           ? "Pago Inicial"
                           : "Datos de Pago"}
@@ -2405,145 +2370,96 @@ export default function FacturaPage() {
                         </button>
                       )}
                     </div>
-                    <div className="space-y-3">
-                      {pagos.map((pago, i) => (
-                        <div
-                          key={i}
-                          className="space-y-3 pb-3 border-b border-gray-100 last:border-0"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500">
-                                Medio de Pago
-                              </label>
-                              <select
-                                value={pago.medioPago}
-                                onChange={(e) =>
-                                  actualizarPago(i, "medioPago", e.target.value)
-                                }
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                              >
-                                {todosMedios.map((m) => (
-                                  <option
-                                    key={m}
-                                    value={m}
-                                    disabled={
-                                      mediosUsados.includes(m) &&
-                                      pago.medioPago !== m
-                                    }
-                                  >
-                                    {m}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500">
-                                Monto
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="number"
-                                  value={pago.monto}
-                                  onChange={(e) => {
-                                    actualizarPago(i, "monto", e.target.value);
-                                    setPagosEditados((prev) => {
-                                      const n = [...prev];
-                                      n[i] = e.target.value !== "";
-                                      return n;
-                                    });
-                                  }}
-                                  onBlur={(e) => {
-                                    if (
-                                      e.target.value === "" ||
-                                      e.target.value === "0"
-                                    ) {
-                                      setPagosEditados((prev) => {
-                                        const n = [...prev];
-                                        n[i] = false;
-                                        return n;
-                                      });
-                                      actualizarPago(i, "monto", "");
-                                    }
-                                  }}
-                                  placeholder={montoRestante(i)}
-                                  disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial'}
-                                  className={`w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
-                                    ${pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-                                />
-                                {pagos.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => eliminarPago(i)}
-                                    className="text-red-400 hover:text-red-600 px-2"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {pago.medioPago !== "Efectivo" && (
-                              <>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs text-gray-500">
-                                    Nº Operación
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={pago.numeroOperacion}
-                                    onChange={(e) =>
-                                      actualizarPago(
-                                        i,
-                                        "numeroOperacion",
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Número de operación"
-                                    className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                                  />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs text-gray-500">
-                                    Entidad Financiera
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={pago.entidadFinanciera}
-                                    onChange={(e) =>
-                                      actualizarPago(
-                                        i,
-                                        "entidadFinanciera",
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Banco / entidad"
-                                    className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                                  />
-                                </div>
-                              </>
-                            )}
-                            <div className="space-y-1.5 md:col-span-2">
-                              <label className="text-xs text-gray-500">
-                                Observaciones
-                              </label>
-                              <input
-                                type="text"
-                                value={pago.observaciones}
-                                onChange={(e) =>
-                                  actualizarPago(
-                                    i,
-                                    "observaciones",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Observaciones (opcional)"
-                                className="w-full py-2.5 px-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+
+<div className="space-y-3">
+  {pagos.map((pago, i) => (
+    <div key={i} className="pb-3 border-b border-gray-100 last:border-0">
+      <div className="flex items-end gap-3">
+
+        <div className="space-y-1.5 w-36 shrink-0">
+          <label className="text-xs text-gray-500">Medio de Pago</label>
+          <select
+            value={pago.medioPago}
+            onChange={(e) => actualizarPago(i, "medioPago", e.target.value)}
+            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+          >
+            {todosMedios.map((m) => (
+              <option key={m} value={m} disabled={mediosUsados.includes(m) && pago.medioPago !== m}>{m}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5 w-32 shrink-0">
+          <label className="text-xs text-gray-500">Monto</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={pago.monto}
+              onChange={(e) => {
+                actualizarPago(i, "monto", e.target.value);
+                setPagosEditados((prev) => { const n = [...prev]; n[i] = e.target.value !== ""; return n; });
+              }}
+              onBlur={(e) => {
+                if (e.target.value === "" || e.target.value === "0") {
+                  setPagosEditados((prev) => { const n = [...prev]; n[i] = false; return n; });
+                  actualizarPago(i, "monto", "");
+                }
+              }}
+              placeholder={montoRestante(i)}
+              disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial'}
+              className={`w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
+                ${pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+            />
+            {pagos.length > 1 && (
+              <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-1">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {pago.medioPago !== "Efectivo" && (
+          <>
+            <div className="space-y-1.5 w-36 shrink-0">
+              <label className="text-xs text-gray-500">Nº Operación</label>
+              <input
+                type="text"
+                value={pago.numeroOperacion}
+                onChange={(e) => actualizarPago(i, "numeroOperacion", e.target.value)}
+                placeholder="Nº operación"
+                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+              />
+            </div>
+            <div className="space-y-1.5 w-36 shrink-0">
+              <label className="text-xs text-gray-500">Entidad Financiera</label>
+              <input
+                type="text"
+                value={pago.entidadFinanciera}
+                onChange={(e) => actualizarPago(i, "entidadFinanciera", e.target.value)}
+                placeholder="Banco / entidad"
+                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-1.5 flex-1">
+          <label className="text-xs text-gray-500">Observaciones</label>
+          <input
+            type="text"
+            value={pago.observaciones}
+            onChange={(e) => actualizarPago(i, "observaciones", e.target.value)}
+            placeholder="Observaciones (opcional)"
+            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+          />
+        </div>
+
+      </div>
+    </div>
+  ))}
+</div>
+
+
                     {factura.tipoPago === "CreditoInicial" && (
                       <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
                         <p className="text-gray-500">
@@ -3307,13 +3223,13 @@ export default function FacturaPage() {
                                   className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
                                     ${esGratuito ? "bg-green-50 border-green-200 text-green-700" : "bg-gray-50 border-gray-200"}`}
                                 >
-                                  <option value="10">10 - Gravado</option>
-                                  <option value="20">20 - Exonerado</option>
-                                  <option value="30">30 - Inafecto</option>
+                                  <option value="10">Grav.</option>
+                                  <option value="20">Exon.</option>
+                                  <option value="30">Inaf.</option>
                                   <option value="11">
                                     11 - Grav. Gratuito
                                   </option>
-                                  <option value="21">21 - Exo. Gratuito</option>
+                                  <option value="21">21 - Exon. Gratuito</option>
                                   <option value="31">
                                     31 - Inaf. Gratuito
                                   </option>
@@ -3356,8 +3272,8 @@ export default function FacturaPage() {
                                     }
                                     className="w-full py-1 px-1 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue"
                                   >
-                                    <option value={18}>18%</option>
-                                    <option value={10.5}>10.5%</option>
+                                    <option value={18}>18</option>
+                                    <option value={10.5}>10.5</option>
                                   </select>
                                 ) : (
                                   <span className="block text-center text-gray-400 text-xs">
@@ -3366,24 +3282,27 @@ export default function FacturaPage() {
                                 )}
                               </td>
 
-                              {/* Tipo descuento */}
+                              {/* T.Desc */}
                               <td className="px-2 py-1.5">
-                                <select
-                                  value={d.codigoTipoDescuento ?? "00"}
-                                  onChange={(e) =>
-                                    actualizarCodigoDescuento(i, e.target.value)
-                                  }
-                                  disabled={
-                                    esGratuito || !!d._esIcbper || esPorConsumo
-                                  }
-                                  className={`w-full py-1 px-1 border rounded-lg text-xs outline-none focus:border-brand-blue
-                                    ${esGratuito || d._esIcbper || esPorConsumo ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-50 border-gray-200"}`}
-                                >
-                                  <option value="00">00 - Afecta base</option>
-                                  <option value="01">
-                                    01 - No afecta base
-                                  </option>
-                                </select>
+                                <div className="relative w-full">
+                                  <select
+                                    value={d.codigoTipoDescuento ?? "01"}
+                                    onChange={e => actualizarCodigoDescuento(i, e.target.value)}
+                                    disabled={!!d._esIcbper || esPorConsumo}
+                                    style={{ color: "transparent" }}
+                                    className={`w-full py-1 pl-1 pr-4 border rounded-lg text-xs outline-none focus:border-brand-blue appearance-none ${
+                                      d._esIcbper || esPorConsumo
+                                        ? "bg-gray-100 border-gray-100 cursor-not-allowed"
+                                        : "bg-gray-50 border-gray-200"
+                                    }`}
+                                  >
+                                    <option style={{ color: "#374151" }} value="00">00 - Afecta base</option>
+                                    <option style={{ color: "#374151" }} value="01">01 - No afecta base</option>
+                                  </select>
+                                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-mono text-gray-700">
+                                    {d.codigoTipoDescuento ?? "01"}
+                                  </span>
+                                </div>
                               </td>
 
                               {/* Descuento unitario */}
@@ -3661,7 +3580,127 @@ export default function FacturaPage() {
         {/* ── Sidebar ── */}
         <div className="space-y-6">
           <Card title="Vista Previa" subtitle="Representación gráfica del comprobante">
-            <div className="mb-3">
+
+     {/* ── Serie y correlativo ── */}
+
+<div>
+  {isSuperAdmin ? (
+    <>
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-bold text-gray-600 uppercase">
+          Sucursal
+        </label>
+        <select
+          value={sucursal?.sucursalId ?? ""}
+          disabled={loadingSucursales}
+          onChange={async (e) => {
+            if (!e.target.value) {
+              setSucursal(null);
+              setCorrelativoActual(null);
+              setDetalles([]);
+              setBusquedaProducto([]);
+              setShowDropdownProducto([]);
+              setCantidadBolsa(0);
+              return;
+            }
+            const sel = sucursales.find(
+              (s: Sucursal) => s.sucursalId === Number(e.target.value),
+            );
+            if (!sel) return;
+            setSucursal(sel);
+            setDetalles([]);
+            setBusquedaProducto([]);
+            setShowDropdownProducto([]);
+            setCantidadBolsa(0);
+            const res = await axios.get(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
+              { headers: { Authorization: `Bearer ${accessToken}` } },
+            );
+            setCorrelativoActual(res.data.correlativoFactura);
+            setFactura((prev) => ({
+              ...prev,
+              serie: sel.serieFactura,
+              correlativo: String(res.data.correlativoFactura).padStart(8, "0"),
+            }));
+          }}
+          className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+        >
+          <option value="">Seleccionar sucursal</option>
+          {sucursales.map((s: Sucursal) => (
+            <option key={s.sucursalId} value={s.sucursalId}>
+              {s.serieFactura} — {s.nombre ?? s.codEstablecimiento}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Info serie - estilos compactos */}
+      <div
+        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full mt-3 text-sm ${
+          !sucursal
+            ? "bg-amber-50 border-amber-200"
+            : serieDisplay
+              ? "bg-green-50 border-green-300"
+              : "bg-gray-50 border-gray-200"
+        }`}
+      >
+        {!sucursal ? (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-3.5 h-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
+            </svg>
+            <span>Elige una sucursal</span>
+          </span>
+        ) : !serieDisplay ? (
+          <span className="text-xs text-gray-400">Sin serie</span>
+        ) : (
+          <>
+            <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+              Factura:
+            </p>
+            <span className="text-xs font-mono font-semibold text-gray-800">
+              {serieDisplay}-{correlativoDisplay}
+            </span>
+          </>
+        )}
+      </div>
+    </>
+  ) : (
+    <div
+      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+        serieDisplay
+          ? "bg-green-50 border-green-300"
+          : "bg-gray-50 border-gray-200"
+      }`}
+    >
+      {loadingSucursal ? (
+        <span className="text-gray-400 text-xs">Cargando...</span>
+      ) : !serieDisplay ? (
+        <span className="text-xs text-gray-400">Sin serie</span>
+      ) : (
+        <>
+          <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+            Factura:
+          </p>
+          <span className="text-xs font-mono font-semibold text-gray-800">
+            {serieDisplay}-{correlativoDisplay}
+          </span>
+        </>
+      )}
+    </div>
+  )}
+</div>
+
+            <div className="mb-3 mt-3">
               <select
                 value={tamanoPdf}
                 onChange={async (e) => {
@@ -3736,7 +3775,7 @@ export default function FacturaPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                 <div className="p-4 rounded-full bg-white shadow-sm">
                   <Printer className="w-8 h-8 text-gray-400" />
                 </div>
@@ -3751,36 +3790,21 @@ export default function FacturaPage() {
               <Button
                 className="w-full py-3 text-base"
                 type="button"
-                onClick={
-                  emitido
-                    ? nuevaFactura
-                    : comprobanteRechazado
-                      ? reintentarEnvio
-                      : rechazadoPorSunat  // ← nuevo
-                        ? nuevaFactura
-                        : emitirComprobante
-                }
+                onClick={emitido ? nuevaFactura : emitirComprobante}
                 disabled={
                   emitiendo ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && sinSucursal) ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !serieDisplay) ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) ||
-                  (!emitido && !comprobanteRechazado && !rechazadoPorSunat && detalles.length === 0)
+                  (!emitido && sinSucursal) ||
+                  (!emitido && !serieDisplay) ||
+                  (!emitido && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) ||
+                  (!emitido && detalles.length === 0)
                 }
               >
                 {emitiendo ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {comprobanteRechazado ? "Reenviando..." : "Emitiendo..."}
+                    Emitiendo...
                   </span>
-                ) : emitido
-                    ? "Nueva Factura"
-                    : comprobanteRechazado
-                      ? "🔄 Reintentar envío a SUNAT"
-                      : rechazadoPorSunat   // ← nuevo
-                        ? "Nueva Factura"
-                        : "Emitir Factura"
-                }
+                ) : emitido ? "Nueva Factura" : "Emitir Factura"}
               </Button>
               {sinSucursal && <p className="text-xs text-amber-600 text-center">Selecciona una sucursal para emitir</p>}
               {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
@@ -3816,5 +3840,13 @@ export default function FacturaPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function FacturaPage() {
+  return (
+    <Suspense fallback={null}>
+      <FacturaContent />
+    </Suspense>
   );
 }

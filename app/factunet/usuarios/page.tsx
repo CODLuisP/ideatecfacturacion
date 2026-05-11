@@ -117,11 +117,13 @@ function UsuarioCard({
   canEdit,
   onEdit,
   onDelete,
+  canDelete,
 }: {
   u: any;
   canEdit: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  canDelete: boolean;
 }) {
   const cfg = ROL_CONFIG[u.rol as Rol] ?? ROL_CONFIG.facturador;
   const Icon = cfg.icon;
@@ -162,12 +164,14 @@ function UsuarioCard({
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={onDelete}
-                className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:text-rose-700 hover:bg-rose-100 transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {canDelete && (
+                <button
+                  onClick={onDelete}
+                  className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:text-rose-700 hover:bg-rose-100 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -290,7 +294,7 @@ export default function UsuariosPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal?ruc=${ruc}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
-      console.log("Sucursales response:", res.data); // 👈 revisa esto
+      console.log("Sucursales response:", res.data);
       setSucursales(res.data);
     } catch {
       showToast("Error al cargar sucursales", "error");
@@ -357,21 +361,13 @@ export default function UsuariosPage() {
   const handleCrearUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(formData.password)) {
-      showToast(
-        "La contraseña debe tener mínimo 8 caracteres con letras y números",
-        "error",
-      );
+    if (formData.password.length < 8) {
+      showToast("La contraseña debe tener mínimo 8 caracteres", "error");
       return;
     }
 
-    // Validar que el superadmin haya seleccionado RUC y sucursal
+    // Validar que el superadmin haya seleccionado sucursal
     if (isSuperadmin) {
-      if (rucEmpresa.length !== 11) {
-        showToast("Ingresa un RUC válido de 11 dígitos", "error");
-        return;
-      }
       if (!formData.sucursalID) {
         showToast("Selecciona una sucursal", "error");
         return;
@@ -384,7 +380,7 @@ export default function UsuariosPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/Usuario/register`,
         {
           username: formData.username,
-          email: formData.email,
+          email: formData.rol === "facturador" ? user?.email : formData.email,
           password: formData.password,
           rol: formData.rol,
           ruc: user?.ruc,
@@ -409,19 +405,19 @@ export default function UsuariosPage() {
   };
 
   // ── Filtrado ───────────────────────────────────────────────────────────────
-const filtered = usuarios
-  .filter((u) => {
-    const matchSearch =
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchRol = rolFilter === "todos" || u.rol === rolFilter;
-    return matchSearch && matchRol;
-  })
-  .sort((a, b) => {
-    if (a.rol === "superadmin" && b.rol !== "superadmin") return -1;
-    if (a.rol !== "superadmin" && b.rol === "superadmin") return 1;
-    return 0;
-  });
+  const filtered = usuarios
+    .filter((u) => {
+      const matchSearch =
+        u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchRol = rolFilter === "todos" || u.rol === rolFilter;
+      return matchSearch && matchRol;
+    })
+    .sort((a, b) => {
+      if (a.rol === "superadmin" && b.rol !== "superadmin") return -1;
+      if (a.rol !== "superadmin" && b.rol === "superadmin") return 1;
+      return 0;
+    });
 
   const counts = {
     todos: usuarios.length,
@@ -516,6 +512,7 @@ const filtered = usuarios
               key={u.usuarioID}
               u={u}
               canEdit={canManage}
+              canDelete={canManage && !(isSuperadmin && u.rol === "superadmin")}
               onEdit={() => setModalEditar(u)}
               onDelete={() => setModalEliminar(u)}
             />
@@ -569,7 +566,6 @@ const filtered = usuarios
               );
             })}
           </div>
-
           {/* ── Campos solo para superadmin: RUC + Sucursal ── */}
           {isSuperadmin && (
             <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-3">
@@ -605,8 +601,8 @@ const filtered = usuarios
               )}
             </div>
           )}
-
           {/* Usuario */}
+          // Busca el campo "Usuario" en el modal y reemplázalo por esto:
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
               Usuario
@@ -616,31 +612,19 @@ const filtered = usuarios
               placeholder="Ej: juan.perez"
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               required
+              minLength={4}
               value={formData.username}
               onChange={(e) =>
                 setFormData({ ...formData, username: e.target.value })
               }
             />
+            {formData.username.length > 0 && formData.username.length < 4 && (
+              <p className="text-[10px] text-rose-500 italic px-1">
+                El usuario debe tener al menos 4 caracteres
+              </p>
+            )}
           </div>
-
-          {/* Email */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Correo electrónico
-            </label>
-            <input
-              type="email"
-              placeholder="juan.p@empresa.com"
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
-              required
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-            />
-          </div>
-
-          {/* Rol */}
+          {/* Rol / Perfil */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
               Rol / Perfil
@@ -648,9 +632,15 @@ const filtered = usuarios
             <select
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
               value={formData.rol}
-              onChange={(e) =>
-                setFormData({ ...formData, rol: e.target.value })
-              }
+              onChange={(e) => {
+                const nuevoRol = e.target.value;
+                setFormData({
+                  ...formData,
+                  rol: nuevoRol,
+                  // Al cambiar a admin, precarga el email del contexto
+                  email: nuevoRol === "admin" ? (user?.email ?? "") : "",
+                });
+              }}
             >
               <option value="facturador">Facturador</option>
               {(isSuperadmin || user?.rol === "admin") && (
@@ -669,7 +659,29 @@ const filtered = usuarios
               </p>
             )}
           </div>
-
+          {/* Email — solo visible si el rol es admin */}
+          {formData.rol !== "facturador" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="juan.p@empresa.com"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm transition-colors"
+                required
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+              {formData.email === user?.email && (
+                <p className="text-[10px] text-blue-500 italic px-1">
+                  Correo sugerido
+                </p>
+              )}
+            </div>
+          )}
           {/* Contraseña */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase">
@@ -679,7 +691,7 @@ const filtered = usuarios
               <input
                 type={showPassword ? "text" : "password"}
                 required
-                placeholder="Mín. 8 caracteres con letras y números"
+                placeholder="Mín. 8 caracteres"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
@@ -699,10 +711,9 @@ const filtered = usuarios
               </button>
             </div>
             <p className="text-[10px] text-gray-400 italic">
-              Mínimo 8 caracteres, debe incluir letras y números.
+              Mínimo 8 caracteres.
             </p>
           </div>
-
           <div className="pt-4 flex justify-end gap-3">
             <Button variant="outline" type="button" onClick={handleCloseModal}>
               Cancelar

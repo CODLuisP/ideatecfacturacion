@@ -8,13 +8,14 @@ interface UseComprobantesSucursalListadoParams {
   fechaDesde?: string | null
   fechaHasta?: string | null
   limit?: number
-  page?: number
+  offset?: number
 }
 
 interface UseComprobantesSucursalListadoReturn {
   comprobantes: ComprobanteListado[]
   loading: boolean
   error: string | null
+  hasMore: boolean
   fetchComprobantes: (params: UseComprobantesSucursalListadoParams) => Promise<ComprobanteListado[]>
   reset: () => void
 }
@@ -25,9 +26,10 @@ export const useComprobantesSucursalListado = (): UseComprobantesSucursalListado
   const [comprobantes, setComprobantes] = useState<ComprobanteListado[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
 
   const fetchComprobantes = useCallback(async ({
-    sucursalId, fechaDesde, fechaHasta, limit = 100, page = 1
+    sucursalId, fechaDesde, fechaHasta, limit = 100, offset = 0
   }: UseComprobantesSucursalListadoParams): Promise<ComprobanteListado[]> => {
     setLoading(true)
     setError(null)
@@ -36,31 +38,35 @@ export const useComprobantesSucursalListado = (): UseComprobantesSucursalListado
       if (fechaDesde) url.searchParams.append("fechaDesde", fechaDesde)
       if (fechaHasta) url.searchParams.append("fechaHasta", fechaHasta)
       url.searchParams.append("limit", limit.toString()) 
-      url.searchParams.append("page", page.toString()) 
+      url.searchParams.append("offset", offset.toString()) 
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` }
       })
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
       const data: ComprobanteListado[] = await response.json()
+      
       setComprobantes(data)
+      setHasMore(data.length === limit)
       return data
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al obtener comprobantes"
       setError(msg)
       showToast('Error al obtener comprobantes de la sucursal', 'error')
       setComprobantes([])
+      setHasMore(false)
       return []
     } finally {
       setLoading(false)
     }
-  }, [accessToken])
+  }, [accessToken, showToast])
 
   const reset = useCallback(() => {
     setComprobantes([])
     setError(null)
     setLoading(false)
+    setHasMore(true)
   }, [])
 
-  return { comprobantes, loading, error, fetchComprobantes, reset }
-}
+  return { comprobantes, loading, error, hasMore, fetchComprobantes, reset }
+}

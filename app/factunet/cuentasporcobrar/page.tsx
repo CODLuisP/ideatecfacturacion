@@ -155,7 +155,7 @@ export default function CuentasPorCobrarPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por cliente, RUC/DNI o N° comprobante..."
-              className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-sm"
+              className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all shadow-sm text-xs"
             />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -171,7 +171,7 @@ export default function CuentasPorCobrarPage() {
                     value={sucursalFiltro ?? ''}
                     onChange={e => setSucursalFiltro(e.target.value || null)}
                     className={cn(
-                      "appearance-none pl-3 pr-8 py-2.5 text-sm font-medium border rounded-xl outline-none cursor-pointer transition-all shadow-sm",
+                      "appearance-none pl-3 pr-8 py-2.5 text-xs font-medium border rounded-md outline-none cursor-pointer transition-all shadow-sm",
                       sucursalFiltro
                         ? "bg-blue-50 border-blue-300 text-blue-700"
                         : "bg-white border-gray-200 text-gray-600"
@@ -191,7 +191,7 @@ export default function CuentasPorCobrarPage() {
             <button
               onClick={() => setShowAvanzado(o => !o)}
               className={cn(
-                "flex items-center gap-2 px-3 py-2.5 text-sm font-medium border rounded-xl transition-all shadow-sm",
+                "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md transition-all shadow-sm",
                 showAvanzado ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
               )}
             >
@@ -213,26 +213,26 @@ export default function CuentasPorCobrarPage() {
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Nº Doc. Cliente</label>
                 <input type="text" value={avClienteDoc} onChange={e => setAvClienteDoc(e.target.value)}
                   placeholder="RUC o DNI"
-                  className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 w-64" />
+                  className="py-1.5 px-2 bg-white border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400 w-64" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha desde</label>
                 <input type="date" value={avFechaDesde} max={hoy}
                   onChange={e => { setAvFechaDesde(e.target.value); if (avFechaHasta && e.target.value > avFechaHasta) setAvFechaHasta(''); }}
-                  className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
+                  className="py-1.5 px-2 bg-white border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Fecha hasta</label>
                 <input type="date" value={avFechaHasta} min={avFechaDesde || undefined} max={hoy}
                   onChange={e => setAvFechaHasta(e.target.value)}
-                  className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400" />
+                  className="py-1.5 px-2 bg-white border border-gray-200 rounded-md text-xs outline-none focus:border-blue-400" />
               </div>
               <button onClick={buscarAvanzado} disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors self-end disabled:opacity-50">
-                <Search size={14} /> Buscar
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors self-end disabled:opacity-50">
+                <Search size={13} /> Buscar
               </button>
               <button onClick={limpiarAvanzado}
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors self-end pb-2">
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-md transition-all self-end">
                 <X size={12} /> Limpiar
               </button>
             </div>
@@ -551,7 +551,7 @@ const DropdownFiltro = ({ label, value, options, onChange }: DropdownFiltroProps
       <button
         onClick={() => setOpen(o => !o)}
         className={cn(
-          "flex items-center gap-2 pl-3 pr-2.5 py-2 text-sm font-medium border rounded-lg outline-none transition-all shadow-sm whitespace-nowrap",
+          "flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border rounded-md outline-none transition-all shadow-sm whitespace-nowrap",
           active ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
         )}
       >
@@ -561,13 +561,13 @@ const DropdownFiltro = ({ label, value, options, onChange }: DropdownFiltroProps
           : <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />}
       </button>
       {open && (
-        <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-36">
+        <div className="absolute top-full mt-1.5 left-0 z-40 bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden min-w-36">
           {options.map(opt => (
             <button
               key={opt}
               onClick={() => { onChange(opt); setOpen(false); }}
               className={cn(
-                "w-full flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors text-left",
+                "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left",
                 value === opt ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700 hover:bg-gray-50"
               )}
             >

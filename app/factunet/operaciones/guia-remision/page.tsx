@@ -8,11 +8,13 @@ import {
   ChevronLeft,
   Truck,
   FileText,
+  X,
+  Check,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useToast } from "@/app/components/ui/Toast";
 import ModalPuntoDireccion, {
   DireccionSeleccionada,
@@ -32,6 +34,9 @@ import ModalDocumentoRelacionado, {
 } from "@/app/components/guia/ModalDocumentoRelacionado";
 import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
 import { useSearchParams } from "next/navigation";
+import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
+import { consultaDni } from "@/app/components/apiConsultasJsonPe/consultaDni";
+
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -85,14 +90,14 @@ const MOTIVOS_TRASLADO = [
 ];
 
 const inputClass =
-  "w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all";
+  "w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all";
 const selectClass =
-  "w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue";
-const labelClass = "text-xs font-bold text-gray-500 uppercase";
+  "w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue";
+const labelClass = "text-[10px] font-bold text-gray-600 uppercase";
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export default function GuiaRemisionPage() {
+function GuiaRemisionContent() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
   const { showToast } = useToast();
@@ -171,6 +176,8 @@ export default function GuiaRemisionPage() {
   const [guiaEmitidaId, setGuiaEmitidaId] = useState<number | null>(null);
   const [telefonoEnvio, setTelefonoEnvio] = useState("");
   const [correoEnvio, setCorreoEnvio] = useState("");
+  const [errorWhatsApp, setErrorWhatsApp] = useState("");
+  const [errorCorreo, setErrorCorreo] = useState("");
 
   // — Estados nuevos para superadmin
   const [sucursales, setSucursales] = useState<any[]>([]);
@@ -189,6 +196,9 @@ export default function GuiaRemisionPage() {
   const searchParams = useSearchParams();
   const editarGuiaId = searchParams.get("editarGuiaId");
   const [placaM1L, setPlacaM1L] = useState("");
+  const [fechaTraslado, setFechaTraslado] = useState(
+    new Date().toISOString().split("T")[0],
+  );
 
   const isSuperAdmin = user?.rol === "superadmin";
 
@@ -237,6 +247,7 @@ export default function GuiaRemisionPage() {
     setSucursal(null);
     setRefreshSucursal((prev) => prev + 1);
     setPlacaM1L("");
+    setFechaTraslado(new Date().toISOString().split("T")[0]);
   };
 
   useEffect(() => {
@@ -524,6 +535,8 @@ export default function GuiaRemisionPage() {
     // checkboxes siempre inician desmarcados
     setEnviarWhatsapp(false);
     setEnviarCorreo(false);
+    setErrorWhatsApp("");
+    setErrorCorreo("");
   }, [destinatarioSeleccionado]);
 
   useEffect(() => {
@@ -558,6 +571,7 @@ export default function GuiaRemisionPage() {
     ? String(correlativoActual).padStart(7, "0")
     : "-------";
 
+  // handleDestinatarioSunat actualizado
   const handleDestinatarioSunat = async (val: string) => {
     setDestinatarioSunatResultado(null);
 
@@ -569,16 +583,11 @@ export default function GuiaRemisionPage() {
         color: "#185FA5",
       });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/dni/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
-        if (data.success) {
-          const nombre =
-            `${data.apellidoPaterno} ${data.apellidoMaterno} ${data.nombres}`.trim();
+        const data = await consultaDni(val);
+        if (data) {
           setDestinatarioSunatResultado({
             clienteId: 0,
-            razonSocialNombre: nombre,
+            razonSocialNombre: data.nombreCompleto,
             numeroDocumento: val,
             tipoDocumento: {
               tipoDocumentoId: "01",
@@ -586,7 +595,10 @@ export default function GuiaRemisionPage() {
             },
             direccion: [],
           });
-          setDestinatarioSunatHint({ text: `✓ ${nombre}`, color: "#15803d" });
+          setDestinatarioSunatHint({
+            text: `✓ ${data.nombreCompleto}`,
+            color: "#15803d",
+          });
         } else {
           setDestinatarioSunatHint({
             text: "DNI no encontrado",
@@ -609,11 +621,8 @@ export default function GuiaRemisionPage() {
         color: "#185FA5",
       });
       try {
-        const res = await fetch(
-          `https://dniruc.apisperu.com/api/v1/ruc/${val}?token=${process.env.NEXT_PUBLIC_APISPERU_TOKEN}`,
-        );
-        const data = await res.json();
-        if (data.ruc) {
+        const data = await consultaRuc(val);
+        if (data) {
           setDestinatarioSunatResultado({
             clienteId: 0,
             razonSocialNombre: data.razonSocial,
@@ -622,11 +631,11 @@ export default function GuiaRemisionPage() {
               tipoDocumentoId: "06",
               tipoDocumentoNombre: "RUC",
             },
-            direccion: data.direccion
+            direccion: data.direccionLineal
               ? [
                   {
                     direccionId: 0,
-                    direccionLineal: data.direccion,
+                    direccionLineal: data.direccionLineal,
                     ubigeo: data.ubigeo ?? "",
                     departamento: data.departamento ?? "",
                     provincia: data.provincia ?? "",
@@ -757,6 +766,8 @@ export default function GuiaRemisionPage() {
     setTelefonoEnvio("");
     setCorreoEnvio("");
     setErrorEnvio(null);
+    setErrorWhatsApp("");
+    setErrorCorreo("");
     setEnvioExitoso(false);
     resetFormulario();
   };
@@ -878,7 +889,7 @@ export default function GuiaRemisionPage() {
             MOTIVOS_TRASLADO.find((m) => m.codigo === motivoCodigo)?.label ??
             "",
           modTraslado: modalidad,
-          fecTraslado: new Date().toISOString(),
+          fecTraslado: new Date(fechaTraslado).toISOString(),
           codPuerto: null,
           indTransbordo: transbordo,
           pesoTotal,
@@ -1113,24 +1124,12 @@ export default function GuiaRemisionPage() {
     );
 
     if (enviarCorreo && correoEnvio.trim()) {
-      const formData = new FormData();
-      formData.append("toEmail", correoEnvio);
-      formData.append(
-        "toName",
-        destinatarioSeleccionado?.razonSocialNombre ?? "",
-      );
-      formData.append(
-        "subject",
-        `Guía de Remisión ${guiaData?.numeroCompleto ?? ""}`,
-      );
-      formData.append(
-        "body",
-        "Se emitió la guía de remisión para el traslado de los bienes indicados.",
-      );
-      formData.append("tipo", "9");
-      formData.append(
-        "guiaJson",
-        JSON.stringify({
+      const correos = correoEnvio
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (correos.length > 0) {
+        const guiaJsonStr = JSON.stringify({
           serieNumero: guiaData?.numeroCompleto ?? "",
           estadoSunat: guiaData?.estadoSunat ?? "EMITIDO",
           motivoTraslado: guiaData?.desTraslado ?? "",
@@ -1145,75 +1144,199 @@ export default function GuiaRemisionPage() {
               cantidad: b.cantidad,
               unidad: b.unidad,
             })) ?? [],
-        }),
-      );
-      formData.append("adjunto", pdfFile);
+        });
 
-      const resCorreo = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: formData,
-        },
-      );
-      if (!resCorreo.ok) throw new Error("Error al enviar el correo");
+        const resultadosCorreo = await Promise.allSettled(
+          correos.map((correo) => {
+            const formData = new FormData();
+            formData.append("toEmail", correo);
+            formData.append(
+              "toName",
+              destinatarioSeleccionado?.razonSocialNombre ?? "",
+            );
+            formData.append(
+              "subject",
+              `Guía de Remisión ${guiaData?.numeroCompleto ?? ""}`,
+            );
+            formData.append(
+              "body",
+              "Se emitió la guía de remisión para el traslado de los bienes indicados.",
+            );
+            formData.append("tipo", "9");
+            formData.append("guiaJson", guiaJsonStr);
+            formData.append("adjunto", pdfFile);
+
+            return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${accessToken}` },
+              body: formData,
+            }).then((res) => {
+              if (!res.ok) throw new Error(`Error al enviar a ${correo}`);
+            });
+          }),
+        );
+
+        const fallidos = resultadosCorreo.filter(
+          (r) => r.status === "rejected",
+        );
+        if (fallidos.length === correos.length)
+          throw new Error("Error al enviar el correo");
+      }
     }
 
     if (enviarWhatsapp && telefonoEnvio.trim()) {
-      const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
-      const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
+      const telefonos = telefonoEnvio
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (telefonos.length > 0) {
+        const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
+        const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
 
-      // ── Verificar estado de conexión WhatsApp ──────────────────────
-      const resEstado = await fetch(`${whatsappBase}/api/status`, {
-        headers: {
-          "x-api-key": whatsappApiKey,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!resEstado.ok)
-        throw new Error("No se pudo verificar el estado de WhatsApp");
+        // ── Verificar estado de conexión WhatsApp ──────────────────────
+        const resEstado = await fetch(`${whatsappBase}/api/status`, {
+          headers: {
+            "x-api-key": whatsappApiKey,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!resEstado.ok)
+          throw new Error("No se pudo verificar el estado de WhatsApp");
 
-      const estadoData = await resEstado.json();
-      if (!estadoData.exito || estadoData.datos?.estado !== "conectado") {
-        throw new Error(
-          estadoData.datos?.mensaje ?? "WhatsApp no está conectado",
+        const estadoData = await resEstado.json();
+        if (!estadoData.exito || estadoData.datos?.estado !== "conectado") {
+          throw new Error(
+            estadoData.datos?.mensaje ?? "WhatsApp no está conectado",
+          );
+        }
+
+        // ── Subir PDF ──────────────────────────────────────────────────
+        const uploadForm = new FormData();
+        uploadForm.append("file", pdfFile);
+        const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+          method: "POST",
+          headers: { "x-api-key": whatsappApiKey },
+          body: uploadForm,
+        });
+        if (!resUpload.ok)
+          throw new Error("No se pudo subir el PDF a WhatsApp");
+        const uploadData = await resUpload.json();
+        const fileUrl = uploadData.datos.url;
+
+        // ── Enviar mensajes ─────────────────────────────────────────────
+        const resultadosWsp = await Promise.allSettled(
+          telefonos.map((num) => {
+            const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
+            return fetch(`${whatsappBase}/api/send/single`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": whatsappApiKey,
+              },
+              body: JSON.stringify({
+                phone: numeroFormateado,
+                type: "documento",
+                file_url: fileUrl,
+                filename: `${guiaData?.numeroCompleto ?? idGuia}.pdf`,
+                mime_type: "application/pdf",
+                text: `Estimado(a) ${destinatarioSeleccionado?.razonSocialNombre ?? ""}, adjuntamos la guía de remisión electrónica ${guiaData?.numeroCompleto ?? ""}.`,
+              }),
+            }).then((res) => {
+              if (!res.ok) throw new Error(`Error al enviar a ${num}`);
+            });
+          }),
         );
+
+        const fallidos = resultadosWsp.filter((r) => r.status === "rejected");
+        if (fallidos.length === telefonos.length)
+          throw new Error("Error al enviar por WhatsApp");
       }
+    }
+  };
 
-      // ── Subir PDF ──────────────────────────────────────────────────
-      const uploadForm = new FormData();
-      uploadForm.append("file", pdfFile);
-      const resUpload = await fetch(`${whatsappBase}/api/upload`, {
-        method: "POST",
-        headers: { "x-api-key": whatsappApiKey },
-        body: uploadForm,
-      });
-      if (!resUpload.ok) throw new Error("No se pudo subir el PDF a WhatsApp");
-      const uploadData = await resUpload.json();
-      const fileUrl = uploadData.datos.url;
+  const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9,\s]/g, "");
+    setTelefonoEnvio(val);
+    setEnviarWhatsapp(false);
 
-      // ── Enviar mensaje ─────────────────────────────────────────────
-      const numeroFormateado = telefonoEnvio.startsWith("51")
-        ? telefonoEnvio
-        : `51${telefonoEnvio}`;
+    if (!val.trim()) {
+      setErrorWhatsApp("");
+      return;
+    }
 
-      const resWsp = await fetch(`${whatsappBase}/api/send/single`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": whatsappApiKey,
-        },
-        body: JSON.stringify({
-          phone: numeroFormateado,
-          type: "documento",
-          file_url: fileUrl,
-          filename: `${guiaData?.numeroCompleto ?? idGuia}.pdf`,
-          mime_type: "application/pdf",
-          text: `Estimado(a) ${destinatarioSeleccionado?.razonSocialNombre ?? ""}, adjuntamos la guía de remisión electrónica ${guiaData?.numeroCompleto ?? ""}.`,
-        }),
-      });
-      if (!resWsp.ok) throw new Error("Error al enviar por WhatsApp");
+    const numbers = val
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+    let hasError = false;
+    for (const num of numbers) {
+      if (!/^[9]\d{8}$/.test(num)) {
+        setErrorWhatsApp(
+          `El número ${num} no es válido. Debe empezar con 9 y tener 9 dígitos.`,
+        );
+        hasError = true;
+        break;
+      }
+    }
+    if (!hasError) setErrorWhatsApp("");
+  };
+
+  const handleCorreoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCorreoEnvio(val);
+    setEnviarCorreo(false);
+
+    if (!val.trim()) {
+      setErrorCorreo("");
+      return;
+    }
+
+    const emails = val
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    let hasError = false;
+    for (const email of emails) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setErrorCorreo(`El correo ${email} no es válido.`);
+        hasError = true;
+        break;
+      }
+    }
+    if (!hasError) setErrorCorreo("");
+  };
+
+  const handleCheckWhatsapp = (checked: boolean) => {
+    if (checked) {
+      if (!telefonoEnvio.trim()) {
+        setErrorWhatsApp("Debes ingresar al menos un número");
+        setEnviarWhatsapp(false);
+        return;
+      }
+      if (errorWhatsApp) {
+        setEnviarWhatsapp(false);
+        return;
+      }
+      setEnviarWhatsapp(true);
+    } else {
+      setEnviarWhatsapp(false);
+    }
+  };
+
+  const handleCheckCorreo = (checked: boolean) => {
+    if (checked) {
+      if (!correoEnvio.trim()) {
+        setErrorCorreo("Debes ingresar al menos un correo");
+        setEnviarCorreo(false);
+        return;
+      }
+      if (errorCorreo) {
+        setEnviarCorreo(false);
+        return;
+      }
+      setEnviarCorreo(true);
+    } else {
+      setEnviarCorreo(false);
     }
   };
 
@@ -1221,11 +1344,11 @@ export default function GuiaRemisionPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-2">
+      <div className="flex items-center gap-4 ">
         <Button
           variant="ghost"
           onClick={() => router.push("/factunet/operaciones")}
-          className="h-10 w-10 p-0 rounded-full"
+          className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -1370,7 +1493,7 @@ export default function GuiaRemisionPage() {
                   <label className={labelClass}>Serie y Número</label>
                   <div className="flex gap-2">
                     <div
-                      className={`w-1/3 py-2.5 px-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm flex items-center ${
+                      className={`w-1/3 py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono text-sm flex items-center ${
                         loadingSucursal ? "animate-pulse" : ""
                       }`}
                     >
@@ -1382,7 +1505,7 @@ export default function GuiaRemisionPage() {
                       value={
                         loadingSucursal ? "Cargando..." : correlativoFormateado
                       }
-                      className="w-2/3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono"
+                      className="w-2/3 py-2 bg-gray-100 border border-gray-200 rounded-xl px-4 text-gray-500 font-mono"
                     />
                   </div>
                   {errorSucursal && (
@@ -1399,7 +1522,8 @@ export default function GuiaRemisionPage() {
                   </label>
                   <input
                     type="date"
-                    defaultValue={new Date().toISOString().split("T")[0]}
+                    value={fechaTraslado}
+                    onChange={(e) => setFechaTraslado(e.target.value)}
                     className={inputClass}
                   />
                 </div>
@@ -1464,7 +1588,7 @@ export default function GuiaRemisionPage() {
                 <div className="space-y-1.5">
                   <label className={labelClass}>Punto de Partida</label>
                   {puntoPartida ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                       <p className="text-xs text-gray-700 leading-relaxed">
                         {puntoPartida.resumen}
                       </p>
@@ -1480,7 +1604,7 @@ export default function GuiaRemisionPage() {
                     <button
                       type="button"
                       onClick={() => setModalPartida(true)}
-                      className="w-full py-2.5 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
+                      className="w-full py-2 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
                     >
                       + Agregar punto de partida
                     </button>
@@ -1491,7 +1615,7 @@ export default function GuiaRemisionPage() {
                 <div className="space-y-1.5">
                   <label className={labelClass}>Punto de Llegada</label>
                   {puntoLlegada ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                       <p className="text-xs text-gray-700 leading-relaxed">
                         {puntoLlegada.resumen}
                       </p>
@@ -1507,7 +1631,7 @@ export default function GuiaRemisionPage() {
                     <button
                       type="button"
                       onClick={() => setModalLlegada(true)}
-                      className="w-full py-2.5 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
+                      className="w-full py-2 px-4 text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-brand-blue hover:text-brand-blue transition-colors text-left"
                     >
                       + Agregar punto de llegada
                     </button>
@@ -1697,7 +1821,7 @@ export default function GuiaRemisionPage() {
                     )}
                   </div>
                   {transportistaPublico ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl">
                       <div>
                         <p className="text-sm font-medium text-gray-800">
                           {transportistaPublico.razonSocial}
@@ -1803,7 +1927,7 @@ export default function GuiaRemisionPage() {
                           setDestinatarioSunatResultado(null);
                           setDestinatarioSunatHint(null);
                         }}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all"
                       />
                       <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
 
@@ -1853,7 +1977,7 @@ export default function GuiaRemisionPage() {
                               destinatarioQuery.replace(/\D/g, ""),
                             )
                           }
-                          className="w-full py-2.5 px-4 text-sm text-brand-blue border border-dashed border-brand-blue/40 rounded-xl hover:bg-brand-blue/5 transition-colors disabled:opacity-50"
+                          className="w-full py-2 px-4 text-sm text-brand-blue border border-dashed border-brand-blue/40 rounded-xl hover:bg-brand-blue/5 transition-colors disabled:opacity-50"
                         >
                           {loadingSunat
                             ? "Consultando SUNAT..."
@@ -1900,50 +2024,58 @@ export default function GuiaRemisionPage() {
                   <label className={labelClass}>Enviar guía a</label>
 
                   {/* WhatsApp */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       id="chk-whatsapp"
                       checked={enviarWhatsapp}
-                      onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                      className="accent-brand-blue w-4 h-4 shrink-0"
+                      onChange={(e) => handleCheckWhatsapp(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4 shrink-0 mt-2"
                     />
-                    <div className="relative flex-1">
-                      <input
-                        type="tel"
-                        placeholder="WhatsApp: 987654321"
-                        value={telefonoEnvio}
-                        onChange={(e) => setTelefonoEnvio(e.target.value)}
-                        disabled={!enviarWhatsapp}
-                        className={`${inputClass} text-xs py-2 ${!enviarWhatsapp ? "opacity-40 cursor-not-allowed" : ""}`}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                        WhatsApp
-                      </span>
+                    <div className="flex-1 space-y-1">
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          placeholder="Ej. 987654321, 912345678"
+                          value={telefonoEnvio}
+                          onChange={handleTelefonoChange}
+                          className={`${inputClass} text-xs py-2 ${errorWhatsApp ? "border-red-500 focus:ring-red-200" : ""}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          WhatsApp
+                        </span>
+                      </div>
+                      {errorWhatsApp && (
+                        <p className="text-xs text-red-500">{errorWhatsApp}</p>
+                      )}
                     </div>
                   </div>
 
                   {/* Correo */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       id="chk-correo"
                       checked={enviarCorreo}
-                      onChange={(e) => setEnviarCorreo(e.target.checked)}
-                      className="accent-brand-blue w-4 h-4 shrink-0"
+                      onChange={(e) => handleCheckCorreo(e.target.checked)}
+                      className="accent-brand-blue w-4 h-4 shrink-0 mt-2"
                     />
-                    <div className="relative flex-1">
-                      <input
-                        type="email"
-                        placeholder="Correo: ejemplo@gmail.com"
-                        value={correoEnvio}
-                        onChange={(e) => setCorreoEnvio(e.target.value)}
-                        disabled={!enviarCorreo}
-                        className={`${inputClass} text-xs py-2 ${!enviarCorreo ? "opacity-40 cursor-not-allowed" : ""}`}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                        Email
-                      </span>
+                    <div className="flex-1 space-y-1">
+                      <div className="relative">
+                        <input
+                          type="email"
+                          placeholder="Ej. uno@correo.com, dos@correo.com"
+                          value={correoEnvio}
+                          onChange={handleCorreoChange}
+                          className={`${inputClass} text-xs py-2 ${errorCorreo ? "border-red-500 focus:ring-red-200" : ""}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          Email
+                        </span>
+                      </div>
+                      {errorCorreo && (
+                        <p className="text-xs text-red-500">{errorCorreo}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1999,7 +2131,7 @@ export default function GuiaRemisionPage() {
                     {documentosRelacionados.map((doc, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl"
+                        className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-xl"
                       >
                         <div>
                           <p className="text-sm font-medium text-gray-800">
@@ -2154,7 +2286,7 @@ export default function GuiaRemisionPage() {
                   rows={3}
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
-                  className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm resize-none"
+                  className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm resize-none"
                 />
               </div>
             </form>
@@ -2204,7 +2336,7 @@ export default function GuiaRemisionPage() {
             ) : (
               /* — Sin emitir aún — */
               <div className="space-y-3">
-                <div className="aspect-[1/1.4] bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-8 text-center space-y-4">
+            <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                   <div className="p-4 rounded-full bg-white shadow-sm">
                     <Printer className="w-8 h-8 text-gray-400" />
                   </div>
@@ -2228,9 +2360,6 @@ export default function GuiaRemisionPage() {
                   onClick={handleEmitir}
                 >
                   {emitiendo ? "Emitiendo..." : "Emitir Guía de Remisión"}
-                </Button>
-                <Button type="button" variant="outline" className="w-full">
-                  Enviar
                 </Button>
               </div>
             )}
@@ -2411,5 +2540,13 @@ export default function GuiaRemisionPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function GuiaRemisionPage() {
+  return (
+    <Suspense fallback={null}>
+      <GuiaRemisionContent />
+    </Suspense>
   );
 }
