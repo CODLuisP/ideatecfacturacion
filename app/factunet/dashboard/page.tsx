@@ -549,14 +549,7 @@ export default function DashboardPage() {
       icon: FileText,
       color: "text-orange-600",
       bg: "bg-orange-50",
-    },
-    {
-      label: "Estado SUNAT",
-      value: "Conectado",
-      icon: Zap,
-      color: "text-amber-600",
-      bg: "bg-amber-50",
-    },
+    }
   ];
 
   const isPageLoading = loading || isAuthLoading || (!dashboard && !error);
@@ -628,7 +621,7 @@ export default function DashboardPage() {
 
       <div className="space-y-4 animate-in fade-in duration-500">
         {/* ─── KPI Grid (7 cards) ─────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           {isPageLoading
             ? Array.from({ length: 7 }).map((_, i) => (
                 <Card key={i} className="p-0">
