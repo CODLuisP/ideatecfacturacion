@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const fetchCompanyData = useCallback(
     async (ruc: string, token: string | null) => {
       try {
-        const r = await fetch(`http://localhost:5004/api/companies/${ruc}`, {
+        const r = await fetch(`https://factunetapi.ideatec.com.pe:8443/api/companies/${ruc}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) return;

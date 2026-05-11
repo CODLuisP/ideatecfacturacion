@@ -21,7 +21,7 @@ import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
 import { LogoCropper } from "@/app/components/ui/LogoCropper";
 
-const BASE_URL = "http://localhost:5004";
+const BASE_URL = "https://factunetapi.ideatec.com.pe:8443";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface EmpresaForm {
