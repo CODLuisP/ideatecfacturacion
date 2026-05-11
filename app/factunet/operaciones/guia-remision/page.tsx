@@ -36,7 +36,7 @@ import ModalBienGuia, { BienGuia } from "@/app/components/guia/Modalbienguia";
 import { useSearchParams } from "next/navigation";
 import { consultaRuc } from "@/app/components/apiConsultasJsonPe/consultaRuc";
 import { consultaDni } from "@/app/components/apiConsultasJsonPe/consultaDni";
-import { input } from "motion/react-client";
+
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
