@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+
+import { useState, useRef, useEffect } from "react";
 import {
   Menu,
   ChevronRight,
@@ -21,6 +22,7 @@ import { signOut } from "next-auth/react";
 import { useAuth } from "@/context/AuthContext";
 import { DateChip } from "./DateChip";
 import { useNotifications } from "@/hooks/useNotifications";
+import Link from "next/link";
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -441,32 +443,26 @@ export const Topbar = ({
 
                 <ul className="py-1.5">
                   <li>
-                    <button
-                      onClick={() =>
-                        (window.location.href =
-                          "http://localhost:3000/factunet/empresa")
-                      }
+                    <Link
+                      href="/factunet/empresa"
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
                     >
                       <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
                         <Settings className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
                       </div>
                       <span className="font-medium">Empresa</span>
-                    </button>
+                    </Link>
                   </li>
                   <li>
-                    <button
-                      onClick={() =>
-                        (window.location.href =
-                          "http://localhost:3000/factunet/sunat")
-                      }
+                    <Link
+                      href="/factunet/sunat"
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
                     >
                       <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
                         <Zap className="w-3.5 h-3.5 text-gray-500 group-hover:text-blue-600 transition-colors" />
                       </div>
                       <span className="font-medium">SUNAT</span>
-                    </button>
+                    </Link>
                   </li>
                 </ul>
 
