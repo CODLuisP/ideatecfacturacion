@@ -19,12 +19,14 @@ interface UseReportesAvanzadosReturn {
   loadingExcelListado: boolean
   loadingExcelProductos: boolean
   loadingExcelMedios: boolean
+  loadingExcelControlCaja: boolean
   fetchListado: (params: ReportesAvanzadosParams) => Promise<void>
   fetchProductosTop: (params: ReportesAvanzadosParams) => Promise<void>
   fetchMediosPago: (params: ReportesAvanzadosParams) => Promise<void>
   descargarExcelListado: (params: ReportesAvanzadosParams, titulo: string) => Promise<void>
   descargarExcelProductos: (params: ReportesAvanzadosParams, titulo: string) => Promise<void>
   descargarExcelMedios: (params: ReportesAvanzadosParams, titulo: string) => Promise<void>
+  descargarExcelControlCaja: (params: ReportesAvanzadosParams, titulo: string) => Promise<void>
 }
 
 export const useReportesAvanzados = (): UseReportesAvanzadosReturn => {
@@ -41,6 +43,7 @@ export const useReportesAvanzados = (): UseReportesAvanzadosReturn => {
   const [loadingExcelListado, setLoadingExcelListado] = useState(false)
   const [loadingExcelProductos, setLoadingExcelProductos] = useState(false)
   const [loadingExcelMedios, setLoadingExcelMedios] = useState(false)
+  const [loadingExcelControlCaja, setLoadingExcelControlCaja] = useState(false)
 
   const buildUrl = (path: string, params: Record<string, string | number | null | undefined>) => {
     const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}${path}`)
@@ -120,6 +123,31 @@ export const useReportesAvanzados = (): UseReportesAvanzadosReturn => {
       setMediosPago([])
     } finally {
       setLoadingMedios(false)
+    }
+  }, [accessToken])
+
+  // ── Control de caja ─────────────────────────────────────────────────────────
+  const descargarExcelControlCaja = useCallback(async (
+    params: ReportesAvanzadosParams,
+    titulo: string
+  ) => {
+    setLoadingExcelControlCaja(true)
+    try {
+      const url = buildUrl(`/api/Reportes/control-caja/${params.ruc}/excel`, {
+        titulo,
+        codEstablecimiento: params.codEstablecimiento,
+        fechaDesde:         params.fechaDesde,
+        fechaHasta:         params.fechaHasta,
+        usuarioCreacion:    params.usuarioCreacion,
+        clienteNumDoc:      params.clienteNumDoc,
+        limit:              params.limit,
+      })
+      await descargarBlob(url, titulo)
+      showToast('Excel descargado correctamente', 'success')
+    } catch {
+      showToast('Error al generar el Excel', 'error')
+    } finally {
+      setLoadingExcelControlCaja(false)
     }
   }, [accessToken])
 
@@ -217,5 +245,6 @@ export const useReportesAvanzados = (): UseReportesAvanzadosReturn => {
     loadingExcelListado, loadingExcelProductos, loadingExcelMedios,
     fetchListado, fetchProductosTop, fetchMediosPago,
     descargarExcelListado, descargarExcelProductos, descargarExcelMedios,
+    loadingExcelControlCaja, descargarExcelControlCaja,
   }
 }

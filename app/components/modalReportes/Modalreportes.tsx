@@ -32,9 +32,11 @@ interface ModalReportesProps {
   loadingExcelListado: boolean;
   loadingExcelProductos: boolean;
   loadingExcelMedios: boolean;
+  loadingExcelControlCaja: boolean;
   onDescargarListado: (filtros: FiltrosReporteModal) => Promise<void>;
   onDescargarProductos: (filtros: FiltrosReporteModal) => Promise<void>;
   onDescargarMedios: (filtros: FiltrosReporteModal) => Promise<void>;
+  onDescargarControlCaja: (filtros: FiltrosReporteModal) => Promise<void>;
 }
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
@@ -126,11 +128,11 @@ function ReporteBtn({ icon: Icon, label, descripcion, loading, onClick, color }:
 export function ModalReportes({
   abierto, onCerrar, filtros, onSetFiltro, onResetFiltros,
   usuarios, sucursales, isSuperAdmin, puedeVerUsuarios,
-  loadingExcelListado, loadingExcelProductos, loadingExcelMedios,
-  onDescargarListado, onDescargarProductos, onDescargarMedios,
+  loadingExcelListado, loadingExcelProductos, loadingExcelMedios, loadingExcelControlCaja,
+  onDescargarListado, onDescargarProductos, onDescargarMedios, onDescargarControlCaja,
 }: ModalReportesProps) {
 
-  const hayDescarga = loadingExcelListado || loadingExcelProductos || loadingExcelMedios;
+  const hayDescarga = loadingExcelListado || loadingExcelProductos || loadingExcelMedios || loadingExcelControlCaja;
 
   const hoy       = getHoyString();
   const lunes     = getLunesString();
@@ -375,6 +377,12 @@ export function ModalReportes({
                       descripcion="Comprobantes aceptados con detalle"
                       loading={loadingExcelListado} onClick={() => onDescargarListado(filtros)}
                       color="border-blue-100 hover:border-blue-300 hover:bg-blue-50/50 text-blue-600"
+                    />
+                    <ReporteBtn
+                      icon={FileSpreadsheet} label="Control de Caja"
+                      descripcion="Movimientos incluyendo pendientes"
+                      loading={loadingExcelControlCaja} onClick={() => onDescargarControlCaja(filtros)}
+                      color="border-green-100 hover:border-green-300 hover:bg-green-50/50 text-green-600"
                     />
                     <ReporteBtn
                       icon={SortAsc} label="Top Productos"

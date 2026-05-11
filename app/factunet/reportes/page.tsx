@@ -278,6 +278,17 @@ export default function ReportesPage() {
     );
   };
 
+  const handleDescargarControlCaja = async () => {
+    const codEst = isSuperAdmin
+      ? (modal.filtros.codEstablecimiento ?? null)
+      : getCodEstablecimiento();
+
+    await avanzados.descargarExcelControlCaja(
+      { ...getParamsBase(), ...modal.filtros, codEstablecimiento: codEst },
+      resolverTitulo('control-caja')
+    );
+  };
+
   const handleDescargarMedios = async () => {
     const codEst = isSuperAdmin
       ? (modal.filtros.codEstablecimiento ?? null)
@@ -620,9 +631,11 @@ export default function ReportesPage() {
         loadingExcelListado={avanzados.loadingExcelListado}
         loadingExcelProductos={avanzados.loadingExcelProductos}
         loadingExcelMedios={avanzados.loadingExcelMedios}
+        loadingExcelControlCaja={avanzados.loadingExcelControlCaja}
         onDescargarListado={handleDescargarListado}
         onDescargarProductos={handleDescargarProductos}
         onDescargarMedios={handleDescargarMedios}
+        onDescargarControlCaja={handleDescargarControlCaja} 
       />
     </div>
   );
