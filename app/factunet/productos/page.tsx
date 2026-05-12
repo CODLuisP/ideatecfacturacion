@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench, Download, CheckCircle, XCircle, Loader2, PackageSearch } from "lucide-react";
+import { Search, Upload, Plus, Edit2, Trash2, ChevronDown, Package, Wrench, Download, CheckCircle, XCircle, Loader2, PackageSearch, FileSpreadsheet } from "lucide-react";
 import axios from "axios";
 
 
@@ -22,6 +22,7 @@ import { useProductosEmpresaLista } from "./gestioProductos/useProductosEmpresaL
 import { useSucursalRuc } from "../operaciones/boleta/gestionBoletas/useSucursalRuc";
 import { useRegistrarCategoria } from "./gestioProductos/useRegistrarCategoria";
 import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
+import ModalReporteProductos from "@/app/components/modalProductos/Modalreporteproductos";
 
 export default function ProductosPage() {
   const { showToast } = useToast();
@@ -65,6 +66,9 @@ export default function ProductosPage() {
   const [importProgreso, setImportProgreso] = useState<{ total: number; actual: number } | null>(null);
   const [importResultados, setImportResultados] = useState<{ ok: string[]; errores: { fila: number; nombre: string; error: string }[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  //modal reporte
+  const [isReporteOpen, setIsReporteOpen] = useState(false);
 
   //Categorias
   const { categorias, setCategorias, loadingCategorias, fetchCategorias } = useCategoriasLista()
@@ -376,6 +380,9 @@ export default function ProductosPage() {
                 <Button variant="outline" onClick={() => setIsImportOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
                     <Upload className="w-3.5 h-3.5" /> Importar
                 </Button>
+                <Button variant="outline" onClick={() => setIsReporteOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Reporte Excel
+                </Button>
                 <Button onClick={() => setIsNewOpen(true)} className="py-2.5 px-3 text-xs rounded-md h-auto">
                     <Plus className="w-3.5 h-3.5" /> Nuevo Producto
                 </Button>
@@ -626,6 +633,12 @@ export default function ProductosPage() {
         onClose={() => setIsEditOpen(false)}
         onProductoEditado={handleProductoEditado}
         categorias={categorias}
+      />
+      <ModalReporteProductos
+        isOpen={isReporteOpen}
+        onClose={() => setIsReporteOpen(false)}
+        categorias={categorias}
+        sucursales={sucursales}
       />
 
       {/* Modal importar */}
