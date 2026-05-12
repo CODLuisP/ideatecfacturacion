@@ -373,7 +373,7 @@ export function ModalReportes({
                   </div>
                   <div className="flex gap-2">
                     <ReporteBtn
-                      icon={FileSpreadsheet} label="Listado de Comprobantes"
+                      icon={FileSpreadsheet} label="Libro Contable"
                       descripcion="Comprobantes aceptados con detalle"
                       loading={loadingExcelListado} onClick={() => onDescargarListado(filtros)}
                       color="border-blue-100 hover:border-blue-300 hover:bg-blue-50/50 text-blue-600"
