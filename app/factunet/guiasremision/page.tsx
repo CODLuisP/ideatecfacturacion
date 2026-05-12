@@ -737,24 +737,24 @@ function TablaRemitente({
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
-
-
-{loading ? (
-  <tr>
-    <td colSpan={13} className="px-6 py-16 text-center w-full">
-      <div className="flex flex-col items-center justify-center gap-3">
-        <RefreshCw size={24} className="animate-spin text-blue-400" />
-        <span className="text-sm text-gray-400">Cargando guías...</span>
-      </div>
-    </td>
-  </tr>
-) : guias.length === 0 ? (
-  <tr>
-    <td colSpan={13} className="px-6 py-16 text-center text-sm text-gray-400 w-full">
-      No se encontraron guías con ese criterio.
-    </td>
-  </tr>
-
+        {loading ? (
+          <tr>
+            <td colSpan={13} className="px-6 py-16 text-center w-full">
+              <div className="flex flex-col items-center justify-center gap-3">
+                <RefreshCw size={24} className="animate-spin text-blue-400" />
+                <span className="text-sm text-gray-400">Cargando guías...</span>
+              </div>
+            </td>
+          </tr>
+        ) : guias.length === 0 ? (
+          <tr>
+            <td
+              colSpan={13}
+              className="px-6 py-16 text-center text-sm text-gray-400 w-full"
+            >
+              No se encontraron guías con ese criterio.
+            </td>
+          </tr>
         ) : (
           guias.map((g) => (
             <tr
@@ -1010,8 +1010,8 @@ function TablaTransportista({
       <tbody className="divide-y divide-gray-100">
         {loading ? (
           <tr>
-            <td colSpan={9} className="px-6 py-16 text-center">
-              <div className="flex flex-col items-center gap-3">
+            <td colSpan={13} className="px-6 py-16 text-center w-full">
+              <div className="flex flex-col items-center justify-center gap-3">
                 <RefreshCw size={24} className="animate-spin text-blue-400" />
                 <span className="text-sm text-gray-400">Cargando guías...</span>
               </div>
@@ -1020,7 +1020,7 @@ function TablaTransportista({
         ) : guias.length === 0 ? (
           <tr>
             <td
-              colSpan={9}
+              colSpan={13}
               className="px-6 py-16 text-center text-sm text-gray-400"
             >
               No se encontraron guías con ese criterio.

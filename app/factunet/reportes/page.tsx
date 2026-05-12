@@ -428,7 +428,7 @@ export default function ReportesPage() {
 
         {/* Botones derecha */}
         <div className="flex gap-2">
-          {/* 👇 Botón Reportes — abre el modal */}
+          {/* Botón Reportes — abre el modal */}
           <Button
             variant="outline"
             onClick={modal.abrir}

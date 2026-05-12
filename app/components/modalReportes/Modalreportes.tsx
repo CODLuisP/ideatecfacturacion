@@ -171,7 +171,7 @@ export function ModalReportes({
       {abierto && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={onCerrar} />
+            className="fixed inset-0 w-full h-full bg-black/40 backdrop-blur-sm z-50" onClick={onCerrar} />
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}

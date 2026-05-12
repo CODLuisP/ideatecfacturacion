@@ -511,12 +511,12 @@ export default function SunatPage() {
                   <label
                     key={env.key}
                     className={cn(
-                      "flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all",
+                      "flex items-start gap-3 p-4 rounded-xl border cursor-default transition-all",
                       config.environment === env.key
                         ? env.accent === "emerald"
                           ? "border-emerald-300 bg-emerald-50/60"
                           : "border-amber-300 bg-amber-50/60"
-                        : "border-gray-200 hover:border-gray-300 bg-gray-50/30",
+                        : "border-gray-200 bg-gray-50/30",
                     )}
                   >
                     <input
@@ -524,14 +524,8 @@ export default function SunatPage() {
                       name="environment"
                       value={env.key}
                       checked={config.environment === env.key}
-                      onChange={() =>
-                        setConfig((c) => ({
-                          ...c,
-                          environment: env.key,
-                          saved: false,
-                        }))
-                      }
-                      className="mt-0.5 accent-brand-blue"
+                      onChange={() => {}}
+                      className="mt-0.5 accent-brand-blue pointer-events-none"
                     />
                     <div>
                       <p className="text-sm font-bold text-gray-900">
