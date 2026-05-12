@@ -629,6 +629,9 @@ export default function ConfiguracionPage() {
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [savingSucursalId, setSavingSucursalId] = useState<number | null>(null);
 
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [logoBase64Pure, setLogoBase64Pure] = useState<string | null>(null);
+
   // Cropper state
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
 
@@ -689,6 +692,10 @@ export default function ConfiguracionPage() {
           telefono: d.telefono ?? "",
           email: d.email ?? "",
         });
+        if (d.logoBase64) {
+          setLogoBase64Pure(d.logoBase64);
+          setLogoDataUrl(toDataUrl(d.logoBase64));
+        }
         setTipoEmision(d.tipoEmision ?? true);
       })
       .catch(() => {
@@ -748,6 +755,8 @@ export default function ConfiguracionPage() {
     croppedFile: File,
   ) => {
     setImageToCrop(null);
+    setLogoDataUrl(croppedDataUrl);
+    setLogoBase64Pure(stripDataUrlPrefix(croppedDataUrl));
     setUploadingLogo(true);
     try {
       const formData = new FormData();
@@ -760,11 +769,18 @@ export default function ConfiguracionPage() {
       });
       showToast("Logo subido y procesado correctamente", "success");
     } catch {
-
+      setLogoDataUrl("");
+      setLogoBase64Pure(null);
       showToast("Error al subir el logo. Inténtalo de nuevo.", "error");
     } finally {
       setUploadingLogo(false);
     }
+  };
+
+  const handleLogoRemove = () => {
+    if (!canEdit) return;
+    setLogoDataUrl("");
+    setLogoBase64Pure(null);
   };
 
   const upd =
@@ -832,6 +848,7 @@ export default function ConfiguracionPage() {
         distrito: form.distrito,
         telefono: form.telefono || null,
         email: form.email,
+        logoBase64: logoBase64Pure,
         tipoEmision: tipoEmision,
       };
       await axios.put(`${BASE_URL}/api/companies/${form.ruc}`, payload, {
@@ -924,6 +941,14 @@ export default function ConfiguracionPage() {
               {isFacturador && <ReadOnlyBanner />}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3" >
+                <LogoUploader
+                  logoDataUrl={logoDataUrl}
+                  uploading={uploadingLogo}
+                  canEdit={canEdit}
+                  onFileSelected={handleFileSelected}
+                  onLogoRemove={handleLogoRemove}
+                  onError={(msg) => showToast(msg, "error")}
+                />
 
                 <div className="md:col-span-2 mt-3 mx-3">
                   <SectionHeader

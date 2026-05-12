@@ -24,6 +24,7 @@ interface CertificadoDigitalCardProps {
   ruc: string;
   initialData?: CompanyData | null;
   loadingInitial?: boolean;
+  logoBase64?: string | null; 
 }
 
 // ─── Parse cert expiry from PEM base64 ───────────────────────────────────────
@@ -179,7 +180,8 @@ function PemDisplay({ pem }: { pem: string }) {
 export function CertificadoDigitalCard({
   ruc,
   initialData,
-  loadingInitial, 
+  loadingInitial,
+  logoBase64, 
 }: CertificadoDigitalCardProps) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
@@ -332,7 +334,7 @@ export function CertificadoDigitalCard({
       setStep("saving");
       await axios.put(
         ApisSunat.updateCompany(ruc),
-        { certificadoPem: pem, certificadoPassword: certPasswordInput },
+        { certificadoPem: pem, certificadoPassword: certPasswordInput, logoBase64: logoBase64 ?? null,  },
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 

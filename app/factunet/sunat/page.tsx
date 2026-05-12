@@ -433,10 +433,12 @@ export default function SunatPage() {
             environment: config.environment,
             clientId: config.clientId || null,
             clientSecret: config.clientSecret || null,
+            logoBase64: user?.logoBase64 ?? null,
             igv: igv,
           }
         : {
             environment: config.environment,
+            logoBase64: user?.logoBase64 ?? null,
             igv: igv,
           };
 
@@ -465,6 +467,12 @@ export default function SunatPage() {
       <div className="space-y-6 animate-in fade-in duration-500">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <EstadoConexionSunatCard className="lg:col-span-2" />
+          <CertificadoDigitalCard
+            ruc={user?.ruc ?? ""}
+            initialData={companyData}
+            loadingInitial={loadingCompany}
+            logoBase64={user?.logoBase64 ?? null}
+          />
         </div>
 
         <form onSubmit={handleSubmitIntent} className="space-y-4">
