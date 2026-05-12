@@ -16,6 +16,7 @@ import { Button } from '../components/ui/Button';
 import { MenuItem, View } from '../types';
 import { RECENT_DOCS } from '../components/data/mockData';
 
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
