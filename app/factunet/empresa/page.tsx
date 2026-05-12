@@ -692,10 +692,6 @@ export default function ConfiguracionPage() {
           telefono: d.telefono ?? "",
           email: d.email ?? "",
         });
-        if (d.logoBase64) {
-          setLogoBase64Pure(d.logoBase64);
-          setLogoDataUrl(toDataUrl(d.logoBase64));
-        }
         setTipoEmision(d.tipoEmision ?? true);
       })
       .catch(() => {
@@ -703,6 +699,26 @@ export default function ConfiguracionPage() {
         setLoadingEmpresa(false);
       })
       .finally(() => setLoadingEmpresa(false));
+
+    // Cargar logo desde nueva API
+    axios
+      .get(`${BASE_URL}/api/companies/logo?ruc=${ruc}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      .then((res) => {
+        const data = res.data;
+        if (data.success && data.logoBase64) {
+          setLogoBase64Pure(data.logoBase64);
+          setLogoDataUrl(toDataUrl(data.logoBase64));
+        } else {
+          setLogoBase64Pure(null);
+          setLogoDataUrl("");
+        }
+      })
+      .catch(() => {
+        setLogoBase64Pure(null);
+        setLogoDataUrl("");
+      });
   }, [user?.ruc, accessToken]);
 
   // ── GET sucursales ────────────────────────────────────────────────────────

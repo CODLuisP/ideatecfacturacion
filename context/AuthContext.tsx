@@ -79,7 +79,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
         if (!data) return;
 
-        if (data.logoBase64) setLogoOverride(data.logoBase64);
         if (data.igv) setIgvOverride(data.igv);
         if (data.environment) {
           setEnvironmentOverride(data.environment === "production" ? "production" : "beta");
@@ -87,6 +86,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         if (data.tipoEmision !== undefined) {
           setTipoEmisionOverride(data.tipoEmision);
           localStorage.setItem("AuthContext_tipoEmision", String(data.tipoEmision));
+        }
+
+        try {
+          const logoRes = await fetch(`${apiUrl}/api/companies/logo?ruc=${ruc}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (logoRes.ok) {
+            const logoData = await logoRes.json();
+            if (logoData.success && logoData.logoBase64) {
+              setLogoOverride(logoData.logoBase64);
+            } else {
+              setLogoOverride(null);
+            }
+          } else {
+            setLogoOverride(null);
+          }
+        } catch (logoErr) {
+          setLogoOverride(null);
         }
       } catch (error) {
         console.error("Error fetching company data:", error);
