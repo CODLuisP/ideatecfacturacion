@@ -44,7 +44,7 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-gray-800">
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => signOut({ callbackUrl: '/' })}
           className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-900/50 text-red-400 rounded transition-colors"
         >
           <LogOut size={18} />

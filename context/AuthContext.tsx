@@ -169,7 +169,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     // 3. Cerrar sesión en NextAuth
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/" });
   }, []);
 
   // Efecto para limpiar si la sesión expira o se cierra externamente

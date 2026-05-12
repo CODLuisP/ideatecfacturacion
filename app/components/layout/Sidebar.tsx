@@ -19,7 +19,7 @@ export const Sidebar = ({
   menuItems,
 }: SidebarProps) => {
 
-  const handleLogout = () => signOut({ callbackUrl: '/login' });
+  const handleLogout = () => signOut({ callbackUrl: '/' });
 
   return (
     <aside

@@ -80,7 +80,7 @@ function ResetPasswordContent() {
       }
 
       setStatus(ResetStatus.SUCCESS);
-      setTimeout(() => router.push("/login"), 3000);
+      setTimeout(() => router.push("/"), 3000);
     } catch {
       setStatus(ResetStatus.ERROR);
       setErrorMsg("Error de conexión. Intenta nuevamente.");
@@ -100,7 +100,7 @@ function ResetPasswordContent() {
             Este enlace de recuperación no es válido o ha expirado. Solicita uno nuevo.
           </p>
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => router.push("/")}
             className="w-full py-3 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-sm transition-colors"
           >
             Volver al inicio de sesión
@@ -271,7 +271,7 @@ function ResetPasswordContent() {
             ¿Recordaste tu contraseña?{" "}
             <button
               type="button"
-              onClick={() => router.push("/login")}
+              onClick={() => router.push("/")}
               className="font-bold text-blue-700 hover:text-blue-900"
             >
               Volver al login

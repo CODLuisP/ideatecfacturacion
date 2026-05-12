@@ -28,7 +28,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import IncaPattern from "../components/IncaPattern";
+import IncaPattern from "./IncaPattern";
 
 // ─── Enums & Interfaces ────────────────────────────────────────────────────────
 
@@ -636,9 +636,9 @@ const PrivacyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   </div>
 );
 
-// ─── Página Principal ──────────────────────────────────────────────────────────
+// ─── Componente de Login ──────────────────────────────────────────────────────────
 
-const LoginPage: React.FC = () => {
+const LoginClient: React.FC = () => {
   const router = useRouter();
   const [formData, setFormData] = useState<LoginFormData>({
     identifier: "",
@@ -1163,4 +1163,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export default LoginClient;

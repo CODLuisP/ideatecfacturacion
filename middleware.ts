@@ -6,8 +6,8 @@ export default withAuth(
     const token = req.nextauth.token;
     const { pathname } = req.nextUrl;
 
-    // Redirigir usuarios autenticados fuera del login
-    if (token && (pathname === "/login" || pathname === "/")) {
+    // Redirigir usuarios autenticados fuera del login (que ahora es /)
+    if (token && pathname === "/") {
       return NextResponse.redirect(
         new URL("/factunet/dashboard", req.url),
       );
@@ -32,16 +32,15 @@ export default withAuth(
       },
     },
     pages: {
-      signIn: "/login",
+      signIn: "/", // ✅ Ahora la raíz es el login
     },
   },
 );
 
 export const config = {
   matcher: [
-    "/factunet/:path*", // ✅ Cubre /factunet/dashboard y cualquier subruta
+    "/factunet/:path*",
     '/docs/:path*',
-    "/login",
     "/",
   ],
 };
