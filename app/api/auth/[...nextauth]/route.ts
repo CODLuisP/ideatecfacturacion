@@ -33,7 +33,7 @@ export const authOptions: AuthOptions = {
               identifier: credentials.identifier,
               password: credentials.password,
               environment: credentials.environment || "production",
-              rememberMe: credentials.rememberMe === "true" || credentials.rememberMe === true,
+              rememberMe: credentials.rememberMe === "true",
             }),
           });
 
