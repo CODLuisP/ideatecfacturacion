@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   Eye,
@@ -650,6 +650,15 @@ const LoginPage: React.FC = () => {
   const [status, setStatus] = useState<LoginStatus>(LoginStatus.IDLE);
   const [apiError, setApiError] = useState<string>("");
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [environment, setEnvironment] = useState<"beta" | "production">("production");
+
+  // Detectar entorno desde la URL
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isBeta = window.location.href.toLowerCase().includes("beta");
+      setEnvironment(isBeta ? "beta" : "production");
+    }
+  }, []);
 
   // Cargar credenciales guardadas al montar el componente
   useEffect(() => {
@@ -711,9 +720,15 @@ const LoginPage: React.FC = () => {
     setStatus(LoginStatus.LOADING);
     setApiError("");
     try {
+      // ── NUEVO: Limpiar cualquier sesión previa antes de intentar una nueva ──
+      // Esto asegura que no queden tokens "sucios" de otros ambientes
+      await signOut({ redirect: false });
+
       const result = await signIn("credentials", {
         identifier: formData.identifier,
         password: formData.password,
+        environment: environment,
+        rememberMe: formData.rememberMe.toString(),
         redirect: false,
       });
       if (result?.error) {
@@ -920,6 +935,39 @@ const LoginPage: React.FC = () => {
                       <AlertCircle size={14} /> {errors.password}
                     </p>
                   )}
+                </div>
+
+                {/* Ambiente de Trabajo */}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Ambiente de Trabajo
+                  </label>
+                  <div className="flex p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setEnvironment("production")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
+                        environment === "production"
+                          ? "bg-white text-blue-900 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <Globe size={14} />
+                      Producción
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnvironment("beta")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
+                        environment === "beta"
+                          ? "bg-white text-orange-600 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <Zap size={14} />
+                      Beta
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between">

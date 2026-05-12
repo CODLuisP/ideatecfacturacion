@@ -221,10 +221,18 @@ export function CertificadoDigitalCard({
     const fetchCompany = async () => {
       setLoadingCompany(true);
       try {
-        const res = await axios.get(ApisSunat.getCompany(ruc), {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        const res = await axios.get(`${ApisSunat.getCompany(ruc)}?t=${Date.now()}`, {
+          headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          },
         });
-        setCompany(res.data);
+        let data = res.data;
+        if (Array.isArray(data)) {
+          data = data[0];
+        }
+        setCompany(data);
       } catch {
         showToast("Error al cargar datos del certificado", "error");
       } finally {
@@ -333,7 +341,7 @@ export function CertificadoDigitalCard({
       setCompany((prev) =>
         prev
           ? { ...prev, certificadoPem: pem, certificadoPassword: certPasswordInput }
-          : { certificadoPem: pem, certificadoPassword: certPasswordInput, environment: "produccion" },
+          : { certificadoPem: pem, certificadoPassword: certPasswordInput, environment: "production" },
       );
 
       setPemResult(pem);

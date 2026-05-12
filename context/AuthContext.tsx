@@ -58,20 +58,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const fetchCompanyData = useCallback(
     async (ruc: string, token: string | null) => {
       try {
-        const r = await fetch(`https://factunetapi.ideatec.com.pe:8443/api/companies/${ruc}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        // Añadimos timestamp para evitar caché del navegador entre ambientes
+        const r = await fetch(`${apiUrl}/api/companies/${ruc}?t=${Date.now()}`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          },
+          cache: "no-store"
         });
+
         if (!r.ok) return;
-        const data = await r.json();
-        if (data?.environment) setEnvironmentOverride(data.environment);
-        if (data?.igv !== undefined) setIgvOverride(data.igv);
-        if (data?.tipoEmision !== undefined) {
+
+        let data = await r.json();
+        // Si el backend devuelve un array, tomamos el primer elemento
+        if (Array.isArray(data)) {
+          data = data[0];
+        }
+
+        if (!data) return;
+
+        if (data.logoBase64) setLogoOverride(data.logoBase64);
+        if (data.igv) setIgvOverride(data.igv);
+        if (data.environment) {
+          setEnvironmentOverride(data.environment === "production" ? "production" : "beta");
+        }
+        if (data.tipoEmision !== undefined) {
           setTipoEmisionOverride(data.tipoEmision);
           localStorage.setItem("AuthContext_tipoEmision", String(data.tipoEmision));
         }
-        setLogoOverride(data?.logoBase64 ?? null);
-      } catch {
-        // falla silenciosamente
+      } catch (error) {
+        console.error("Error fetching company data:", error);
       }
     },
     [],
@@ -121,7 +139,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     tipoEmisionOverride,
   ]);
 
-  const logout = useCallback(() => signOut({ callbackUrl: "/login" }), []);
+  const logout = useCallback(async () => {
+    // 1. Limpiar estados locales
+    setEnvironmentOverride(null);
+    setIgvOverride(null);
+    setLogoOverride(null);
+    setTipoEmisionOverride(null);
+    
+    // 2. Limpiar localStorage relacionado con Auth
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("AuthContext_tipoEmision");
+    }
+
+    // 3. Cerrar sesión en NextAuth
+    await signOut({ callbackUrl: "/login" });
+  }, []);
+
+  // Efecto para limpiar si la sesión expira o se cierra externamente
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      setEnvironmentOverride(null);
+      setIgvOverride(null);
+      setLogoOverride(null);
+      setTipoEmisionOverride(null);
+    }
+  }, [status]);
 
   const setEnvironment = useCallback((env: string) => {
     setEnvironmentOverride(env);

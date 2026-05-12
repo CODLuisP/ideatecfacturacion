@@ -26,7 +26,7 @@ interface Config {
   solPassword: string;
   clientId: string;
   clientSecret: string;
-  environment: "produccion" | "beta";
+  environment: "production" | "beta";
   saved: boolean;
 }
 
@@ -39,7 +39,7 @@ export interface CompanyData {
 // ─── ConfirmModal ─────────────────────────────────────────────────────────────
 interface ConfirmModalProps {
   open: boolean;
-  environment: "produccion" | "beta";
+  environment: "production" | "beta";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -51,7 +51,7 @@ function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   if (!open) return null;
-  const isProduccion = environment === "produccion";
+  const isProduccion = environment === "production";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -341,7 +341,7 @@ export default function SunatPage() {
     solPassword: "",
     clientId: "",
     clientSecret: "",
-    environment: "produccion",
+    environment: "production",
     saved: false,
   });
 
@@ -367,15 +367,28 @@ export default function SunatPage() {
     const fetchCompany = async () => {
       setLoadingCompany(true);
       try {
-        const res = await axios.get(ApisSunat.getCompany(user.ruc), {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        const res = await axios.get(`${ApisSunat.getCompany(user.ruc)}?t=${Date.now()}`, {
+          headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          },
         });
-        const data = res.data;
+        let data = res.data;
+        // Si el backend devuelve un array, tomamos el primer elemento
+        if (Array.isArray(data)) {
+          data = data[0];
+        }
+
+        if (!data) {
+          setLoadingCompany(false);
+          return;
+        }
 
         setCompanyData({
           certificadoPem: data.certificadoPem ?? null,
           certificadoPassword: data.certificadoPassword ?? null,
-          environment: data.environment ?? "produccion",
+          environment: data.environment ?? "production",
         });
 
         setConfig({
@@ -383,7 +396,7 @@ export default function SunatPage() {
           solPassword: data.solClave ?? "",
           clientId: data.clientId ?? "",
           clientSecret: data.clientSecret ?? "",
-          environment: data.environment === "beta" ? "beta" : "produccion",
+          environment: data.environment === "beta" ? "beta" : "production",
           saved: !!(data.solUsuario && data.solClave),
         });
 
@@ -482,7 +495,7 @@ export default function SunatPage() {
                 {(
                   [
                     {
-                      key: "produccion",
+                      key: "production",
                       label: "Producción",
                       desc: "Comprobantes reales enviados a SUNAT",
                       accent: "emerald",

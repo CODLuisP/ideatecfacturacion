@@ -11,6 +11,8 @@ export const authOptions: AuthOptions = {
       credentials: {
         identifier: { label: "RUC o Email", type: "text" },
         password: { label: "Password", type: "password" },
+        environment: { label: "Environment", type: "text" },
+        rememberMe: { label: "Remember Me", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.identifier || !credentials?.password) {
@@ -30,6 +32,8 @@ export const authOptions: AuthOptions = {
             body: JSON.stringify({
               identifier: credentials.identifier,
               password: credentials.password,
+              environment: credentials.environment || "production",
+              rememberMe: credentials.rememberMe === "true" || credentials.rememberMe === true,
             }),
           });
 

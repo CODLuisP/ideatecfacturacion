@@ -21,7 +21,7 @@ import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
 import { LogoCropper } from "@/app/components/ui/LogoCropper";
 
-const BASE_URL = "https://factunetapi.ideatec.com.pe:8443";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface EmpresaForm {
@@ -667,11 +667,19 @@ export default function ConfiguracionPage() {
 
     setLoadingEmpresa(true);
     axios
-      .get(`${BASE_URL}/api/companies/${ruc}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      .get(`${BASE_URL}/api/companies/${ruc}?t=${Date.now()}`, {
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
+        },
       })
       .then((res) => {
-        const d = res.data;
+        let d = res.data;
+        if (Array.isArray(d)) {
+          d = d[0];
+        }
+        if (!d) return;
         setForm({
           ruc: d.ruc ?? "",
           razonSocial: d.razonSocial ?? "",
@@ -706,8 +714,12 @@ export default function ConfiguracionPage() {
 
     if (isSuperAdmin) {
       axios
-        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}&t=${Date.now()}`, {
+          headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          },
         })
         .then((res) => setSucursales(res.data ?? []))
         .catch(() => showToast("No se pudieron cargar las sucursales", "error"))
@@ -719,8 +731,12 @@ export default function ConfiguracionPage() {
         return;
       }
       axios
-        .get(`${BASE_URL}/api/Sucursal/${sucursalId}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        .get(`${BASE_URL}/api/Sucursal/${sucursalId}?t=${Date.now()}`, {
+          headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          },
         })
         .then((res) => setSucursales([res.data]))
         .catch(() => showToast("No se pudo cargar la sucursal", "error"))
