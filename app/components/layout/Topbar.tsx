@@ -68,10 +68,6 @@ export const Topbar = ({
 
   const isBeta = user?.environment === "beta";
 
-  const logoSrc = user?.logoBase64
-    ? `data:image/png;base64,${user.logoBase64}`
-    : "/user.png";
-
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node))
@@ -400,12 +396,6 @@ export const Topbar = ({
                     : "border-gray-200 group-hover:border-gray-300"
                 }`}
               >
-                <img
-                  src={logoSrc}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
               </div>
               <ChevronRight
                 className={`w-3 h-3 text-gray-700 transition-transform duration-200 ${
