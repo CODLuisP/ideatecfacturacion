@@ -1347,7 +1347,7 @@ function GuiaRemisionContent() {
       <div className="flex items-center gap-4 ">
         <Button
           variant="ghost"
-          onClick={() => router.push("/factunet/operaciones")}
+          onClick={() => router.push("/factufly/operaciones")}
           className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -2550,3 +2550,4 @@ export default function GuiaRemisionPage() {
     </Suspense>
   );
 }
+

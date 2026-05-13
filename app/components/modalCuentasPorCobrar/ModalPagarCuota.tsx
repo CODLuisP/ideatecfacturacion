@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react'
 import { X, CreditCard, Calendar, DollarSign, AlertCircle, TrendingUp } from 'lucide-react'
 import { cn } from '@/app/utils/cn'
-import { formatFecha } from '@/app/factunet/comprobantes/gestionComprobantes/helpers'
-import { Cuota, PagarCuotaPayload } from '@/app/factunet/cuentasporcobrar/gestionCuentasPorCobrar/CuentasPorCobrar'
+import { formatFecha } from '@/app/factufly/comprobantes/gestionComprobantes/helpers'
+import { Cuota, PagarCuotaPayload } from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/CuentasPorCobrar'
 import {
   calcularDescuento, calcularPenalidad,
   TASA_DESCUENTO_DIARIA, TASA_PENALIDAD_DIARIA,
   formatMoneda, MEDIO_PAGO_OPTS
-} from '@/app/factunet/cuentasporcobrar/gestionCuentasPorCobrar/helpers'
+} from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/helpers'
 
 interface ModalPagarCuotaProps {
   cuota: Cuota

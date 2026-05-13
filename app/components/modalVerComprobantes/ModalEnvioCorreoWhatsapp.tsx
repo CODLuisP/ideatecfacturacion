@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Mail, MessageCircle, CheckCircle2, X, Send, Plus, Check } from 'lucide-react';
 import { cn } from '@/app/utils/cn';
-import { ComprobanteListado, ComprobanteDetalleItem } from '@/app/factunet/comprobantes/gestionComprobantes/Comprobante';
-import { padCorrelativo, tipoLabel, formatFechaHora, COLORS } from '@/app/factunet/comprobantes/gestionComprobantes/helpers';
-import { useActualizarCorreoWhatsapp } from '@/app/factunet/comprobantes/gestionComprobantes/UseActualizarCorreoWhatsapp';
+import { ComprobanteListado, ComprobanteDetalleItem } from '@/app/factufly/comprobantes/gestionComprobantes/Comprobante';
+import { padCorrelativo, tipoLabel, formatFechaHora, COLORS } from '@/app/factufly/comprobantes/gestionComprobantes/helpers';
+import { useActualizarCorreoWhatsapp } from '@/app/factufly/comprobantes/gestionComprobantes/UseActualizarCorreoWhatsapp';
 import { useToast } from '../ui/Toast';
 
 export interface ModalEnvioCorreoWhatsappProps {

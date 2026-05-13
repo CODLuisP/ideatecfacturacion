@@ -16,13 +16,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://factunet.pe'),
+  metadataBase: new URL('https://factufly.pe'),
   title: {
-    default: 'FactuNet | Sistema de Facturación Electrónica SUNAT',
-    template: '%s | FactuNet',
+    default: 'FactuFly | Sistema de Facturación Electrónica SUNAT',
+    template: '%s | FactuFly',
   },
   description: 'Sistema de facturación electrónica para empresas peruanas. Autorizado por SUNAT, emite facturas, boletas y notas de crédito de forma rápida y segura.',
-  keywords: ['Facturación electrónica', 'SUNAT', 'Perú', 'Sistema de facturación', 'Facturas electrónicas Perú', 'FactuNet', 'Software facturación'],
+  keywords: ['Facturación electrónica', 'SUNAT', 'Perú', 'Sistema de facturación', 'Facturas electrónicas Perú', 'FactuFly', 'Software facturación'],
   authors: [{ name: 'Ideatec' }],
   creator: 'Ideatec',
   publisher: 'Ideatec',
@@ -32,16 +32,16 @@ export const metadata: Metadata = {
     telephone: false,
   },
   openGraph: {
-    title: 'FactuNet | Facturación Electrónica SUNAT',
-    description: 'Emite comprobantes electrónicos 100% validos por SUNAT rápidamente con FactuNet.',
-    url: 'https://factunet.pe',
-    siteName: 'FactuNet',
+    title: 'FactuFly | Facturación Electrónica SUNAT',
+    description: 'Emite comprobantes electrónicos 100% validos por SUNAT rápidamente con FactuFly.',
+    url: 'https://factufly.pe',
+    siteName: 'FactuFly',
     locale: 'es_PE',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FactuNet | Sistema de Facturación Electrónica',
+    title: 'FactuFly | Sistema de Facturación Electrónica',
     description: 'Emite facturas y boletas rápidamente. Totalmente compatible con SUNAT.',
   },
   verification: {
@@ -57,10 +57,10 @@ export default function RootLayout({
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
-    name: 'FactuNet',
-    image: 'https://factunet.pe/logofnsb.png',
+    name: 'FactuFly',
+    image: 'https://factufly.pe/logofnsb.png',
     description: 'Sistema de facturación electrónica para empresas en Perú, autorizado por SUNAT.',
-    url: 'https://factunet.pe',
+    url: 'https://factufly.pe',
     address: {
       '@type': 'PostalAddress',
       addressCountry: 'PE'

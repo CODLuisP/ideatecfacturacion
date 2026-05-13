@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/app/utils/cn";
 import { Button } from "@/app/components/ui/Button";
-import { FiltrosReporteModal } from "@/app/factunet/reportes/gestionReportes/Reportes";
-import { UsuarioReporte } from "@/app/factunet/reportes/gestionReportes/UseUsuariosReporte";
+import { FiltrosReporteModal } from "@/app/factufly/reportes/gestionReportes/Reportes";
+import { UsuarioReporte } from "@/app/factufly/reportes/gestionReportes/UseUsuariosReporte";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Sucursal {

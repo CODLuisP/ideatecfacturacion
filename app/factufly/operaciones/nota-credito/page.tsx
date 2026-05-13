@@ -823,7 +823,7 @@ const actualizarStockDevolucion = async () => {
           <div className="flex items-center gap-4 ">
                      <Button
             variant="ghost"
-            onClick={() => router.push("/factunet/operaciones")}
+            onClick={() => router.push("/factufly/operaciones")}
             className="h-10 w-10 p-0 rounded-xl bg-gray-200 hover:bg-gray-300"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -971,7 +971,7 @@ const actualizarStockDevolucion = async () => {
                       {(correlativoInput || comprobante) && (
                         <button type="button" 
                           onClick={() => { limpiarBuscador(); setCodMotivo(""); setDesMotivo(""); if (vieneDesdeLista) {
-                            router.replace('/factunet/operaciones/nota-credito')} setVieneDesdeLista(false)
+                            router.replace('/factufly/operaciones/nota-credito')} setVieneDesdeLista(false)
                           }} 
                           title="Limpiar búsqueda"
                           className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
@@ -1484,3 +1484,4 @@ export default function NotaCreditoPage() {
     </Suspense>
   );
 }
+

@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 
 export async function GET() {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Factunet";
+  workbook.creator = "FactuFly";
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Productos", {
@@ -178,7 +178,8 @@ export async function GET() {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition":
-        'attachment; filename="plantilla_productos_factunet.xlsx"',
+        'attachment; filename="plantilla_productos_FactuFly.xlsx"',
     },
   });
 }
+

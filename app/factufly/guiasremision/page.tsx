@@ -411,7 +411,7 @@ export default function GuiasRemisionPage() {
             <div className="shrink-0">
               <button
                 onClick={() =>
-                  router.push("/factunet/operaciones/guia-remision")
+                  router.push("/factufly/operaciones/guia-remision")
                 }
                 className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-white bg-brand-blue hover:bg-blue-700 rounded-md shadow-sm transition-colors"
               >
@@ -612,7 +612,7 @@ export default function GuiasRemisionPage() {
               loadingGuiaId={loadingGuiaId}
               onEditar={(guiaId) =>
                 router.push(
-                  `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
+                  `/factufly/operaciones/guia-remision?editarGuiaId=${guiaId}`,
                 )
               }
               loadingXmlMap={loadingXmlMap}
@@ -631,7 +631,7 @@ export default function GuiasRemisionPage() {
               loadingGuiaId={loadingGuiaId}
               onEditar={(guiaId) =>
                 router.push(
-                  `/factunet/operaciones/guia-remision?editarGuiaId=${guiaId}`,
+                  `/factufly/operaciones/guia-remision?editarGuiaId=${guiaId}`,
                 )
               }
               loadingXmlMap={loadingXmlMap}
@@ -1471,3 +1471,4 @@ const DropdownOpcionesGuia = ({
     </div>
   );
 };
+
