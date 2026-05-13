@@ -413,8 +413,7 @@ export default function CuentasPorCobrarPage() {
                   const vencida        = getCuotaVencida(cuota.fechaVencimiento) && estado !== 'PAGADO'
                   const diasVencida    = getDiasVencida(cuota.fechaVencimiento)
                   const montoPagadoAnt = cuota.montoPagado ?? 0
-                  const montoFinal     = cuota.montoFinal ?? cuota.monto
-                  const progreso       = montoFinal > 0 ? Math.min((montoPagadoAnt / montoFinal) * 100, 100) : 0
+                  const progreso       = cuota.monto > 0 ? Math.min((montoPagadoAnt / cuota.monto) * 100, 100) : 0
                   const yaEstaPagado   = estado === 'PAGADO'
 
                   return (
@@ -442,7 +441,6 @@ export default function CuentasPorCobrarPage() {
                             )}
                           </div>
                         </div>
-
                         {/* Montos */}
                         <div className="flex-1 grid grid-cols-3 gap-3">
                           <div className="text-center">
@@ -455,7 +453,7 @@ export default function CuentasPorCobrarPage() {
                           </div>
                           <div className="text-center">
                             <p className="text-[10px] font-bold text-gray-400 uppercase mb-0.5">Restante</p>
-                            <p className="text-sm font-semibold text-blue-600">{formatMoneda(montoFinal - montoPagadoAnt, comprobanteSeleccionado.tipoMoneda)}</p>
+                            <p className="text-sm font-semibold text-blue-600">{formatMoneda(cuota.monto - montoPagadoAnt, comprobanteSeleccionado.tipoMoneda)}</p>
                           </div>
                         </div>
 
@@ -502,9 +500,6 @@ export default function CuentasPorCobrarPage() {
                       {cuota.fechaPago && (
                         <div className="mt-2 ml-12 flex flex-wrap gap-3 text-[10px] text-gray-400">
                           <span>Último pago: {formatFecha(cuota.fechaPago)}</span>
-                          {cuota.medioPago && <span>· {cuota.medioPago}</span>}
-                          {cuota.entidadFinanciera && <span>· {cuota.entidadFinanciera}</span>}
-                          {cuota.numeroOperacion && <span>· Op: {cuota.numeroOperacion}</span>}
                         </div>
                       )}
                     </div>
