@@ -32,17 +32,21 @@ export interface Cuota {
   montoPagado: number | null
   fechaPago: string | null
   estado: string | null
-  montoDescuento: number
-  motivoDescuento: string | null
-  montoFinal: number | null
-  tasaDescuentoDiaria: number
-  diasAnticipacion: number
-  porcentajeDescuento: number
+  usuarioRegistroPago: number | null
+}
+
+// ── Historial de pagos de una cuota ──────────────────────────────────────────
+export interface CuotaPago {
+  cuotaPagoId: number
+  cuotaId: number
+  montoPagado: number
+  fechaPago: string
   medioPago: string | null
   entidadFinanciera: string | null
   numeroOperacion: string | null
   observaciones: string | null
   usuarioRegistroPago: number | null
+  fechaRegistro: string
 }
 
 // ── Comprobante con cuotas ────────────────────────────────────────────────────
@@ -80,12 +84,6 @@ export interface PagarCuotaPayload {
   numeroOperacion?: string | null
   observaciones?: string | null
   usuarioRegistroPago: number
-  tasaDescuentoDiaria?: number
-  diasAnticipacion?: number
-  porcentajeDescuento?: number
-  montoDescuento?: number
-  motivoDescuento?: string | null
-  montoFinal?: number
 }
 
 // ── Filtros listado ───────────────────────────────────────────────────────────

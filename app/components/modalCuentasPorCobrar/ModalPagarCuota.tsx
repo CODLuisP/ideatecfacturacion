@@ -1,14 +1,11 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import { X, CreditCard, Calendar, DollarSign, AlertCircle, TrendingUp } from 'lucide-react'
+import React, { useState } from 'react'
+import { X, CreditCard, Calendar, AlertCircle, Clock, History, ChevronDown, RefreshCw } from 'lucide-react'
 import { cn } from '@/app/utils/cn'
 import { formatFecha } from '@/app/factufly/comprobantes/gestionComprobantes/helpers'
-import { Cuota, PagarCuotaPayload } from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/CuentasPorCobrar'
-import {
-  calcularDescuento, calcularPenalidad,
-  TASA_DESCUENTO_DIARIA, TASA_PENALIDAD_DIARIA,
-  formatMoneda, MEDIO_PAGO_OPTS
-} from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/helpers'
+import { Cuota, CuotaPago, PagarCuotaPayload } from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/CuentasPorCobrar'
+import { formatMoneda, MEDIO_PAGO_OPTS } from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/helpers'
+import { useHistorialPagos } from '@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/UseHistorialPagos'
 
 interface ModalPagarCuotaProps {
   cuota: Cuota
@@ -23,20 +20,15 @@ export const ModalPagarCuota = ({
   cuota, tipoMoneda, onClose, onConfirm, loading, usuarioId
 }: ModalPagarCuotaProps) => {
 
-const d = new Date()
-const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const d = new Date()
+  const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-const dVenc = new Date(cuota.fechaVencimiento)
-const venc = `${dVenc.getFullYear()}-${String(dVenc.getMonth() + 1).padStart(2, '0')}-${String(dVenc.getDate()).padStart(2, '0')}`
-
-const estaVencida = venc < hoy
-
-  // ── Flags para mostrar secciones según tasa configurada
-  const mostrarDescuento = TASA_DESCUENTO_DIARIA > 0 && !estaVencida && hoy < venc
-  const mostrarPenalidad = TASA_PENALIDAD_DIARIA > 0 && estaVencida
+  const dVenc = new Date(cuota.fechaVencimiento)
+  const venc = `${dVenc.getFullYear()}-${String(dVenc.getMonth() + 1).padStart(2, '0')}-${String(dVenc.getDate()).padStart(2, '0')}`
+  const estaVencida = venc < hoy
 
   const montoPagadoAnterior = cuota.montoPagado ?? 0
-  const montoRestante = (cuota.montoFinal ?? cuota.monto) - montoPagadoAnterior
+  const montoRestante = cuota.monto - montoPagadoAnterior
 
   const [montoPagado, setMontoPagado]             = useState(montoRestante.toFixed(2))
   const [fechaPago, setFechaPago]                 = useState(hoy)
@@ -44,54 +36,42 @@ const estaVencida = venc < hoy
   const [entidadFinanciera, setEntidadFinanciera] = useState('')
   const [numeroOperacion, setNumeroOperacion]     = useState('')
   const [observaciones, setObservaciones]         = useState('')
-  const [aplicarDescuento, setAplicarDescuento]   = useState(mostrarDescuento)
-  const [aplicarPenalidad, setAplicarPenalidad]   = useState(mostrarPenalidad)
   const [errors, setErrors]                       = useState<Record<string, string>>({})
 
-  const [descuento, setDescuento] = useState({
-    diasAnticipacion: 0, porcentajeDescuento: 0, montoDescuento: 0, montoFinal: cuota.monto
-  })
-  const [penalidad, setPenalidad] = useState({
-    diasMora: 0, porcentajePenalidad: 0, montoPenalidad: 0, montoFinal: cuota.monto
-  })
+  // Acordeón historial
+  const hookHistorial                             = useHistorialPagos()
+  const [historialAbierto, setHistorialAbierto]   = useState(false)
+  const [historial, setHistorial]                 = useState<CuotaPago[]>([])
+  const [historialCargado, setHistorialCargado]   = useState(false)
+
+  const tieneHistorial = montoPagadoAnterior > 0
+
+  const toggleHistorial = async () => {
+    if (historialAbierto) {
+      setHistorialAbierto(false)
+      return
+    }
+    setHistorialAbierto(true)
+    if (!historialCargado) {
+      const data = await hookHistorial.fetchHistorial(cuota.cuotaId)
+      setHistorial(data)
+      setHistorialCargado(true)
+    }
+  }
 
   const requiereEntidad = ['TRANSFERENCIA', 'TARJETA', 'CHEQUE'].includes(medioPago)
 
-  useEffect(() => {
-    if (!fechaPago) return
-
-    const pagoStr = fechaPago
-    const vencStr = venc
-
-    const esPagoAntes   = pagoStr < vencStr
-    const esPagoDespues = pagoStr > vencStr
-
-    if (aplicarDescuento && esPagoAntes && TASA_DESCUENTO_DIARIA > 0) {
-      const res = calcularDescuento(cuota.monto, cuota.fechaVencimiento, fechaPago)
-      setDescuento(res)
-      setMontoPagado(Math.max(0, res.montoFinal - montoPagadoAnterior).toFixed(2))
-    } else {
-      setDescuento({ diasAnticipacion: 0, porcentajeDescuento: 0, montoDescuento: 0, montoFinal: cuota.monto })
-      if (!aplicarPenalidad) setMontoPagado(Math.max(0, montoRestante).toFixed(2))
-    }
-
-    if (aplicarPenalidad && esPagoDespues && TASA_PENALIDAD_DIARIA > 0) {
-      const res = calcularPenalidad(cuota.monto, cuota.fechaVencimiento, fechaPago)
-      setPenalidad(res)
-      setMontoPagado(Math.max(0, res.montoFinal - montoPagadoAnterior).toFixed(2))
-    } else {
-      setPenalidad({ diasMora: 0, porcentajePenalidad: 0, montoPenalidad: 0, montoFinal: cuota.monto })
-      if (!aplicarDescuento) setMontoPagado(Math.max(0, montoRestante).toFixed(2))
-    }
-  }, [fechaPago, aplicarDescuento, aplicarPenalidad])
+  const montoPagadoNum = parseFloat(montoPagado) || 0
+  const montoTrasEstePago = montoPagadoAnterior + montoPagadoNum
+  const quedaria = Math.max(0, cuota.monto - montoTrasEstePago)
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {}
     const monto = parseFloat(montoPagado)
-    if (!montoPagado || isNaN(monto) || monto <= 0) errs.montoPagado = 'Ingrese un monto válido'
-    if (monto > montoRestante) {
+    if (!montoPagado || isNaN(monto) || monto <= 0)
+      errs.montoPagado = 'Ingrese un monto válido'
+    if (monto > montoRestante)
       errs.montoPagado = `El monto no puede superar el restante (${formatMoneda(montoRestante, tipoMoneda)})`
-    }
     if (!fechaPago) errs.fechaPago = 'Seleccione una fecha'
     if (!medioPago) errs.medioPago = 'Seleccione un medio de pago'
     setErrors(errs)
@@ -100,30 +80,6 @@ const estaVencida = venc < hoy
 
   const handleConfirm = async () => {
     if (!validate()) return
-
-    let montoFinalEfectivo     = cuota.montoFinal ?? cuota.monto
-    let montoDescuentoEfectivo = 0
-    let motivoDescuento        = null
-    let diasAnticipacion       = 0
-    let porcentajeDescuento    = 0
-    let tasaUsada              = 0
-
-    if (mostrarDescuento && aplicarDescuento && descuento.diasAnticipacion > 0) {
-      montoFinalEfectivo     = descuento.montoFinal
-      montoDescuentoEfectivo = descuento.montoDescuento
-      motivoDescuento        = `Pronto pago ${descuento.diasAnticipacion} días antes`
-      diasAnticipacion       = descuento.diasAnticipacion
-      porcentajeDescuento    = descuento.porcentajeDescuento
-      tasaUsada              = TASA_DESCUENTO_DIARIA
-    } else if (mostrarPenalidad && aplicarPenalidad && penalidad.diasMora > 0) {
-      montoFinalEfectivo     = penalidad.montoFinal
-      montoDescuentoEfectivo = -penalidad.montoPenalidad
-      motivoDescuento        = `Penalidad por mora ${penalidad.diasMora} días`
-      diasAnticipacion       = -penalidad.diasMora
-      porcentajeDescuento    = -penalidad.porcentajePenalidad
-      tasaUsada              = TASA_PENALIDAD_DIARIA
-    }
-
     const payload: PagarCuotaPayload = {
       cuotaId:             cuota.cuotaId,
       montoPagado:         parseFloat(montoPagado),
@@ -133,36 +89,9 @@ const estaVencida = venc < hoy
       numeroOperacion:     numeroOperacion || null,
       observaciones:       observaciones || null,
       usuarioRegistroPago: usuarioId,
-      tasaDescuentoDiaria: tasaUsada,
-      diasAnticipacion,
-      porcentajeDescuento,
-      montoDescuento:      montoDescuentoEfectivo,
-      motivoDescuento,
-      montoFinal:          montoFinalEfectivo,
     }
     await onConfirm(payload)
   }
-
-  // ── Switch component ──────────────────────────────────────────────────────
-  const Switch = ({ value, onChange, colorOn = 'bg-emerald-500' }: {
-    value: boolean
-    onChange: (v: boolean) => void
-    colorOn?: string
-  }) => (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={cn(
-        "relative inline-flex w-11 h-6 rounded-full transition-colors duration-200 ease-in-out shrink-0 focus:outline-none",
-        value ? colorOn : "bg-gray-200"
-      )}
-    >
-      <span className={cn(
-        "inline-block w-5 h-5 mt-0.5 bg-white rounded-full shadow-md transform transition-transform duration-200 ease-in-out",
-        value ? "translate-x-5" : "translate-x-0.5"
-      )} />
-    </button>
-  )
 
   return (
     <div className="fixed inset-0 z-50 w-full h-full flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
@@ -200,8 +129,7 @@ const estaVencida = venc < hoy
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
               <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
               <p className="text-xs text-red-700 font-medium">
-                Esta cuota está vencida.
-                {mostrarPenalidad && ` Puede aplicar una penalidad por mora (${(TASA_PENALIDAD_DIARIA * 100).toFixed(4)}% diario).`}
+                Esta cuota está vencida. Por favor coordine el pago con el cliente.
               </p>
             </div>
           )}
@@ -212,8 +140,8 @@ const estaVencida = venc < hoy
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Monto Total</p>
               <p className="text-sm font-bold text-gray-900">{formatMoneda(cuota.monto, tipoMoneda)}</p>
             </div>
-            <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-center">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pagado</p>
+            <div className="bg-emerald-50 rounded-xl px-3 py-2.5 text-center">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Pagado</p>
               <p className="text-sm font-bold text-emerald-600">{formatMoneda(montoPagadoAnterior, tipoMoneda)}</p>
             </div>
             <div className="bg-blue-50 rounded-xl px-3 py-2.5 text-center">
@@ -238,71 +166,7 @@ const estaVencida = venc < hoy
             {errors.fechaPago && <p className="text-xs text-rose-500">{errors.fechaPago}</p>}
           </div>
 
-          {/* Descuento pronto pago — solo si tasa > 0 y paga antes */}
-          {mostrarDescuento && (
-            <div className="border border-emerald-100 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-emerald-50">
-                <div className="flex items-center gap-2">
-                  <DollarSign size={14} className="text-emerald-600" />
-                  <span className="text-xs font-bold text-emerald-700">Descuento por pronto pago</span>
-                  <span className="text-[10px] text-emerald-500">({(TASA_DESCUENTO_DIARIA * 100).toFixed(4)}% diario)</span>
-                </div>
-                <Switch value={aplicarDescuento} onChange={setAplicarDescuento} colorOn="bg-emerald-500" />
-              </div>
-              {aplicarDescuento && (
-                <div className="px-4 py-3 space-y-2 animate-in slide-in-from-top-1 duration-200">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-gray-50 rounded-lg px-2 py-2">
-                      <p className="text-[10px] text-gray-400 mb-0.5">Días anticipados</p>
-                      <p className="text-sm font-bold text-gray-800">{descuento.diasAnticipacion}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg px-2 py-2">
-                      <p className="text-[10px] text-gray-400 mb-0.5">% Descuento</p>
-                      <p className="text-sm font-bold text-emerald-600">{descuento.porcentajeDescuento}%</p>
-                    </div>
-                    <div className="bg-emerald-50 rounded-lg px-2 py-2">
-                      <p className="text-[10px] text-gray-400 mb-0.5">Monto final</p>
-                      <p className="text-sm font-bold text-emerald-700">{formatMoneda(descuento.montoFinal, tipoMoneda)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Penalidad por mora — solo si tasa > 0 y está vencida */}
-          {mostrarPenalidad && (
-            <div className="border border-red-100 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-red-50">
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={14} className="text-red-600" />
-                  <span className="text-xs font-bold text-red-700">Penalidad por mora</span>
-                  <span className="text-[10px] text-red-500">({(TASA_PENALIDAD_DIARIA * 100).toFixed(4)}% diario)</span>
-                </div>
-                <Switch value={aplicarPenalidad} onChange={setAplicarPenalidad} colorOn="bg-red-500" />
-              </div>
-              {aplicarPenalidad && (
-                <div className="px-4 py-3 space-y-2 animate-in slide-in-from-top-1 duration-200">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-gray-50 rounded-lg px-2 py-2">
-                      <p className="text-[10px] text-gray-400 mb-0.5">Días de mora</p>
-                      <p className="text-sm font-bold text-gray-800">{penalidad.diasMora}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg px-2 py-2">
-                      <p className="text-[10px] text-gray-400 mb-0.5">% Penalidad</p>
-                      <p className="text-sm font-bold text-red-600">{penalidad.porcentajePenalidad}%</p>
-                    </div>
-                    <div className="bg-red-50 rounded-lg px-2 py-2">
-                      <p className="text-[10px] text-gray-400 mb-0.5">Monto final</p>
-                      <p className="text-sm font-bold text-red-700">{formatMoneda(penalidad.montoFinal, tipoMoneda)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Monto pagado */}
+          {/* Monto a pagar */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
               Monto a Pagar <span className="text-rose-500">*</span>
@@ -310,13 +174,40 @@ const estaVencida = venc < hoy
             <input
               type="number"
               value={montoPagado}
-              min={0}
+              min={0.01}
+              max={montoRestante}
               step="0.01"
               onChange={e => setMontoPagado(e.target.value)}
               className={cn("w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none focus:border-blue-400 text-sm",
                 errors.montoPagado ? "border-rose-400" : "border-gray-200")}
             />
             {errors.montoPagado && <p className="text-xs text-rose-500">{errors.montoPagado}</p>}
+
+            {/* Barra de progreso */}
+            {montoPagadoNum > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between text-[10px] text-gray-400">
+                  <span>Progreso tras este pago</span>
+                  <span>{Math.min(((montoTrasEstePago / cuota.monto) * 100), 100).toFixed(0)}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div
+                    className={cn("h-1.5 rounded-full transition-all",
+                      quedaria === 0 ? "bg-emerald-500" : estaVencida ? "bg-red-500" : "bg-blue-500"
+                    )}
+                    style={{ width: `${Math.min(((montoTrasEstePago / cuota.monto) * 100), 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">
+                    Quedaría: <span className="font-semibold text-gray-600">{formatMoneda(quedaria, tipoMoneda)}</span>
+                  </span>
+                  {quedaria === 0 && (
+                    <span className="text-emerald-600 font-bold">¡Cuota completada!</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Medio de pago */}
@@ -366,6 +257,79 @@ const estaVencida = venc < hoy
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-400 text-sm resize-none"
             />
           </div>
+
+          {/* Info último pago */}
+          {cuota.fechaPago && (
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500">
+              <Clock size={13} className="shrink-0 text-gray-400" />
+              <span>Último pago registrado: <span className="font-semibold">{formatFecha(cuota.fechaPago)}</span></span>
+            </div>
+          )}
+
+          {/* Acordeón historial de pagos */}
+          {tieneHistorial && (
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              {/* Cabecera acordeón */}
+              <button
+                type="button"
+                onClick={toggleHistorial}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors group"
+              >
+                <div className="flex items-center gap-2">
+                  <History size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  <span className="text-xs font-semibold text-gray-500 group-hover:text-blue-600 transition-colors">
+                    Historial de pagos
+                  </span>
+                </div>
+                <ChevronDown
+                  size={14}
+                  className={cn("text-gray-400 transition-transform duration-200", historialAbierto && "rotate-180")}
+                />
+              </button>
+
+              {/* Contenido acordeón */}
+              {historialAbierto && (
+                <div className="animate-in slide-in-from-top-1 duration-200">
+                  {hookHistorial.loading ? (
+                    <div className="flex items-center justify-center gap-2 py-5">
+                      <RefreshCw size={14} className="animate-spin text-blue-400" />
+                      <span className="text-xs text-gray-400">Cargando historial...</span>
+                    </div>
+                  ) : historial.length === 0 ? (
+                    <div className="py-5 text-center text-xs text-gray-400">
+                      Sin registros de pago
+                    </div>
+                  ) : (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
+                          <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Monto</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Medio</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Entidad</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">N° Op.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {historial.map(p => (
+                          <tr key={p.cuotaPagoId} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{formatFecha(p.fechaPago)}</td>
+                            <td className="px-3 py-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap">
+                              {formatMoneda(p.montoPagado, tipoMoneda)}
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-500">{p.medioPago ?? '-'}</td>
+                            <td className="px-3 py-2.5 text-gray-500">{p.entidadFinanciera ?? '-'}</td>
+                            <td className="px-3 py-2.5 text-gray-500">{p.numeroOperacion ?? '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Footer */}
