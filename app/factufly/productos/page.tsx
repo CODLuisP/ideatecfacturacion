@@ -258,8 +258,6 @@ export default function ProductosPage() {
         incluirIGV: boolean;
         unidadMedida: string;
         categoria: string;
-        stock: number | null;
-        codigoSunat: string;
         codigo: string;
         errorValidacion?: string;
       }[] = parseJson.filas;
@@ -340,8 +338,6 @@ export default function ProductosPage() {
           tipoAfectacionIGV: f.tipoAfectacionIGV,
           incluirIGV: f.incluirIGV,
           unidadMedida: f.unidadMedida,
-          stock: f.stock,
-          codigoSunat: f.codigoSunat || "",
           codigo: f.codigo || "",
           categoriaId: catId,
           sucursalId,

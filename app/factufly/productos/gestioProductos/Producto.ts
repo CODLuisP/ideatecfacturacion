@@ -10,7 +10,7 @@ export interface SucursalProducto {
   sucursalProductoId: number;
   nomSucursal: string | null;
   precioUnitario: number;
-  stock: number | null;
+  stock?: number | null;
 }
 
 // ─── Producto Base (sin datos de sucursal) ───────────────────
@@ -37,7 +37,7 @@ export interface ProductoSucursal extends ProductoBase {
 export interface NuevoProducto {
   codigo: string;
   tipoProducto: string;
-  codigoSunat: string;
+  codigoSunat?: string;
   nomProducto: string;
   unidadMedida: string;
   tipoAfectacionIGV: string;
@@ -45,7 +45,7 @@ export interface NuevoProducto {
   categoriaId: number;
   sucursalId: number;
   precioUnitario: number;
-  stock: number | null;
+  stock?: number | null;
 }
 
 // ─── Para editar producto (PUT) ───────────────────────────────
@@ -53,7 +53,7 @@ export interface EditProducto {
   productoId: number;
   codigo: string;
   tipoProducto: string;
-  codigoSunat: string;
+  codigoSunat?: string;
   nomProducto: string;
   unidadMedida: string;
   tipoAfectacionIGV: string;
@@ -61,5 +61,5 @@ export interface EditProducto {
   categoriaId: number;
   sucursalProductoId: number;
   precioUnitario: number;
-  stock: number | null;
+  stock?: number | null;
 }

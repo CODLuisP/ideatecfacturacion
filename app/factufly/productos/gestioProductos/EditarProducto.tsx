@@ -29,7 +29,6 @@ interface FormFieldsProps {
 const emptyForm: NuevoProducto = {
   codigo: "",
   tipoProducto: "BIEN",
-  codigoSunat: "",
   nomProducto: "",
   unidadMedida: "NIU",
   tipoAfectacionIGV: "10",
@@ -37,7 +36,6 @@ const emptyForm: NuevoProducto = {
   categoriaId: 0,
   sucursalId: 1,
   precioUnitario: 0,
-  stock: 0,
 };
 
 export default function EditarProducto({
@@ -59,7 +57,6 @@ export default function EditarProducto({
     setForm({
       codigo: producto.codigo,
       tipoProducto: producto.tipoProducto ?? "BIEN",
-      codigoSunat: producto.codigoSunat ?? "",
       nomProducto: producto.nomProducto,
       unidadMedida: producto.unidadMedida,
       tipoAfectacionIGV: producto.tipoAfectacionIGV,
@@ -67,7 +64,6 @@ export default function EditarProducto({
       categoriaId: producto.categoria?.categoriaId ?? 0,
       sucursalId: 0, // solo para no romper inteface Nuevo Producto
       precioUnitario: producto.sucursalProducto.precioUnitario,
-      stock: producto.sucursalProducto.stock,
     });
 
     setPrecioInput(producto.sucursalProducto.precioUnitario.toFixed(2));
@@ -82,7 +78,7 @@ export default function EditarProducto({
 
       if (target.type === "checkbox") {
         value = target.checked;
-      } else if (target.type === "number" || field === "categoriaId" || field === "stock") {
+      } else if (target.type === "number" || field === "categoriaId") {
         value = Number(target.value);
       } else {
         value = target.value;
@@ -102,7 +98,6 @@ export default function EditarProducto({
         setForm((prev) => ({
           ...prev,
           tipoProducto: value as string,
-          stock: value === "SERVICIO" ? null : prev.stock ?? 0,
         }));
         return;
       }
@@ -124,18 +119,12 @@ export default function EditarProducto({
       return;
     }
 
-    if (form.tipoProducto !== "SERVICIO" && (form.stock ?? 0) < 0) {
-      showToast("El stock no puede ser negativo.", "info");
-      return;
-    }
-
     setIsSubmitting(true);
 
     const payload: EditProducto = {
       productoId: producto.productoId,
       codigo: form.codigo,
       tipoProducto: form.tipoProducto,
-      codigoSunat: form.codigoSunat,
       nomProducto: form.nomProducto,
       unidadMedida: form.unidadMedida,
       tipoAfectacionIGV: form.tipoAfectacionIGV,
@@ -143,7 +132,6 @@ export default function EditarProducto({
       categoriaId: form.categoriaId,
       sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
       precioUnitario: Number(precioInput || 0),
-      stock: form.stock
     };
 
     try {
@@ -162,17 +150,14 @@ export default function EditarProducto({
         ...producto,
         codigo: form.codigo,
         tipoProducto: form.tipoProducto,
-        codigoSunat: form.codigoSunat,
         nomProducto: form.nomProducto,
         unidadMedida: form.unidadMedida,
         tipoAfectacionIGV: form.tipoAfectacionIGV,
         incluirIGV: form.incluirIGV,
         categoria: categoriaActualizada,
         sucursalProducto: {
-          sucursalProductoId: producto.sucursalProducto.sucursalProductoId,
-          nomSucursal: producto.sucursalProducto.nomSucursal,
+          ...producto.sucursalProducto,
           precioUnitario: Number(precioInput || 0),
-          stock: form.stock,
         },
       };
 
@@ -329,26 +314,6 @@ function FormEditarProducto({ form, setForm, precioInput, setPrecioInput, onChan
             </div>
           )}
         </div>
-
-        {form.tipoProducto !== "SERVICIO" && (
-          <InputBase
-            label="Stock"
-            type="number"
-            value={String(form.stock ?? 0)}
-            onChange={onChange("stock")}
-            placeholder="0"
-          />
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <InputBase
-          label="Código SUNAT"
-          labelOptional="(opcional)"
-          value={form.codigoSunat}
-          onChange={onChange("codigoSunat")}
-          placeholder="Ej: 43211503"
-        />
         <InputBase
           label="Código"
           value={form.codigo}

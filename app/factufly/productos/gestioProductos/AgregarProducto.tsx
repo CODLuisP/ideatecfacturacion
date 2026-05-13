@@ -36,7 +36,6 @@ interface Props {
 const emptyForm: NuevoProducto = {
   codigo: "",
   tipoProducto: "BIEN",
-  codigoSunat: "",
   nomProducto: "",
   unidadMedida: "NIU",
   tipoAfectacionIGV: "10",
@@ -44,7 +43,6 @@ const emptyForm: NuevoProducto = {
   categoriaId: 0,
   sucursalId: 0,
   precioUnitario: 0,
-  stock: 0,
 };
 
 export default function AgregarProducto({
@@ -155,12 +153,10 @@ export default function AgregarProducto({
       nomProducto: prod.nomProducto,
       codigo: prod.codigo,
       tipoProducto: prod.tipoProducto ?? "BIEN",
-      codigoSunat: prod.codigoSunat ?? "",
       unidadMedida: prod.unidadMedida,
       tipoAfectacionIGV: prod.tipoAfectacionIGV,
       incluirIGV: prod.incluirIGV,
       categoriaId: prod.categoria?.categoriaId ?? 0,
-      stock: prod.tipoProducto === "SERVICIO" ? null : 0,
     }));
     setSugerencias([]);
     setShowSugerencias(false);
@@ -190,7 +186,6 @@ export default function AgregarProducto({
         setForm((prev) => ({
           ...prev,
           tipoProducto: value as string,
-          stock: value === "SERVICIO" ? null : (prev.stock ?? 0),
         }));
         return;
       }
@@ -212,12 +207,6 @@ export default function AgregarProducto({
     if (!soloSucursal) {
       if (form.categoriaId === 0) newErrors.categoriaId = true;
     }
-
-    if (
-      form.tipoProducto !== "SERVICIO" &&
-      (form.stock == null || form.stock < 0)
-    )
-      newErrors.stock = true;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -449,30 +438,9 @@ export default function AgregarProducto({
                 </select>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <InputBase
-                label="Código SUNAT"
-                labelOptional="(opcional)"
-                value={form.codigoSunat}
-                onChange={handleFormChange("codigoSunat")}
-                placeholder="Ej: 43211503"
-              />
-
-              <InputBase
-                label="Código"
-                labelOptional="(auto)"
-                value={form.codigo}
-                readOnly
-                placeholder="Se genera automáticamente"
-                showError={false}
-                className="bg-gray-100 text-gray-500 cursor-not-allowed"
-              />
-            </div>
           </>
         )}
 
-        {/* ── Stock y Precio ── */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <InputBase
@@ -503,7 +471,21 @@ export default function AgregarProducto({
               </div>
             )}
           </div>
+ 
+          {!soloSucursal && (
+            <InputBase
+              label="Código"
+              labelOptional="(auto)"
+              value={form.codigo}
+              readOnly
+              placeholder="Se genera automáticamente"
+              showError={false}
+              className="bg-gray-100 text-gray-500 cursor-not-allowed"
+            />
+          )}
         </div>
+
+
 
         <div className="pt-4 flex justify-end gap-3">
           <Button variant="outline" type="button" onClick={onClose}>

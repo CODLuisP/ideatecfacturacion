@@ -10,8 +10,6 @@ export interface FilaProducto {
   incluirIGV: boolean;
   unidadMedida: string;
   categoria: string;
-  stock: number | null;
-  codigoSunat: string;
   codigo: string;
   errorValidacion?: string; // si hay error de validación de datos
 }
@@ -68,15 +66,12 @@ export async function POST(req: NextRequest) {
       const incluirIGVRaw    = getStr(5).toUpperCase();
       const unidadRaw        = getStr(6).toUpperCase();
       const categoria        = getStr(7);
-      const stockRaw         = getNum(8);
-      const codigoSunat      = getStr(9);
-      const codigo           = getStr(10);
+      const codigo           = getStr(8);
 
       const tipoProducto     = ["BIEN", "SERVICIO"].includes(tipoProductoRaw) ? tipoProductoRaw : "BIEN";
       const tipoAfectacionIGV = ["10", "20", "30"].includes(afectacionRaw) ? afectacionRaw : "10";
       const incluirIGV       = incluirIGVRaw === "" ? true : ["TRUE", "1", "SI", "SÍ", "S"].includes(incluirIGVRaw);
       const unidadMedida     = ["NIU", "KGM", "LTR"].includes(unidadRaw) ? unidadRaw : "NIU";
-      const stock            = tipoProducto === "SERVICIO" ? null : (stockRaw ?? 0);
 
       // Validaciones básicas
       let errorValidacion: string | undefined;
@@ -92,8 +87,6 @@ export async function POST(req: NextRequest) {
         incluirIGV,
         unidadMedida,
         categoria,
-        stock,
-        codigoSunat,
         codigo,
         errorValidacion,
       });

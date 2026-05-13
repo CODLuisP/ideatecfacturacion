@@ -19,8 +19,6 @@ export async function GET() {
     { key: "incluirIGV",        width: 16 },
     { key: "unidadMedida",      width: 16 },
     { key: "categoria",         width: 18 },
-    { key: "stock",             width: 12 },
-    { key: "codigoSunat",       width: 18 },
     { key: "codigo",            width: 18 },
   ];
 
@@ -41,8 +39,6 @@ export async function GET() {
     { label: "Precio Incluye IGV",    optional: true,  comment: "TRUE o FALSE\nSolo aplica si Afectación=10\n(por defecto: TRUE)" },
     { label: "Unidad de Medida",      optional: true,  comment: "NIU = Unidad\nKGM = Kilogramo\nLTR = Litro\n(por defecto: NIU)" },
     { label: "Categoría",            optional: false, comment: "Nombre de la categoría. Ej: Bebidas, Ferretería, etc." },
-    { label: "Stock Inicial",         optional: true,  comment: "Cantidad inicial en inventario.\nDejar vacío si es SERVICIO.\n(por defecto: 0)" },
-    { label: "Código SUNAT",          optional: true,  comment: "Código de producto SUNAT (catálogo). Ej: 43211503" },
     { label: "Código Interno",        optional: true,  comment: "Código interno del producto.\nSi se deja vacío se genera automáticamente." },
   ];
 
@@ -77,8 +73,8 @@ export async function GET() {
 
   // ── Filas de ejemplo (3 y 4) ──────────────────────────────────────────────
   const examples = [
-    ["Arroz Premium 5kg", 12.5,  "BIEN",     "10", "TRUE",  "KGM", "Abarrotes", 100, "10061090", ""],
-    ["Servicio de Instalación", 150, "SERVICIO", "10", "TRUE", "NIU", "Servicios", "",  "",         "SVC-001"],
+    ["Arroz Premium 5kg", 12.5,  "BIEN",     "10", "TRUE",  "KGM", "Abarrotes", ""],
+    ["Servicio de Instalación", 150, "SERVICIO", "10", "TRUE", "NIU", "Servicios", "SVC-001"],
   ];
 
   examples.forEach((row, ri) => {
@@ -142,8 +138,6 @@ export async function GET() {
     ["Tipo Afectación IGV", "10 (Gravado) | 20 (Exonerado) | 30 (Inafecto)", "10"],
     ["Precio Incluye IGV",  "TRUE | FALSE  (solo si IGV=10)",               "TRUE"],
     ["Unidad de Medida",    "NIU (Unidad) | KGM (Kg) | LTR (Litro)",        "NIU"],
-    ["Stock Inicial",       "Número entero ≥ 0. Vacío si es SERVICIO.",     "0"],
-    ["Código SUNAT",        "Catálogo SUNAT. Puede ir vacío.",              "(vacío)"],
     ["Código Interno",      "Texto libre. Vacío = se genera automático.",   "(auto)"],
   ];
 
