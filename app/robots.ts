@@ -5,8 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: ['/'],
-      disallow: ['/factunet/', '/api/'], // Evitar que el panel interno y las APIs sean indexadas
+      disallow: ['/factufly/', '/api/'], // Evitar que el panel interno y las APIs sean indexadas
     },
-    sitemap: 'https://factunet.pe/sitemap.xml',
+    sitemap: 'https://factufly.pe/sitemap.xml',
   };
 }

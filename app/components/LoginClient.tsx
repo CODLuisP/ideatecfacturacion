@@ -300,7 +300,7 @@ const DemoModal: React.FC<DemoModalProps> = ({ onClose, onFillDemo }) => {
             <PlayCircle size={22} />
           </div>
           <div>
-            <h3 className="text-base font-bold">Demo de FACTUNET</h3>
+            <h3 className="text-base font-bold">Demo de FactuFly</h3>
             <p className="text-blue-200 text-xs">
               Sin compromiso, 100% gratuito
             </p>
@@ -531,11 +531,11 @@ const TermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
       {[
         {
           title: "1. Aceptación de los Términos",
-          body: "Al acceder y utilizar la plataforma IDEATEC Factus, usted acepta estar sujeto a estos Términos de Servicio. Si no está de acuerdo con alguno de estos términos, le pedimos que no utilice nuestros servicios.",
+          body: "Al acceder y utilizar la plataforma FactuFly, usted acepta estar sujeto a estos Términos de Servicio. Si no está de acuerdo con alguno de estos términos, le pedimos que no utilice nuestros servicios.",
         },
         {
           title: "2. Descripción del Servicio",
-          body: "IDEATEC Factus es una plataforma de facturación electrónica que permite a empresas y personas naturales con negocio emitir comprobantes de pago electrónicos conforme a las normas de la SUNAT (Superintendencia Nacional de Aduanas y de Administración Tributaria) del Perú.",
+          body: "FactuFly es una plataforma de facturación electrónica que permite a empresas y personas naturales con negocio emitir comprobantes de pago electrónicos conforme a las normas de la SUNAT (Superintendencia Nacional de Aduanas y de Administración Tributaria) del Perú.",
         },
         {
           title: "3. Obligaciones del Usuario",
@@ -752,7 +752,7 @@ const LoginClient: React.FC = () => {
 
         setStatus(LoginStatus.SUCCESS);
         setTimeout(() => {
-          window.location.href = "/factunet/dashboard";
+          window.location.href = "/factufly/dashboard";
         }, 800);
       }
     } catch (error) {
@@ -822,7 +822,7 @@ const LoginClient: React.FC = () => {
                 {/* Textos a la derecha, uno debajo del otro */}
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-extrabold text-[#00296b] tracking-[0.02em] leading-tight">
-                    FACTU<span className="text-[#a80a0a]">NET</span>
+                    FACTU<span className="text-[#a80a0a]">FLY</span>
                   </h1>
                   <p className="text-sm text-[#6c757d] font-medium tracking-wide">
                     Facturación electrónica
@@ -1136,7 +1136,7 @@ const LoginClient: React.FC = () => {
               </div>
               <p className="text-blue-200 text-xs lg:text-sm">
                 <span className="text-white font-bold">Más de 5,000</span>{" "}
-                empresas peruanas <br /> ya confían en FACTUNET.
+                empresas peruanas <br /> ya confían en FactuFly.
               </p>
             </div>
           </div>

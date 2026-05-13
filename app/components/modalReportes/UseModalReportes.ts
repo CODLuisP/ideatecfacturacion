@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { FiltrosReporteModal, Periodo } from '@/app/factunet/reportes/gestionReportes/Reportes'
+import { FiltrosReporteModal, Periodo } from '@/app/factufly/reportes/gestionReportes/Reportes'
 
 interface UseModalReportesReturn {
   abierto: boolean

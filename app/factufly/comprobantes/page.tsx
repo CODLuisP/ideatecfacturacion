@@ -337,20 +337,20 @@ export default function VerComprobantesPage() {
 
   const editarenviarSunat = (c: ComprobanteListado) => {
     switch (c.tipoComprobante) {
-      case "01": router.push(`/factunet/operaciones/factura?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`); break;
-      case "03": router.push(`/factunet/operaciones/boleta?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`); break;
-      case "07": router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}`); break;
-      case "08": router.push(`/factunet/operaciones/nota-debito?serie=${c.serie}`); break;
+      case "01": router.push(`/factufly/operaciones/factura?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`); break;
+      case "03": router.push(`/factufly/operaciones/boleta?comprobanteId=${c.comprobanteId}&serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`); break;
+      case "07": router.push(`/factufly/operaciones/nota-credito?serie=${c.serie}`); break;
+      case "08": router.push(`/factufly/operaciones/nota-debito?serie=${c.serie}`); break;
       default: break;
     }
   };
 
   const generarNotaCredito = (c: ComprobanteListado) => {
-    router.push(`/factunet/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+    router.push(`/factufly/operaciones/nota-credito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
   };
 
   const generarNotaDebito = (c: ComprobanteListado) => {
-    router.push(`/factunet/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
+    router.push(`/factufly/operaciones/nota-debito?serie=${c.serie}&correlativo=${c.correlativo}&ruc=${c.company.numeroDocumento}&establecimiento=${c.company.establecimientoAnexo}`);
   };
 
   const anularComprobante = async (_c: ComprobanteListado) => {};
@@ -517,7 +517,7 @@ export default function VerComprobantesPage() {
                   <RotateCcw className="w-3.5 h-3.5" /> Enviar pendientes ({pendientes.length})
                 </Button>
               )}
-              <Button className="py-2.5 px-3 text-xs rounded-md h-auto" onClick={() => router.push("/factunet/operaciones")}>
+              <Button className="py-2.5 px-3 text-xs rounded-md h-auto" onClick={() => router.push("/factufly/operaciones")}>
                 <Plus className="w-3.5 h-3.5" /> Nuevo Comprobante
               </Button>
             </div>

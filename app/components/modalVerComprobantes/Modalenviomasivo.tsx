@@ -10,8 +10,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/app/utils/cn";
-import { ComprobanteListado } from "@/app/factunet/comprobantes/gestionComprobantes/Comprobante";
-import { formatFecha, tipoLabel } from "@/app/factunet/comprobantes/gestionComprobantes/helpers";
+import { ComprobanteListado } from "@/app/factufly/comprobantes/gestionComprobantes/Comprobante";
+import { formatFecha, tipoLabel } from "@/app/factufly/comprobantes/gestionComprobantes/helpers";
 
 interface ModalEnvioMasivoProps {
   pendientes: ComprobanteListado[];

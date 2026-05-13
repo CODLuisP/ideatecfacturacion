@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
-import { useReporteProductosExcel, ReporteProductosFiltro } from "@/app/factunet/productos/gestioProductos/useReporteProductosexcel";
+import { useReporteProductosExcel, ReporteProductosFiltro } from "@/app/factufly/productos/gestioProductos/useReporteProductosexcel";
 
 interface Categoria {
   categoriaId: number;

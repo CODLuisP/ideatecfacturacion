@@ -9,7 +9,7 @@ export default withAuth(
     // Redirigir usuarios autenticados fuera del login (que ahora es /)
     if (token && pathname === "/") {
       return NextResponse.redirect(
-        new URL("/factunet/dashboard", req.url),
+        new URL("/factufly/dashboard", req.url),
       );
     }
 
@@ -25,7 +25,7 @@ export default withAuth(
           return true;
         }
 
-        if (pathname.startsWith("/factunet")) {
+        if (pathname.startsWith("/factufly")) {
           return !!token;
         }
         return true;
@@ -39,7 +39,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/factunet/:path*",
+    "/factufly/:path*",
     '/docs/:path*',
     "/",
   ],

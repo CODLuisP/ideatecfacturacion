@@ -17,14 +17,14 @@ import {
 import { cn } from "@/app/utils/cn";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/app/components/ui/Toast";
-import { ComprobanteListado } from "@/app/factunet/comprobantes/gestionComprobantes/Comprobante";
-import { Sucursal } from "@/app/factunet/operaciones/boleta/gestionBoletas/Boleta";
-import { useProximoNumeroResumen } from "@/app/factunet/comprobantes/gestionComprobantes/gestionComprobanteResumen/useProximoNumeroResumen";
-import { useResumenComprobante } from "@/app/factunet/comprobantes/gestionComprobantes/gestionComprobanteResumen/useResumenComprobante";
+import { ComprobanteListado } from "@/app/factufly/comprobantes/gestionComprobantes/Comprobante";
+import { Sucursal } from "@/app/factufly/operaciones/boleta/gestionBoletas/Boleta";
+import { useProximoNumeroResumen } from "@/app/factufly/comprobantes/gestionComprobantes/gestionComprobanteResumen/useProximoNumeroResumen";
+import { useResumenComprobante } from "@/app/factufly/comprobantes/gestionComprobantes/gestionComprobanteResumen/useResumenComprobante";
 import {
   buildResumenDTO,
   formatFechaISO,
-} from "@/app/factunet/comprobantes/gestionComprobantes/gestionComprobanteResumen/resumenComprobantetypes";
+} from "@/app/factufly/comprobantes/gestionComprobantes/gestionComprobanteResumen/resumenComprobantetypes";
 
 const TIPOS_RESUMEN = ["03", "07", "08"];
 const formatCurrency = (n: number) =>
@@ -605,3 +605,4 @@ export function ModalResumen({
     document.body,
   );
 }
+

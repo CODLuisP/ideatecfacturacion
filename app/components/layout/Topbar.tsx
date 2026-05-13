@@ -444,7 +444,7 @@ export const Topbar = ({
                 <ul className="py-1.5">
                   <li>
                     <Link
-                      href="/factunet/empresa"
+                      href="/factufly/empresa"
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
                     >
                       <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
@@ -455,7 +455,7 @@ export const Topbar = ({
                   </li>
                   <li>
                     <Link
-                      href="/factunet/sunat"
+                      href="/factufly/sunat"
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors group"
                     >
                       <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-blue-50 transition-colors">
@@ -518,3 +518,4 @@ export const Topbar = ({
     </>
   );
 };
+

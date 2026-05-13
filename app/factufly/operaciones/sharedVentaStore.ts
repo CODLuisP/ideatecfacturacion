@@ -1,4 +1,4 @@
-const STORE_KEY = 'factunet_venta_compartida';
+const STORE_KEY = 'FactuFly_venta_compartida';
 
 export const sharedVentaStore = {
   save(cliente: any, items: any[], extra: any = {}) {
@@ -21,3 +21,4 @@ export const sharedVentaStore = {
     } catch { /* ignore */ }
   },
 };
+

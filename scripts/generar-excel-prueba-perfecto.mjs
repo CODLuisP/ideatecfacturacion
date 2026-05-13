@@ -3,7 +3,7 @@ import path from "path";
 
 async function generatePerfectSampleExcel() {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Factunet";
+  workbook.creator = "FactuFly";
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Productos", {
@@ -125,3 +125,4 @@ async function generatePerfectSampleExcel() {
 }
 
 generatePerfectSampleExcel();
+

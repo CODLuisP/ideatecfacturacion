@@ -4,10 +4,10 @@ import path from "path";
 import os from "os";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const outputPath = path.join(os.homedir(), "Desktop", "productos_prueba_factunet.xlsx");
+const outputPath = path.join(os.homedir(), "Desktop", "productos_prueba_FactuFly.xlsx");
 
 const workbook = new ExcelJS.Workbook();
-workbook.creator = "Factunet";
+workbook.creator = "FactuFly";
 workbook.created = new Date();
 
 const sheet = workbook.addWorksheet("Productos", {
@@ -160,3 +160,4 @@ refs.forEach(([campo, valores, defecto], ri) => {
 // ── Guardar ───────────────────────────────────────────────────────
 await workbook.xlsx.writeFile(outputPath);
 console.log(`✅ Excel generado en: ${outputPath}`);
+

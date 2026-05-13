@@ -590,7 +590,7 @@ export default function DashboardPage() {
             />
           </div>
         </div>
-        <Button onClick={() => router.push("/factunet/operaciones")}>
+        <Button onClick={() => router.push("/factufly/operaciones")}>
           <Plus className="w-4 h-4" /> Nuevo Comprobante
         </Button>
       </div>
@@ -888,7 +888,7 @@ export default function DashboardPage() {
               <Button
                 variant="ghost"
                 className="text-brand-blue"
-                onClick={() => router.push("/factunet/comprobantes")}
+                onClick={() => router.push("/factufly/comprobantes")}
               >
                 Ver todos <ChevronRight className="w-4 h-4" />
               </Button>
@@ -961,3 +961,4 @@ export default function DashboardPage() {
     </>
   );
 }
+
