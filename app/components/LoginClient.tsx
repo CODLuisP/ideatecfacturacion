@@ -655,7 +655,7 @@ const LoginClient: React.FC = () => {
   // Detectar entorno desde la URL
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const isBeta = window.location.href.toLowerCase().includes("beta");
+      const isBeta = window.location.pathname.startsWith("/beta");
       setEnvironment(isBeta ? "beta" : "production");
     }
   }, []);
@@ -843,6 +843,21 @@ const LoginClient: React.FC = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Banner de Modo Beta */}
+                {environment === "beta" && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <Zap size={20} className="text-orange-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-orange-800 font-bold">
+                        Modo Beta Activado
+                      </p>
+                      <p className="text-xs text-orange-700 mt-0.5">
+                        Estás accediendo al ambiente de pruebas y desarrollo.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Error de API */}
                 {apiError && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
@@ -937,38 +952,7 @@ const LoginClient: React.FC = () => {
                   )}
                 </div>
 
-                {/* Ambiente de Trabajo */}
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-semibold text-slate-700">
-                    Ambiente de Trabajo
-                  </label>
-                  <div className="flex p-1 bg-slate-100 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setEnvironment("production")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
-                        environment === "production"
-                          ? "bg-white text-blue-900 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <Globe size={14} />
-                      Producción
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEnvironment("beta")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
-                        environment === "beta"
-                          ? "bg-white text-orange-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      <Zap size={14} />
-                      Beta
-                    </button>
-                  </div>
-                </div>
+
 
                 <div className="flex items-center justify-between">
                   <label className="flex items-center group cursor-pointer">
