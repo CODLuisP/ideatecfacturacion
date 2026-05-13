@@ -5,7 +5,12 @@ import axios from "axios";
 import { Modal } from "@/app/components/ui/Modal";
 import { Button } from "@/app/components/ui/Button";
 import { InputBase } from "@/app/components/ui/InputBase";
-import { Categoria, NuevoProducto, ProductoBase, ProductoSucursal } from "./Producto";
+import {
+  Categoria,
+  NuevoProducto,
+  ProductoBase,
+  ProductoSucursal,
+} from "./Producto";
 import { useToast } from "@/app/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { generarCodigoProducto } from "./generarCodigoProducto";
@@ -21,8 +26,11 @@ interface Props {
   onClose: () => void;
   onProductoAgregado: (producto: ProductoSucursal) => void;
   categorias: Categoria[];
-  onAgregarCategoria: (dto: { categoriaNombre: string; descripcion?: string }) => Promise<boolean>;  // ← nuevo
-  loadingCategoria: boolean;  // ← nuevo
+  onAgregarCategoria: (dto: {
+    categoriaNombre: string;
+    descripcion?: string;
+  }) => Promise<boolean>; // ← nuevo
+  loadingCategoria: boolean; // ← nuevo
 }
 
 const emptyForm: NuevoProducto = {
@@ -44,15 +52,16 @@ export default function AgregarProducto({
   onClose,
   onProductoAgregado,
   categorias,
-  onAgregarCategoria,  
-  loadingCategoria,    
+  onAgregarCategoria,
+  loadingCategoria,
 }: Props) {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
 
   const [form, setForm] = React.useState<NuevoProducto>(emptyForm);
-  const [productoExistente, setProductoExistente] = React.useState<ProductoBase | null>(null);
+  const [productoExistente, setProductoExistente] =
+    React.useState<ProductoBase | null>(null);
 
   const [sugerencias, setSugerencias] = React.useState<ProductoBase[]>([]);
   const [showSugerencias, setShowSugerencias] = React.useState(false);
@@ -65,7 +74,8 @@ export default function AgregarProducto({
 
   //seleccionar sucursal para agregar si es superadmin
   const { sucursales } = useSucursalRuc(isSuperAdmin);
-  const [sucursalSeleccionada, setSucursalSeleccionada] = React.useState<number>(0);
+  const [sucursalSeleccionada, setSucursalSeleccionada] =
+    React.useState<number>(0);
   const sucursalIdEfectivo = isSuperAdmin
     ? sucursalSeleccionada
     : parseInt(user?.sucursalID ?? "0");
@@ -74,10 +84,10 @@ export default function AgregarProducto({
   const [palabraBusqueda, setPalabraBusqueda] = useState("");
   const { productosBase, loadingBase } = useSearchProductosBaseDisponiblesLista(
     sucursalIdEfectivo,
-    palabraBusqueda
+    palabraBusqueda,
   );
 
-  //const { productosBase } = useProductosBaseDisponiblesLista(sucursalIdEfectivo); sin usar la palbra 
+  //const { productosBase } = useProductosBaseDisponiblesLista(sucursalIdEfectivo); sin usar la palbra
 
   // ─── NUEVO: estado de errores ─────────────────────────────
   const [errors, setErrors] = React.useState<Record<string, boolean>>({});
@@ -93,9 +103,9 @@ export default function AgregarProducto({
       setShowSugerencias(false);
       setErrors({});
       setSucursalSeleccionada(0);
-      setShowNuevaCategoria(false);      
+      setShowNuevaCategoria(false);
       setNombreNuevaCategoria("");
-      setIsModalCategoriaOpen(false);       
+      setIsModalCategoriaOpen(false);
     }
   }, [isOpen]);
 
@@ -109,7 +119,7 @@ export default function AgregarProducto({
     setShowSugerencias(productosBase.length > 0);
   }, [productosBase, palabraBusqueda]);
 
-  const { productosEmpresa } = useProductosEmpresaLista()
+  const { productosEmpresa } = useProductosEmpresaLista();
 
   // REEMPLAZA ESTA FUNCIÓN COMPLETA:
   const handleNomProductoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,14 +127,19 @@ export default function AgregarProducto({
     setPalabraBusqueda(value);
 
     // 👇 genera código automático usando el componente
-    const codigoAuto = value.trim().length > 0
-      ? generarCodigoProducto(value, productosEmpresa.length === 0 ? 0 : productosEmpresa.length)
-      : "";
+    const codigoAuto =
+      value.trim().length > 0
+        ? generarCodigoProducto(
+            value,
+            productosEmpresa.length === 0 ? 0 : productosEmpresa.length,
+          )
+        : "";
 
     setForm((prev) => ({ ...prev, nomProducto: value, codigo: codigoAuto }));
     setProductoExistente(null);
 
-    if (errors.nomProducto) setErrors((prev) => ({ ...prev, nomProducto: false }));
+    if (errors.nomProducto)
+      setErrors((prev) => ({ ...prev, nomProducto: false }));
 
     if (value.trim().length === 0) {
       setSugerencias([]);
@@ -159,8 +174,8 @@ export default function AgregarProducto({
         target.type === "checkbox"
           ? target.checked
           : target.type === "number"
-          ? Number(target.value)
-          : target.value;
+            ? Number(target.value)
+            : target.value;
 
       if (field === "tipoAfectacionIGV") {
         const aplicaIGV = value === "10";
@@ -175,7 +190,7 @@ export default function AgregarProducto({
         setForm((prev) => ({
           ...prev,
           tipoProducto: value as string,
-          stock: value === "SERVICIO" ? null : prev.stock ?? 0,
+          stock: value === "SERVICIO" ? null : (prev.stock ?? 0),
         }));
         return;
       }
@@ -198,7 +213,10 @@ export default function AgregarProducto({
       if (form.categoriaId === 0) newErrors.categoriaId = true;
     }
 
-    if (form.tipoProducto !== "SERVICIO" && (form.stock == null || form.stock < 0))
+    if (
+      form.tipoProducto !== "SERVICIO" &&
+      (form.stock == null || form.stock < 0)
+    )
       newErrors.stock = true;
 
     setErrors(newErrors);
@@ -211,19 +229,17 @@ export default function AgregarProducto({
     if (isSubmitting) return;
     setIsSubmitting(true);
     const formConSucursal = { ...form, sucursalId: sucursalIdEfectivo };
-    console.log("producto a enviar: ", formConSucursal);
 
     try {
       const response = await axios.post<ProductoSucursal>(
         `${process.env.NEXT_PUBLIC_API_URL}/api/productos`,
-        formConSucursal, 
+        formConSucursal,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         },
       );
       showToast("Producto guardado exitosamente.", "success");
       onProductoAgregado(response.data);
-      console.log("producto respuesta: ", response.data)
       setForm({ ...emptyForm, sucursalId: sucursalIdEfectivo });
       onClose();
     } catch (error) {
@@ -235,7 +251,10 @@ export default function AgregarProducto({
         } else if (status === 400) {
           showToast("Los datos ingresados no son válidos.", "error");
         } else {
-          showToast("No se pudo registrar el producto. Intenta nuevamente.", "error");
+          showToast(
+            "No se pudo registrar el producto. Intenta nuevamente.",
+            "error",
+          );
         }
       } else {
         showToast("Error inesperado. Intenta nuevamente.", "error");
@@ -250,7 +269,6 @@ export default function AgregarProducto({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Registrar Nuevo Producto">
       <form className="space-y-4" onSubmit={handleGuardar}>
-
         {/* ── Selector sucursal (solo superAdmin) ── */}
         {isSuperAdmin && (
           <div className="space-y-1.5">
@@ -262,7 +280,8 @@ export default function AgregarProducto({
               onChange={(e) => {
                 const id = Number(e.target.value);
                 setSucursalSeleccionada(id);
-                if (errors.sucursalId) setErrors((prev) => ({ ...prev, sucursalId: false }));
+                if (errors.sucursalId)
+                  setErrors((prev) => ({ ...prev, sucursalId: false }));
               }}
               className={`w-full px-4 py-2 bg-gray-50 border rounded-xl outline-none focus:border-brand-blue ${
                 errors.sucursalId ? "border-rose-400" : "border-gray-200"
@@ -276,7 +295,9 @@ export default function AgregarProducto({
               ))}
             </select>
             {errors.sucursalId && (
-              <p className="text-xs text-rose-500 font-medium">Debe seleccionar una sucursal</p>
+              <p className="text-xs text-rose-500 font-medium">
+                Debe seleccionar una sucursal
+              </p>
             )}
           </div>
         )}
@@ -306,7 +327,7 @@ export default function AgregarProducto({
           )}
           {productoExistente && (
             <p className="text-xs text-green-600 font-semibold pl-1">
-              ✓ Producto encontrado — completa stock y precio para esta sucursal
+              ✓ Producto encontrado — completa precio para esta sucursal
             </p>
           )}
         </div>
@@ -316,7 +337,9 @@ export default function AgregarProducto({
           <>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase">Tipo Producto</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  Tipo Producto
+                </label>
                 <select
                   value={form.tipoProducto}
                   onChange={handleFormChange("tipoProducto")}
@@ -338,7 +361,8 @@ export default function AgregarProducto({
                   value={form.categoriaId === 0 ? null : form.categoriaId}
                   onChange={(val) => {
                     setForm((prev) => ({ ...prev, categoriaId: val }));
-                    if (errors.categoriaId) setErrors((prev) => ({ ...prev, categoriaId: false }));
+                    if (errors.categoriaId)
+                      setErrors((prev) => ({ ...prev, categoriaId: false }));
                   }}
                   onAgregar={() => setIsModalCategoriaOpen(true)}
                   opciones={categorias.map((cat) => ({
@@ -347,7 +371,9 @@ export default function AgregarProducto({
                   }))}
                 />
                 {errors.categoriaId && (
-                  <p className="text-xs text-rose-500 font-medium">Campo obligatorio</p>
+                  <p className="text-xs text-rose-500 font-medium">
+                    Campo obligatorio
+                  </p>
                 )}
 
                 {/* ── Mini formulario nueva categoría ── */}
@@ -362,7 +388,9 @@ export default function AgregarProducto({
                     />
                     <Button
                       type="button"
-                      disabled={loadingCategoria || !nombreNuevaCategoria.trim()}
+                      disabled={
+                        loadingCategoria || !nombreNuevaCategoria.trim()
+                      }
                       onClick={async () => {
                         const ok = await onAgregarCategoria({
                           categoriaNombre: nombreNuevaCategoria.trim(),
@@ -392,7 +420,9 @@ export default function AgregarProducto({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase">Tipo Afectación IGV</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  Tipo Afectación IGV
+                </label>
                 <select
                   value={form.tipoAfectacionIGV}
                   onChange={handleFormChange("tipoAfectacionIGV")}
@@ -405,7 +435,9 @@ export default function AgregarProducto({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase">Unidad de Medida</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  Unidad de Medida
+                </label>
                 <select
                   value={form.unidadMedida}
                   onChange={handleFormChange("unidadMedida")}
@@ -449,7 +481,8 @@ export default function AgregarProducto({
               value={String(form.precioUnitario)}
               onChange={(e) => {
                 handleFormChange("precioUnitario")(e);
-                if (errors.precioUnitario) setErrors((prev) => ({ ...prev, precioUnitario: false }));
+                if (errors.precioUnitario)
+                  setErrors((prev) => ({ ...prev, precioUnitario: false }));
               }}
               placeholder="0.00"
               step="0.01"
@@ -470,24 +503,12 @@ export default function AgregarProducto({
               </div>
             )}
           </div>
-
-          {form.tipoProducto !== "SERVICIO" && (
-            <InputBase
-              label="Stock"
-              type="number"
-              value={String(form.stock ?? 0)}
-              onChange={(e) => {
-                handleFormChange("stock")(e);
-                if (errors.stock) setErrors((prev) => ({ ...prev, stock: false }));
-              }}
-              placeholder="0"
-              showError={!!errors.stock}
-            />
-          )}
         </div>
 
         <div className="pt-4 flex justify-end gap-3">
-          <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" type="button" onClick={onClose}>
+            Cancelar
+          </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : "Guardar Producto"}
           </Button>

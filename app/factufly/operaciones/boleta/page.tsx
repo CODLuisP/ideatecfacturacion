@@ -16,7 +16,14 @@ import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
 import { useEmpresaEmisor } from "./gestionBoletas/useEmpresaEmisor";
-import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  Suspense,
+} from "react";
 import {
   Boleta,
   BoletaCliente,
@@ -1332,17 +1339,6 @@ function BoletaContent() {
   const actualizarCantidad = (index: number, cantidad: number) => {
     const d = detalles[index];
     if (!d) return;
-    if (
-      d._tipoProducto === "BIEN" &&
-      d._stockDisponible != null &&
-      cantidad > d._stockDisponible
-    ) {
-      showToast(
-        `Stock insuficiente. Disponible: ${d._stockDisponible}`,
-        "error",
-      );
-      cantidad = d._stockDisponible;
-    }
     const calc = calcularDetalle(
       d._precioBase ?? d.precioUnitario ?? 0,
       d._precioVentaConIGV ?? d.precioVenta ?? 0,
@@ -1583,30 +1579,54 @@ function BoletaContent() {
       return;
     }
 
-    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
-    const sumaCuotas = cuotas.reduce((acc, c) => acc + (Number(c.monto) || 0), 0)
-    const pagoInvalido = pagos.some(p => !p.monto || Number(p.monto) <= 0)
-    const cuotaInvalida = cuotas.some(c => !c.monto || Number(c.monto) <= 0)
+    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
+    const sumaCuotas = cuotas.reduce(
+      (acc, c) => acc + (Number(c.monto) || 0),
+      0,
+    );
+    const pagoInvalido = pagos.some((p) => !p.monto || Number(p.monto) <= 0);
+    const cuotaInvalida = cuotas.some((c) => !c.monto || Number(c.monto) <= 0);
 
-    if (boleta.tipoPago !== 'Credito' && pagoInvalido) {
-      showToast('Todos los montos de pago deben ser mayores a cero', 'error')
-      return
+    if (boleta.tipoPago !== "Credito" && pagoInvalido) {
+      showToast("Todos los montos de pago deben ser mayores a cero", "error");
+      return;
     }
-    if (boleta.tipoPago !== 'Contado' && cuotaInvalida) {
-      showToast('Todos los montos de las cuotas deben ser mayores a cero', 'error')
-      return
+    if (boleta.tipoPago !== "Contado" && cuotaInvalida) {
+      showToast(
+        "Todos los montos de las cuotas deben ser mayores a cero",
+        "error",
+      );
+      return;
     }
-    if (boleta.tipoPago === 'Contado' && Math.abs(sumaPagos - totales.total) > 0.01) {
-      showToast(`Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
-      return
+    if (
+      boleta.tipoPago === "Contado" &&
+      Math.abs(sumaPagos - totales.total) > 0.01
+    ) {
+      showToast(
+        `Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`,
+        "error",
+      );
+      return;
     }
-    if (boleta.tipoPago === 'Credito' && Math.abs(sumaCuotas - totales.total) > 0.01) {
-      showToast(`Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
-      return
+    if (
+      boleta.tipoPago === "Credito" &&
+      Math.abs(sumaCuotas - totales.total) > 0.01
+    ) {
+      showToast(
+        `Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`,
+        "error",
+      );
+      return;
     }
-    if (boleta.tipoPago === 'CreditoInicial' && Math.abs(sumaPagos + sumaCuotas - totales.total) > 0.01) {
-      showToast(`Pago inicial (${simbolo} ${(sumaPagos).toFixed(2)}) + cuotas (${simbolo} ${(sumaCuotas).toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
-      return
+    if (
+      boleta.tipoPago === "CreditoInicial" &&
+      Math.abs(sumaPagos + sumaCuotas - totales.total) > 0.01
+    ) {
+      showToast(
+        `Pago inicial (${simbolo} ${sumaPagos.toFixed(2)}) + cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`,
+        "error",
+      );
+      return;
     }
 
     setEmitiendo(true);
@@ -1881,26 +1901,6 @@ function BoletaContent() {
       }
     }
 
-    const itemsParaStock = detalles.filter(
-      (d) =>
-        d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN",
-    );
-    if (itemsParaStock.length > 0) {
-      try {
-        await axios.put(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-          itemsParaStock.map((d) => ({
-            sucursalProductoId: d._sucursalProductoId,
-            cantidad: d.cantidad ?? 1,
-          })),
-          { headers: { Authorization: `Bearer ${accessToken}` } },
-        );
-        await fetchProductosSucursal();
-      } catch {
-        console.error("Error al actualizar stock");
-      }
-    }
-
     const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
     const resSucursal = await axios.get(
       `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
@@ -2027,9 +2027,6 @@ function BoletaContent() {
 
           <Card>
             <form className="space-y-3">
-             
-
-
               {/* ── Datos del Cliente ── */}
               <div className=" rounded-xl space-y-2">
                 <div className="flex items-center gap-2">
@@ -2444,7 +2441,6 @@ function BoletaContent() {
                         key={i}
                         className="flex items-end gap-3 pb-3 border-b border-gray-100 last:border-0"
                       >
-
                         <div className="space-y-1.5 w-40 shrink-0">
                           <label className="text-xs text-gray-500">
                             Medio de Pago
@@ -2470,7 +2466,6 @@ function BoletaContent() {
                             ))}
                           </select>
                         </div>
-
 
                         <div className="space-y-1.5 w-36 shrink-0">
                           <label className="text-xs text-gray-500">Monto</label>
@@ -2976,19 +2971,10 @@ function BoletaContent() {
                                             <button
                                               key={p.productoId}
                                               type="button"
-                                              disabled={
-                                                p.tipoProducto === "BIEN" &&
-                                                p.sucursalProducto.stock === 0
+                                              onMouseDown={() =>
+                                                seleccionarProducto(p, i)
                                               }
-                                              onMouseDown={() => {
-                                                if (
-                                                  p.tipoProducto === "BIEN" &&
-                                                  p.sucursalProducto.stock === 0
-                                                )
-                                                  return;
-                                                seleccionarProducto(p, i);
-                                              }}
-                                              className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${p.tipoProducto === "BIEN" && p.sucursalProducto.stock === 0 ? "opacity-50 cursor-not-allowed bg-gray-50" : "hover:bg-gray-50"}`}
+                                              className="w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50"
                                             >
                                               <p className="text-xs font-medium text-gray-800">
                                                 {p.nomProducto}
@@ -3006,12 +2992,7 @@ function BoletaContent() {
                                                         ? " text-red-400"
                                                         : " text-green-600"
                                                     }
-                                                  >
-                                                    {p.sucursalProducto
-                                                      .stock === 0
-                                                      ? " · Sin stock"
-                                                      : ` · Stock: ${p.sucursalProducto.stock}`}
-                                                  </span>
+                                                  ></span>
                                                 )}
                                               </p>
                                             </button>
@@ -3099,14 +3080,6 @@ function BoletaContent() {
                                         +
                                       </button>
                                     </div>
-                                    {d._tipoProducto === "BIEN" &&
-                                      d._stockDisponible != null && (
-                                        <p
-                                          className={`text-[9px] text-center ${d._stockDisponible === 0 ? "text-red-500" : (d.cantidad ?? 1) > d._stockDisponible ? "text-red-400" : "text-gray-400"}`}
-                                        >
-                                          Stock: {d._stockDisponible}
-                                        </p>
-                                      )}
                                   </div>
                                 )}
                               </td>
@@ -3423,126 +3396,129 @@ function BoletaContent() {
             title="Vista Previa"
             subtitle="Representación gráfica del comprobante"
           >
-{/* ── Serie y correlativo ── */}
-<div>
-  {isSuperAdmin ? (
-    <>
-      <div className="space-y-1.5">
-        <label className="text-[10px] font-bold text-gray-600 uppercase">
-          Sucursal
-        </label>
-        <select
-          value={sucursal?.sucursalId ?? ""}
-          disabled={loadingSucursales}
-          onChange={async (e) => {
-            if (!e.target.value) {
-              setSucursal(null);
-              setCorrelativoActual(null);
-              setDetalles([]);
-              setBusquedaProducto([]);
-              setShowDropdownProducto([]);
-              setCantidadBolsa(0);
-              return;
-            }
-            const sel = sucursales.find(
-              (s: Sucursal) => s.sucursalId === Number(e.target.value),
-            );
-            if (!sel) return;
-            setSucursal(sel);
-            setDetalles([]);
-            setBusquedaProducto([]);
-            setShowDropdownProducto([]);
-            setCantidadBolsa(0);
-            const res = await axios.get(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
-              {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              },
-            );
-            setCorrelativoActual(res.data.correlativoBoleta);
-            setBoleta((prev) => ({
-              ...prev,
-              serie: sel.serieBoleta,
-              correlativo: String(res.data.correlativoBoleta).padStart(8, "0"),
-            }));
-          }}
-          className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-        >
-          <option value="">Seleccionar sucursal</option>
-          {sucursales.map((s: Sucursal) => (
-            <option key={s.sucursalId} value={s.sucursalId}>
-              {s.serieBoleta} — {s.nombre ?? s.codEstablecimiento}
-            </option>
-          ))}
-        </select>
-      </div>
+            {/* ── Serie y correlativo ── */}
+            <div>
+              {isSuperAdmin ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">
+                      Sucursal
+                    </label>
+                    <select
+                      value={sucursal?.sucursalId ?? ""}
+                      disabled={loadingSucursales}
+                      onChange={async (e) => {
+                        if (!e.target.value) {
+                          setSucursal(null);
+                          setCorrelativoActual(null);
+                          setDetalles([]);
+                          setBusquedaProducto([]);
+                          setShowDropdownProducto([]);
+                          setCantidadBolsa(0);
+                          return;
+                        }
+                        const sel = sucursales.find(
+                          (s: Sucursal) =>
+                            s.sucursalId === Number(e.target.value),
+                        );
+                        if (!sel) return;
+                        setSucursal(sel);
+                        setDetalles([]);
+                        setBusquedaProducto([]);
+                        setShowDropdownProducto([]);
+                        setCantidadBolsa(0);
+                        const res = await axios.get(
+                          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
+                          {
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                          },
+                        );
+                        setCorrelativoActual(res.data.correlativoBoleta);
+                        setBoleta((prev) => ({
+                          ...prev,
+                          serie: sel.serieBoleta,
+                          correlativo: String(
+                            res.data.correlativoBoleta,
+                          ).padStart(8, "0"),
+                        }));
+                      }}
+                      className="w-full py-2 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    >
+                      <option value="">Seleccionar sucursal</option>
+                      {sucursales.map((s: Sucursal) => (
+                        <option key={s.sucursalId} value={s.sucursalId}>
+                          {s.serieBoleta} — {s.nombre ?? s.codEstablecimiento}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-      {/* Info serie con estilos compactos */}
-      <div
-        className={`flex items-center gap-2 mt-3 px-2 py-2 rounded-lg border w-full text-sm ${
-          !sucursal
-            ? "bg-amber-50 border-amber-200"
-            : serieDisplay
-              ? "bg-green-50 border-green-300"
-              : "bg-gray-50 border-gray-200"
-        }`}
-      >
-        {!sucursal ? (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-3.5 h-3.5 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
-            </svg>
-            <span>Elige una sucursal</span>
-          </span>
-        ) : !serieDisplay ? (
-          <span className="text-xs text-gray-400">Sin serie</span>
-        ) : (
-          <>
-            <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
-              Boleta:
-            </p>
-            <span className="text-xs font-mono font-semibold text-gray-800">
-              {serieDisplay}-{correlativoDisplay}
-            </span>
-          </>
-        )}
-      </div>
-    </>
-  ) : (
-    // Caso no superadmin (estilo compacto también)
-    <div
-      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
-        serieDisplay
-          ? "bg-green-50 border-green-300"
-          : "bg-gray-50 border-gray-200"
-      }`}
-    >
-      {loadingSucursal ? (
-        <span className="text-gray-400 text-xs">Cargando...</span>
-      ) : !serieDisplay ? (
-        <span className="text-xs text-gray-400">Sin serie</span>
-      ) : (
-        <>
-          <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
-            Boleta:
-          </p>
-          <span className="text-xs font-mono font-semibold text-gray-800">
-            {serieDisplay}-{correlativoDisplay}
-          </span>
-        </>
-      )}
-    </div>
-  )}
-</div>
+                  {/* Info serie con estilos compactos */}
+                  <div
+                    className={`flex items-center gap-2 mt-3 px-2 py-2 rounded-lg border w-full text-sm ${
+                      !sucursal
+                        ? "bg-amber-50 border-amber-200"
+                        : serieDisplay
+                          ? "bg-green-50 border-green-300"
+                          : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    {!sucursal ? (
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="w-3.5 h-3.5 shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
+                        </svg>
+                        <span>Elige una sucursal</span>
+                      </span>
+                    ) : !serieDisplay ? (
+                      <span className="text-xs text-gray-400">Sin serie</span>
+                    ) : (
+                      <>
+                        <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+                          Boleta:
+                        </p>
+                        <span className="text-xs font-mono font-semibold text-gray-800">
+                          {serieDisplay}-{correlativoDisplay}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                // Caso no superadmin (estilo compacto también)
+                <div
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+                    serieDisplay
+                      ? "bg-green-50 border-green-300"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  {loadingSucursal ? (
+                    <span className="text-gray-400 text-xs">Cargando...</span>
+                  ) : !serieDisplay ? (
+                    <span className="text-xs text-gray-400">Sin serie</span>
+                  ) : (
+                    <>
+                      <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+                        Boleta:
+                      </p>
+                      <span className="text-xs font-mono font-semibold text-gray-800">
+                        {serieDisplay}-{correlativoDisplay}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="mb-3 mt-3">
               <select
@@ -3652,7 +3628,9 @@ function BoletaContent() {
                 </div>
               </div>
             ) : (
-<div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">                <div className="p-4 rounded-full bg-white shadow-sm">
+              <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
+                {" "}
+                <div className="p-4 rounded-full bg-white shadow-sm">
                   <Printer className="w-8 h-8 text-gray-400" />
                 </div>
                 <div>

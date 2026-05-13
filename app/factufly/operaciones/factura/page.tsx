@@ -16,7 +16,14 @@ import {
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  Suspense,
+} from "react";
 import {
   Factura,
   FacturaCliente,
@@ -128,8 +135,10 @@ function FacturaContent() {
 
   //Editar y reenviar
   const searchParams = useSearchParams();
-  const { comprobante, fetchComprobante: fetchComprobanteById } = useComprobanteUnicoId();
-  const cargandoComprobante = !!searchParams.get('comprobanteId') && !comprobante;
+  const { comprobante, fetchComprobante: fetchComprobanteById } =
+    useComprobanteUnicoId();
+  const cargandoComprobante =
+    !!searchParams.get("comprobanteId") && !comprobante;
 
   const { empresa } = useEmpresaEmisor();
   const { cliente, loadingCliente, errorCliente, buscarCliente } =
@@ -269,116 +278,130 @@ function FacturaContent() {
 
   // Llemar api para obtener comprobante rechazado y editar
   useEffect(() => {
-    const comprobanteId = searchParams.get('comprobanteId');
-    const serie = searchParams.get('serie');
-    const correlativo = searchParams.get('correlativo');
-    const ruc = searchParams.get('ruc');
-    const establecimiento = searchParams.get('establecimiento');
+    const comprobanteId = searchParams.get("comprobanteId");
+    const serie = searchParams.get("serie");
+    const correlativo = searchParams.get("correlativo");
+    const ruc = searchParams.get("ruc");
+    const establecimiento = searchParams.get("establecimiento");
     if (!comprobanteId) return;
     fetchComprobanteById(Number(comprobanteId));
-      // Si es superadmin y viene establecimiento, buscar y setear la sucursal
+    // Si es superadmin y viene establecimiento, buscar y setear la sucursal
     if (isSuperAdmin && establecimiento && sucursales.length > 0) {
       const sucursalEncontrada = sucursales.find(
-        (s: Sucursal) => s.codEstablecimiento === establecimiento
+        (s: Sucursal) => s.codEstablecimiento === establecimiento,
       );
       if (sucursalEncontrada) {
         setSucursal(sucursalEncontrada);
       }
     }
-}, [sucursales]);
+  }, [sucursales]);
 
   useEffect(() => {
     if (!comprobante) return;
     // Cliente
-    setFactura(prev => ({
+    setFactura((prev) => ({
       ...prev,
-      tipoMoneda: comprobante.tipoMoneda ?? 'PEN',
-      tipoPago: comprobante.tipoPago ?? 'Contado',
-      tipoOperacion: comprobante.tipoOperacion ?? '0101',
+      tipoMoneda: comprobante.tipoMoneda ?? "PEN",
+      tipoPago: comprobante.tipoPago ?? "Contado",
+      tipoOperacion: comprobante.tipoOperacion ?? "0101",
       fechaVencimiento: comprobante.fechaVencimiento?.slice(0, 10) ?? fecha,
-      cliente: comprobante.cliente ? {
-        clienteId: comprobante.cliente.clienteId ?? null,
-        tipoDocumento: comprobante.cliente.tipoDocumento,
-        numeroDocumento: comprobante.cliente.numeroDocumento,
-        razonSocial: comprobante.cliente.razonSocial,
-        ubigeo: comprobante.cliente.ubigeo ?? '',
-        direccionLineal: comprobante.cliente.direccionLineal ?? '',
-        departamento: comprobante.cliente.departamento ?? '',
-        provincia: comprobante.cliente.provincia ?? '',
-        distrito: comprobante.cliente.distrito ?? '',
-      } : undefined,
+      cliente: comprobante.cliente
+        ? {
+            clienteId: comprobante.cliente.clienteId ?? null,
+            tipoDocumento: comprobante.cliente.tipoDocumento,
+            numeroDocumento: comprobante.cliente.numeroDocumento,
+            razonSocial: comprobante.cliente.razonSocial,
+            ubigeo: comprobante.cliente.ubigeo ?? "",
+            direccionLineal: comprobante.cliente.direccionLineal ?? "",
+            departamento: comprobante.cliente.departamento ?? "",
+            provincia: comprobante.cliente.provincia ?? "",
+            distrito: comprobante.cliente.distrito ?? "",
+          }
+        : undefined,
     }));
 
     // Búsqueda cliente
-    setBusqueda(comprobante.cliente?.numeroDocumento ?? '');
-    setTipoDoc(comprobante.cliente?.tipoDocumento === '6' ? '06' : (comprobante.cliente?.tipoDocumento ?? '06'));
-    setCorreoCliente(comprobante.cliente?.correo ?? '');
-    setTelefonoCliente(comprobante.cliente?.whatsApp ?? '');
+    setBusqueda(comprobante.cliente?.numeroDocumento ?? "");
+    setTipoDoc(
+      comprobante.cliente?.tipoDocumento === "6"
+        ? "06"
+        : (comprobante.cliente?.tipoDocumento ?? "06"),
+    );
+    setCorreoCliente(comprobante.cliente?.correo ?? "");
+    setTelefonoCliente(comprobante.cliente?.whatsApp ?? "");
 
     // Detalles
     if (comprobante.details && comprobante.details.length > 0) {
-      const nuevosDetalles: DetalleLocal[] = comprobante.details.map((d, idx) => ({
-        item: idx + 1,
-        productoId: d.productoId ?? null,
-        codigo: d.codigo ?? null,
-        descripcion: d.descripcion,
-        cantidad: d.cantidad,
-        unidadMedida: d.unidadMedida,
-        precioUnitario: d.precioUnitario,
-        tipoAfectacionIGV: d.tipoAfectacionIGV,
-        porcentajeIGV: d.porcentajeIGV,
-        montoIGV: d.montoIGV,
-        baseIgv: d.baseIgv,
-        codigoTipoDescuento: d.codigoTipoDescuento ?? '00',
-        descuentoUnitario: d.descuentoUnitario ?? 0,
-        descuentoTotal: d.descuentoTotal ?? 0,
-        valorVenta: d.valorVenta,
-        precioVenta: d.precioVenta,
-        totalVentaItem: d.totalVentaItem,
-        icbper: d.icbper ?? 0,
-        factorIcbper: d.factorIcbper ?? 0,
-        _precioBase: d.precioUnitario,
-        _precioBaseOriginal: d.precioUnitario,
-        _precioVentaConIGV: d.precioVenta,
-        _incluirIGV: false,
-      }));
+      const nuevosDetalles: DetalleLocal[] = comprobante.details.map(
+        (d, idx) => ({
+          item: idx + 1,
+          productoId: d.productoId ?? null,
+          codigo: d.codigo ?? null,
+          descripcion: d.descripcion,
+          cantidad: d.cantidad,
+          unidadMedida: d.unidadMedida,
+          precioUnitario: d.precioUnitario,
+          tipoAfectacionIGV: d.tipoAfectacionIGV,
+          porcentajeIGV: d.porcentajeIGV,
+          montoIGV: d.montoIGV,
+          baseIgv: d.baseIgv,
+          codigoTipoDescuento: d.codigoTipoDescuento ?? "00",
+          descuentoUnitario: d.descuentoUnitario ?? 0,
+          descuentoTotal: d.descuentoTotal ?? 0,
+          valorVenta: d.valorVenta,
+          precioVenta: d.precioVenta,
+          totalVentaItem: d.totalVentaItem,
+          icbper: d.icbper ?? 0,
+          factorIcbper: d.factorIcbper ?? 0,
+          _precioBase: d.precioUnitario,
+          _precioBaseOriginal: d.precioUnitario,
+          _precioVentaConIGV: d.precioVenta,
+          _incluirIGV: false,
+        }),
+      );
       setDetalles(nuevosDetalles);
-      setBusquedaProducto(nuevosDetalles.map(d => d.descripcion ?? ''));
+      setBusquedaProducto(nuevosDetalles.map((d) => d.descripcion ?? ""));
       setShowDropdownProducto(nuevosDetalles.map(() => false));
       inputRefs.current = nuevosDetalles.map(() => null);
     }
 
     // Pagos
     if (comprobante.pagos && comprobante.pagos.length > 0) {
-      setPagos(comprobante.pagos.map(p => ({
-        medioPago: p.medioPago,
-        monto: String(p.monto),
-        numeroOperacion: p.numeroOperacion ?? '',
-        entidadFinanciera: p.entidadFinanciera ?? '',
-        observaciones: p.observaciones ?? '',
-      })));
+      setPagos(
+        comprobante.pagos.map((p) => ({
+          medioPago: p.medioPago,
+          monto: String(p.monto),
+          numeroOperacion: p.numeroOperacion ?? "",
+          entidadFinanciera: p.entidadFinanciera ?? "",
+          observaciones: p.observaciones ?? "",
+        })),
+      );
     }
 
     // Cuotas
     if (comprobante.cuotas && comprobante.cuotas.length > 0) {
       setNumeroCuotas(comprobante.cuotas.length);
-      setCuotas(comprobante.cuotas.map(c => ({
-        numeroCuota: c.numeroCuota,
-        monto: String(c.monto),
-        fechaVencimiento: c.fechaVencimiento?.slice(0, 10) ?? '',
-      })));
+      setCuotas(
+        comprobante.cuotas.map((c) => ({
+          numeroCuota: c.numeroCuota,
+          monto: String(c.monto),
+          fechaVencimiento: c.fechaVencimiento?.slice(0, 10) ?? "",
+        })),
+      );
     }
 
     // Guías
     if (comprobante.guias && comprobante.guias.length > 0) {
-      setGuias(comprobante.guias.map(g => {
-        const partes = g.guiaNumeroCompleto?.split('-') ?? [];
-        return {
-          serie: partes[0] ?? '',
-          numero: partes[1] ?? '',
-          tipoDoc: g.guiaTipoDoc ?? '09',
-        };
-      }));
+      setGuias(
+        comprobante.guias.map((g) => {
+          const partes = g.guiaNumeroCompleto?.split("-") ?? [];
+          return {
+            serie: partes[0] ?? "",
+            numero: partes[1] ?? "",
+            tipoDoc: g.guiaTipoDoc ?? "09",
+          };
+        }),
+      );
     }
 
     // Detracción
@@ -392,14 +415,13 @@ function FacturaContent() {
         cuentaBancoDetraccion: det.cuentaBancoDetraccion,
         porcentajeDetraccion: det.porcentajeDetraccion,
         montoDetraccion: det.montoDetraccion,
-        observacion: det.observacion ?? '',
+        observacion: det.observacion ?? "",
       });
     }
 
     // Descuento global
     setDescuentoGlobal(comprobante.descuentoGlobal ?? 0);
-    setCodigoTipoDescGlobal(comprobante.codigoTipoDescGlobal ?? '02');
-
+    setCodigoTipoDescGlobal(comprobante.codigoTipoDescGlobal ?? "02");
   }, [comprobante]);
 
   const mediosUsados = pagos.map((p) => p.medioPago);
@@ -496,7 +518,9 @@ function FacturaContent() {
 
   // ── ICBPER y bolsa plástica ───────────────────────────────────
   const [cantidadBolsa, setCantidadBolsa] = useState(0);
-  const [tamañoBolsa, setTamañoBolsa] = useState<"pequeña" | "mediana" | "grande">("mediana");
+  const [tamañoBolsa, setTamañoBolsa] = useState<
+    "pequeña" | "mediana" | "grande"
+  >("mediana");
   const [aplicarIcbper, setAplicarIcbper] = useState(false);
   const [showBolsa, setShowBolsa] = useState(false);
 
@@ -616,7 +640,7 @@ function FacturaContent() {
 
     setBusquedaProducto((prev) => {
       // Filter out anything that looks like a bolsa to avoid duplicates or orphans
-      const sinBolsa = prev.filter(s => !s.startsWith("BOLSA PLASTICA"));
+      const sinBolsa = prev.filter((s) => !s.startsWith("BOLSA PLASTICA"));
       if (cantidadBolsa === 0) return sinBolsa;
       return [...sinBolsa, `BOLSA PLASTICA (${tamañoBolsa})`];
     });
@@ -642,7 +666,9 @@ function FacturaContent() {
   });
 
   // ── PDF ──────────────────────────────────────────────────────
-  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<number | null>(null);
+  const [comprobanteIdEmitido, setComprobanteIdEmitido] = useState<
+    number | null
+  >(null);
   const [tamanoPdf, setTamanoPdf] = useState<string>("A4");
   const [pdfA4Url, setPdfA4Url] = useState<string | null>(null);
   const [pdfTicketUrl, setPdfTicketUrl] = useState<string | null>(null);
@@ -652,15 +678,21 @@ function FacturaContent() {
   // ── Effects de inicialización ────────────────────────────────
   useEffect(() => {
     const data = sharedVentaStore.get();
-    
+
     // Load extra UI state first
     if (data.extra) {
-      if (data.extra.porConsumo !== undefined) setPorConsumo(data.extra.porConsumo);
-      if (data.extra.cantidadBolsa !== undefined) setCantidadBolsa(data.extra.cantidadBolsa);
-      if (data.extra.tamañoBolsa !== undefined) setTamañoBolsa(data.extra.tamañoBolsa);
-      if (data.extra.aplicarIcbper !== undefined) setAplicarIcbper(data.extra.aplicarIcbper);
-      if (data.extra.descuentoGlobal !== undefined) setDescuentoGlobal(data.extra.descuentoGlobal);
-      if (data.extra.codigoTipoDescGlobal !== undefined) setCodigoTipoDescGlobal(data.extra.codigoTipoDescGlobal);
+      if (data.extra.porConsumo !== undefined)
+        setPorConsumo(data.extra.porConsumo);
+      if (data.extra.cantidadBolsa !== undefined)
+        setCantidadBolsa(data.extra.cantidadBolsa);
+      if (data.extra.tamañoBolsa !== undefined)
+        setTamañoBolsa(data.extra.tamañoBolsa);
+      if (data.extra.aplicarIcbper !== undefined)
+        setAplicarIcbper(data.extra.aplicarIcbper);
+      if (data.extra.descuentoGlobal !== undefined)
+        setDescuentoGlobal(data.extra.descuentoGlobal);
+      if (data.extra.codigoTipoDescGlobal !== undefined)
+        setCodigoTipoDescGlobal(data.extra.codigoTipoDescGlobal);
     }
 
     if (data.items && data.items.length > 0) {
@@ -669,20 +701,24 @@ function FacturaContent() {
         const porcentajeIGV = i.porcentajeIGV ?? 18;
         const precioUnitario = i.precioUnitario ?? i._precioBase ?? 0;
         // DetalleLocal uses 'precioVenta', ItemRapido uses 'precioVentaConIGV'
-        const precioVenta = i.precioVenta ?? i.precioVentaConIGV ?? i._precioVentaConIGV ?? precioUnitario;
-        
+        const precioVenta =
+          i.precioVenta ??
+          i.precioVentaConIGV ??
+          i._precioVentaConIGV ??
+          precioUnitario;
+
         let baseIgv = 0;
         let montoIGV = 0;
         let totalVentaItem = 0;
         let valorVenta = 0;
-        
+
         if (i._esIcbper) {
           baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
           montoIGV = 0;
           totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
           valorVenta = baseIgv;
         } else {
-          if (i.tipoAfectacionIGV === '10') {
+          if (i.tipoAfectacionIGV === "10") {
             baseIgv = parseFloat((precioUnitario * cantidad).toFixed(2));
             montoIGV = parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2));
             totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
@@ -702,9 +738,9 @@ function FacturaContent() {
           codigo: i.codigo || null,
           descripcion: i.descripcion,
           cantidad,
-          unidadMedida: i.unidadMedida || 'NIU',
+          unidadMedida: i.unidadMedida || "NIU",
           precioUnitario,
-          tipoAfectacionIGV: i.tipoAfectacionIGV || '10',
+          tipoAfectacionIGV: i.tipoAfectacionIGV || "10",
           porcentajeIGV,
           montoIGV,
           baseIgv,
@@ -727,13 +763,17 @@ function FacturaContent() {
         };
       });
       setDetalles(mapped);
-      setBusquedaProducto(mapped.map((i: any) => i.descripcion || ''));
+      setBusquedaProducto(mapped.map((i: any) => i.descripcion || ""));
       setShowDropdownProducto(mapped.map(() => false));
     }
     if (data.cliente) {
-      if (data.cliente.tipoDocumento === '06' || data.cliente.tipoDocumento === '04') {
-        setFactura(prev => ({...prev, cliente: data.cliente}));
-        if (data.cliente.numeroDocumento) setBusqueda(data.cliente.numeroDocumento);
+      if (
+        data.cliente.tipoDocumento === "06" ||
+        data.cliente.tipoDocumento === "04"
+      ) {
+        setFactura((prev) => ({ ...prev, cliente: data.cliente }));
+        if (data.cliente.numeroDocumento)
+          setBusqueda(data.cliente.numeroDocumento);
       }
     }
   }, []);
@@ -833,32 +873,34 @@ function FacturaContent() {
   }, [pagos, factura.tipoPago]);
 
   useEffect(() => {
-      if (factura.tipoPago !== "Credito" && factura.tipoPago !== "CreditoInicial") return;
-      const cuotasFormateadas: FacturaCuota[] = cuotas.map((c) => ({
-        numeroCuota: c.numeroCuota,
-        monto: Number(c.monto) || 0,
-        fechaVencimiento: c.fechaVencimiento,
+    if (factura.tipoPago !== "Credito" && factura.tipoPago !== "CreditoInicial")
+      return;
+    const cuotasFormateadas: FacturaCuota[] = cuotas.map((c) => ({
+      numeroCuota: c.numeroCuota,
+      monto: Number(c.monto) || 0,
+      fechaVencimiento: c.fechaVencimiento,
+    }));
+
+    // ✅ Tomar fecha de vencimiento de la última cuota
+    const ultimaCuota = cuotas[cuotas.length - 1];
+    const fechaVencimientoFinal =
+      ultimaCuota?.fechaVencimiento ?? factura.fechaVencimiento;
+
+    if (factura.tipoPago === "Credito") {
+      setFactura((prev) => ({
+        ...prev,
+        cuotas: cuotasFormateadas,
+        pagos: [],
+        fechaVencimiento: fechaVencimientoFinal,
       }));
-
-      // ✅ Tomar fecha de vencimiento de la última cuota
-      const ultimaCuota = cuotas[cuotas.length - 1];
-      const fechaVencimientoFinal = ultimaCuota?.fechaVencimiento ?? factura.fechaVencimiento;
-
-      if (factura.tipoPago === "Credito") {
-        setFactura((prev) => ({ 
-          ...prev, 
-          cuotas: cuotasFormateadas, 
-          pagos: [],
-          fechaVencimiento: fechaVencimientoFinal,
-        }));
-      } else {
-        setFactura((prev) => ({ 
-          ...prev, 
-          cuotas: cuotasFormateadas,
-          fechaVencimiento: fechaVencimientoFinal,
-        }));
-      }
-    }, [cuotas, factura.tipoPago]);
+    } else {
+      setFactura((prev) => ({
+        ...prev,
+        cuotas: cuotasFormateadas,
+        fechaVencimiento: fechaVencimientoFinal,
+      }));
+    }
+  }, [cuotas, factura.tipoPago]);
 
   useEffect(() => {
     const detallesLimpios = detalles.map(
@@ -879,14 +921,14 @@ function FacturaContent() {
 
   //Guias de remision enlazadas
   useEffect(() => {
-      const guiasFormateadas: FacturaGuia[] = guias
-        .filter((g) => g.serie && g.numero)
-        .map((g) => ({
-          guiaNumeroCompleto: `${g.serie}-${g.numero.padStart(8, "0")}`,
-          guiaTipoDoc: g.tipoDoc,
-        }));
-      setFactura((prev) => ({ ...prev, guias: guiasFormateadas }));
-    }, [guias]);
+    const guiasFormateadas: FacturaGuia[] = guias
+      .filter((g) => g.serie && g.numero)
+      .map((g) => ({
+        guiaNumeroCompleto: `${g.serie}-${g.numero.padStart(8, "0")}`,
+        guiaTipoDoc: g.tipoDoc,
+      }));
+    setFactura((prev) => ({ ...prev, guias: guiasFormateadas }));
+  }, [guias]);
 
   useEffect(() => {
     if (!aplicarDetraccion || totales.importeTotal === 0) return;
@@ -1033,27 +1075,43 @@ function FacturaContent() {
 
   // ── Auto-calcular cuotas ─────────────────────────────────────
   useEffect(() => {
-    if (factura.tipoPago !== 'Credito' && factura.tipoPago !== 'CreditoInicial') return;
+    if (factura.tipoPago !== "Credito" && factura.tipoPago !== "CreditoInicial")
+      return;
     if (totales.total === 0) {
-      setCuotas(prev => prev.map(c => ({ ...c, monto: '' })));
+      setCuotas((prev) => prev.map((c) => ({ ...c, monto: "" })));
       return;
     }
 
     // Restar detracción si aplica (solo en crédito)
     const baseDetraccion = aplicarDetraccion ? detraccion.montoDetraccion : 0;
-    const basePagoInicial = factura.tipoPago === 'CreditoInicial' ? totalPagado : 0;
-    const baseCalculo = Math.max(0, totales.total - basePagoInicial - baseDetraccion);
+    const basePagoInicial =
+      factura.tipoPago === "CreditoInicial" ? totalPagado : 0;
+    const baseCalculo = Math.max(
+      0,
+      totales.total - basePagoInicial - baseDetraccion,
+    );
 
     // Distribuir uniformemente y ajustar última cuota para evitar error de redondeo
     const montoPorCuota = parseFloat((baseCalculo / numeroCuotas).toFixed(2));
-    const sumaAnterior = parseFloat((montoPorCuota * (numeroCuotas - 1)).toFixed(2));
+    const sumaAnterior = parseFloat(
+      (montoPorCuota * (numeroCuotas - 1)).toFixed(2),
+    );
     const ultimaCuota = parseFloat((baseCalculo - sumaAnterior).toFixed(2));
 
-    setCuotas(prev => prev.map((cuota, idx) => ({
-      ...cuota,
-      monto: String(idx === numeroCuotas - 1 ? ultimaCuota : montoPorCuota),
-    })));
-  }, [totales.total, numeroCuotas, factura.tipoPago, totalPagado, aplicarDetraccion, detraccion.montoDetraccion]);
+    setCuotas((prev) =>
+      prev.map((cuota, idx) => ({
+        ...cuota,
+        monto: String(idx === numeroCuotas - 1 ? ultimaCuota : montoPorCuota),
+      })),
+    );
+  }, [
+    totales.total,
+    numeroCuotas,
+    factura.tipoPago,
+    totalPagado,
+    aplicarDetraccion,
+    detraccion.montoDetraccion,
+  ]);
 
   // ── Sincronizar totales en factura ───────────────────────────
   useEffect(() => {
@@ -1169,56 +1227,105 @@ function FacturaContent() {
     ) => {
       const esGratuito = TIPOS_GRATUITOS.includes(tipoAfectacion);
       const precioUnitario = parseFloat(precioBase.toFixed(6));
-      let baseIgv = 0, montoIGV = 0, totalVentaItem = 0, valorVenta = 0;
+      let baseIgv = 0,
+        montoIGV = 0,
+        totalVentaItem = 0,
+        valorVenta = 0;
       let precioVenta = parseFloat(precioVentaConIGV.toFixed(2));
       let descuentoTotal = 0;
 
       if (esGratuito) {
         baseIgv = parseFloat((precioBase * cantidad).toFixed(2));
-        montoIGV = tipoAfectacion === "11"
-          ? parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2))
-          : 0;
+        montoIGV =
+          tipoAfectacion === "11"
+            ? parseFloat(((baseIgv * porcentajeIGV) / 100).toFixed(2))
+            : 0;
         precioVenta = 0;
         totalVentaItem = 0;
         valorVenta = baseIgv;
-        return { precioUnitario, precioVenta, baseIgv, montoIGV, totalVentaItem, valorVenta, descuentoTotal };
+        return {
+          precioUnitario,
+          precioVenta,
+          baseIgv,
+          montoIGV,
+          totalVentaItem,
+          valorVenta,
+          descuentoTotal,
+        };
       }
 
       if (tipoAfectacion === "10") {
         if (codigoDescuento === "00") {
           precioVenta = parseFloat(
-            ((precioBase - descuentoUnitario) * (1 + porcentajeIGV / 100)).toFixed(2),
+            (
+              (precioBase - descuentoUnitario) *
+              (1 + porcentajeIGV / 100)
+            ).toFixed(2),
           );
           totalVentaItem = parseFloat((precioVenta * cantidad).toFixed(2));
-          montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + porcentajeIGV / 100)).toFixed(2));
+          montoIGV = parseFloat(
+            (
+              totalVentaItem -
+              totalVentaItem / (1 + porcentajeIGV / 100)
+            ).toFixed(2),
+          );
           baseIgv = parseFloat((totalVentaItem - montoIGV).toFixed(2));
           valorVenta = baseIgv;
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         } else {
-          totalVentaItem = parseFloat((precioVentaConIGV * cantidad).toFixed(2));
-          montoIGV = parseFloat((totalVentaItem - totalVentaItem / (1 + porcentajeIGV / 100)).toFixed(2));
+          totalVentaItem = parseFloat(
+            (precioVentaConIGV * cantidad).toFixed(2),
+          );
+          montoIGV = parseFloat(
+            (
+              totalVentaItem -
+              totalVentaItem / (1 + porcentajeIGV / 100)
+            ).toFixed(2),
+          );
           baseIgv = parseFloat((totalVentaItem - montoIGV).toFixed(2));
-          precioVenta = parseFloat((precioVentaConIGV - descuentoUnitario).toFixed(2));
+          precioVenta = parseFloat(
+            (precioVentaConIGV - descuentoUnitario).toFixed(2),
+          );
           valorVenta = baseIgv;
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         }
       } else {
         if (codigoDescuento === "00") {
-          baseIgv = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2));
+          baseIgv = parseFloat(
+            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
+          );
           precioVenta = parseFloat((precioBase - descuentoUnitario).toFixed(2));
           totalVentaItem = parseFloat(baseIgv.toFixed(2));
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         } else {
           baseIgv = parseFloat((precioBase * cantidad).toFixed(2));
           precioVenta = parseFloat(precioBase.toFixed(2));
-          totalVentaItem = parseFloat(((precioBase - descuentoUnitario) * cantidad).toFixed(2));
-          descuentoTotal = parseFloat((descuentoUnitario * cantidad).toFixed(2));
+          totalVentaItem = parseFloat(
+            ((precioBase - descuentoUnitario) * cantidad).toFixed(2),
+          );
+          descuentoTotal = parseFloat(
+            (descuentoUnitario * cantidad).toFixed(2),
+          );
         }
         montoIGV = 0;
         valorVenta = baseIgv;
       }
 
-      return { precioUnitario, precioVenta, baseIgv, montoIGV, totalVentaItem, valorVenta, descuentoTotal };
+      return {
+        precioUnitario,
+        precioVenta,
+        baseIgv,
+        montoIGV,
+        totalVentaItem,
+        valorVenta,
+        descuentoTotal,
+      };
     },
     [],
   );
@@ -1413,12 +1520,6 @@ function FacturaContent() {
   const actualizarCantidad = (index: number, cantidad: number) => {
     const d = detalles[index];
     if (!d) return;
-    const esBien = d._tipoProducto === "BIEN";
-    const stockDisponible = d._stockDisponible;
-    if (esBien && stockDisponible != null && cantidad > stockDisponible) {
-      showToast(`Stock insuficiente. Disponible: ${stockDisponible}`, "error");
-      cantidad = stockDisponible;
-    }
     const precioBase = d._precioBase ?? d.precioUnitario ?? 0;
     const precioVentaConIGV = d._precioVentaConIGV ?? d.precioVenta ?? 0;
     const calc = calcularDetalle(
@@ -1584,16 +1685,25 @@ function FacturaContent() {
 
   // ── Preparar y emitir ────────────────────────────────────────
   const prepararFactura = () => {
-    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo para enviar", "error"); return; }
-    const esCredito = factura.tipoPago === 'Credito' || factura.tipoPago === 'CreditoInicial';
-    const esCreditoInicial = factura.tipoPago === 'CreditoInicial';
+    if (enviarCorreo && !correoCliente.trim()) {
+      showToast("Ingrese el correo para enviar", "error");
+      return;
+    }
+    const esCredito =
+      factura.tipoPago === "Credito" || factura.tipoPago === "CreditoInicial";
+    const esCreditoInicial = factura.tipoPago === "CreditoInicial";
 
     // Base neta = total - pago inicial (si aplica) - detracción (si aplica)
-    const baseDetraccion = (esCredito && aplicarDetraccion) ? detraccion.montoDetraccion : 0;
+    const baseDetraccion =
+      esCredito && aplicarDetraccion ? detraccion.montoDetraccion : 0;
     const basePagoInicial = esCreditoInicial ? totalPagado : 0;
-    
+
     const montoCredito = esCredito
-      ? parseFloat(Math.max(0, totales.total - basePagoInicial - baseDetraccion).toFixed(2))
+      ? parseFloat(
+          Math.max(0, totales.total - basePagoInicial - baseDetraccion).toFixed(
+            2,
+          ),
+        )
       : 0;
 
     return {
@@ -1601,84 +1711,161 @@ function FacturaContent() {
       cliente: factura.cliente
         ? {
             ...factura.cliente,
-            tipoDocumento: factura.cliente.tipoDocumento === '06' ? '6' : factura.cliente.tipoDocumento,
-            correo: correoCliente || null,   
-            enviadoPorCorreo: enviarCorreo,          
-            whatsApp: telefonoCliente || null,       
-            enviadoPorWhatsApp: enviarWhatsapp,      
+            tipoDocumento:
+              factura.cliente.tipoDocumento === "06"
+                ? "6"
+                : factura.cliente.tipoDocumento,
+            correo: correoCliente || null,
+            enviadoPorCorreo: enviarCorreo,
+            whatsApp: telefonoCliente || null,
+            enviadoPorWhatsApp: enviarWhatsapp,
           }
         : factura.cliente,
-      tipoPago: factura.tipoPago === 'CreditoInicial' ? 'Credito' : factura.tipoPago,
-      fechaEmision: fechaEmisionEditada ? factura.fechaEmision : formatoFechaActual().fechaHora,
-      horaEmision: fechaEmisionEditada ? factura.horaEmision : formatoFechaActual().fechaHora,
+      tipoPago:
+        factura.tipoPago === "CreditoInicial" ? "Credito" : factura.tipoPago,
+      fechaEmision: fechaEmisionEditada
+        ? factura.fechaEmision
+        : formatoFechaActual().fechaHora,
+      horaEmision: fechaEmisionEditada
+        ? factura.horaEmision
+        : formatoFechaActual().fechaHora,
       company: {
         ...factura.company,
-        establecimientoAnexo: sucursal?.codEstablecimiento ?? factura.company?.establecimientoAnexo ?? '0000',
+        establecimientoAnexo:
+          sucursal?.codEstablecimiento ??
+          factura.company?.establecimientoAnexo ??
+          "0000",
       },
       montoCredito,
       usuarioCreacion: user?.id ?? 0,
-      enviadoEnResumen: null,             
+      enviadoEnResumen: null,
     };
   };
 
   // ── Emitir, guardar en BD ────────
   const emitirComprobante = async () => {
     if (!factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) {
-      showToast("Debe seleccionar o ingresar un cliente", "error"); return;
+      showToast("Debe seleccionar o ingresar un cliente", "error");
+      return;
     }
-    const itemsReales = detalles.filter(d => !d._esIcbper);
-    if (!itemsReales.length) { showToast("Debe agregar al menos un ítem", "error"); return; }
-    const itemSinDesc = itemsReales.findIndex(d => !d.descripcion?.trim());
-    if (itemSinDesc !== -1) { showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error"); return; }
-    const itemSinPrecio = itemsReales.findIndex(d => {
+    const itemsReales = detalles.filter((d) => !d._esIcbper);
+    if (!itemsReales.length) {
+      showToast("Debe agregar al menos un ítem", "error");
+      return;
+    }
+    const itemSinDesc = itemsReales.findIndex((d) => !d.descripcion?.trim());
+    if (itemSinDesc !== -1) {
+      showToast(`El ítem ${itemSinDesc + 1} no tiene descripción`, "error");
+      return;
+    }
+    const itemSinPrecio = itemsReales.findIndex((d) => {
       const esGratuito = TIPOS_GRATUITOS.includes(d.tipoAfectacionIGV ?? "");
       if (esGratuito) return false;
       const precioBase = d._precioBase ?? d.precioUnitario ?? 0;
-      const esGratuitoPorDescuento = (d.descuentoUnitario ?? 0) >= precioBase && precioBase > 0;
+      const esGratuitoPorDescuento =
+        (d.descuentoUnitario ?? 0) >= precioBase && precioBase > 0;
       return !esGratuitoPorDescuento && (d.precioVenta ?? 0) <= 0;
     });
-    if (itemSinPrecio !== -1) { showToast(`El ítem ${itemSinPrecio + 1} debe tener un precio mayor a cero`, "error"); return; }
+    if (itemSinPrecio !== -1) {
+      showToast(
+        `El ítem ${itemSinPrecio + 1} debe tener un precio mayor a cero`,
+        "error",
+      );
+      return;
+    }
     if (aplicarDetraccion) {
-      if (totales.importeTotal < 700) { showToast("La detracción solo aplica cuando el importe supera S/ 700.00", "error"); return; }
-      if (!detraccion.cuentaBancoDetraccion) { showToast("Debe ingresar la cuenta bancaria de detracción", "error"); return; }
-      if (totales.soloGratuitas) { showToast("No aplica detracción en operaciones gratuitas", "error"); return; }
-    }
-    if (!aplicarDetraccion && totales.importeTotal >= 700 && !totales.soloGratuitas) {
-      showToast("El importe supera S/ 700. Verifica si aplica detracción.", "info");
-    }
-    if (enviarCorreo && !correoCliente.trim()) { showToast("Ingrese el correo del cliente para enviar", "error"); return; }
-    if (enviarWhatsapp && !telefonoCliente.trim()) { showToast("Ingrese el teléfono para enviar por WhatsApp", "error"); return; }
-
-    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0)
-    const sumaCuotas = cuotas.reduce((acc, c) => acc + (Number(c.monto) || 0), 0)
-    const pagoInvalido = pagos.some(p => !p.monto || Number(p.monto) <= 0)
-    const cuotaInvalida = cuotas.some(c => !c.monto || Number(c.monto) <= 0)
-    const montoDetraccionAplicada = aplicarDetraccion ? detraccion.montoDetraccion : 0
-
-    if (factura.tipoPago !== 'Credito' && pagoInvalido) {
-      showToast('Todos los montos de pago deben ser mayores a cero', 'error')
-      return
-    }
-    if (factura.tipoPago !== 'Contado' && cuotaInvalida) {
-      showToast('Todos los montos de las cuotas deben ser mayores a cero', 'error')
-      return
-    }
-    if (factura.tipoPago === 'Contado' && Math.abs(sumaPagos - totales.total) > 0.01) {
-      showToast(`Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`, 'error')
-      return
-    }
-    if (factura.tipoPago === 'Credito') {
-      const montoEsperado = parseFloat(Math.max(0, totales.total - montoDetraccionAplicada).toFixed(2))
-      if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
-        showToast(`Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${montoEsperado.toFixed(2)})`, 'error')
-        return
+      if (totales.importeTotal < 700) {
+        showToast(
+          "La detracción solo aplica cuando el importe supera S/ 700.00",
+          "error",
+        );
+        return;
+      }
+      if (!detraccion.cuentaBancoDetraccion) {
+        showToast("Debe ingresar la cuenta bancaria de detracción", "error");
+        return;
+      }
+      if (totales.soloGratuitas) {
+        showToast("No aplica detracción en operaciones gratuitas", "error");
+        return;
       }
     }
-    if (factura.tipoPago === 'CreditoInicial') {
-      const montoEsperado = parseFloat(Math.max(0, totales.total - sumaPagos - montoDetraccionAplicada).toFixed(2))
+    if (
+      !aplicarDetraccion &&
+      totales.importeTotal >= 700 &&
+      !totales.soloGratuitas
+    ) {
+      showToast(
+        "El importe supera S/ 700. Verifica si aplica detracción.",
+        "info",
+      );
+    }
+    if (enviarCorreo && !correoCliente.trim()) {
+      showToast("Ingrese el correo del cliente para enviar", "error");
+      return;
+    }
+    if (enviarWhatsapp && !telefonoCliente.trim()) {
+      showToast("Ingrese el teléfono para enviar por WhatsApp", "error");
+      return;
+    }
+
+    const sumaPagos = pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
+    const sumaCuotas = cuotas.reduce(
+      (acc, c) => acc + (Number(c.monto) || 0),
+      0,
+    );
+    const pagoInvalido = pagos.some((p) => !p.monto || Number(p.monto) <= 0);
+    const cuotaInvalida = cuotas.some((c) => !c.monto || Number(c.monto) <= 0);
+    const montoDetraccionAplicada = aplicarDetraccion
+      ? detraccion.montoDetraccion
+      : 0;
+
+    if (factura.tipoPago !== "Credito" && pagoInvalido) {
+      showToast("Todos los montos de pago deben ser mayores a cero", "error");
+      return;
+    }
+    if (factura.tipoPago !== "Contado" && cuotaInvalida) {
+      showToast(
+        "Todos los montos de las cuotas deben ser mayores a cero",
+        "error",
+      );
+      return;
+    }
+    if (
+      factura.tipoPago === "Contado" &&
+      Math.abs(sumaPagos - totales.total) > 0.01
+    ) {
+      showToast(
+        `Pagos (${simbolo} ${sumaPagos.toFixed(2)}) no coincide con el total (${simbolo} ${totales.total.toFixed(2)})`,
+        "error",
+      );
+      return;
+    }
+    if (factura.tipoPago === "Credito") {
+      const montoEsperado = parseFloat(
+        Math.max(0, totales.total - montoDetraccionAplicada).toFixed(2),
+      );
       if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
-        showToast(`Pago inicial (${simbolo} ${sumaPagos.toFixed(2)}) + cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${(sumaPagos + sumaCuotas).toFixed(2)} vs ${simbolo} ${totales.total.toFixed(2)})`, 'error')
-        return
+        showToast(
+          `Cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${montoEsperado.toFixed(2)})`,
+          "error",
+        );
+        return;
+      }
+    }
+    if (factura.tipoPago === "CreditoInicial") {
+      const montoEsperado = parseFloat(
+        Math.max(
+          0,
+          totales.total - sumaPagos - montoDetraccionAplicada,
+        ).toFixed(2),
+      );
+      if (Math.abs(sumaCuotas - montoEsperado) > 0.01) {
+        showToast(
+          `Pago inicial (${simbolo} ${sumaPagos.toFixed(2)}) + cuotas (${simbolo} ${sumaCuotas.toFixed(2)}) no coincide con el monto a crédito (${simbolo} ${(sumaPagos + sumaCuotas).toFixed(2)} vs ${simbolo} ${totales.total.toFixed(2)})`,
+          "error",
+        );
+        return;
       }
     }
 
@@ -1691,7 +1878,7 @@ function FacturaContent() {
       const resFactura = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/GenerarXml`,
         facturaFinal,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const comprobanteId = resFactura.data.comprobanteId;
 
@@ -1700,11 +1887,11 @@ function FacturaContent() {
 
       // Segunda API: enviar a SUNAT
       await enviarASunat(comprobanteId);
-
     } catch (err: any) {
       // Error en la primera API (GenerarXml / BD)
       const data = err?.response?.data;
-      const mensaje = data?.mensaje ?? data?.message ?? "Error al generar el comprobante";
+      const mensaje =
+        data?.mensaje ?? data?.message ?? "Error al generar el comprobante";
       const detalle = data?.detalle;
       setErrorEmision(detalle ? `${mensaje}: ${detalle}` : mensaje);
       showToast("Error al generar el comprobante.", "error");
@@ -1718,17 +1905,22 @@ function FacturaContent() {
       const resSunat = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
         null,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
       if (resSunat.data.exitoso) {
-        showToast(resSunat.data.mensaje ?? "Factura emitida correctamente.", "success");
+        showToast(
+          resSunat.data.mensaje ?? "Factura emitida correctamente.",
+          "success",
+        );
         setEmitido(true);
         procesarSegundoPlano(comprobanteId);
       } else {
         // SUNAT respondió pero rechazó — sin reintento
         const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
-        setErrorEmision(resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT");
+        setErrorEmision(
+          resSunat.data.mensaje ?? "Comprobante rechazado por SUNAT",
+        );
         showToast(`La factura ${serieCorrelativo} fue rechazada.`, "error");
         setEmitido(true);
         procesarSegundoPlano(comprobanteId);
@@ -1739,7 +1931,8 @@ function FacturaContent() {
       if (tieneRespuesta) {
         // SUNAT respondió con error HTTP — sin reintento
         const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
-        const mensaje = err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
+        const mensaje =
+          err?.response?.data?.mensaje ?? err?.response?.data?.message ?? "";
         setErrorEmision(mensaje || "Comprobante rechazado por SUNAT");
         showToast(`La factura ${serieCorrelativo} fue rechazada.`, "error");
         setEmitido(true);
@@ -1748,7 +1941,10 @@ function FacturaContent() {
         // SUNAT no responde / timeout — reintento silencioso
         const serieCorrelativo = `${factura.serie}-${factura.correlativo}`;
         setErrorEmision("No se pudo conectar con SUNAT.");
-        showToast(`La factura ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`, "error");
+        showToast(
+          `La factura ${serieCorrelativo} fue generada. Verificar estado en sección Comprobantes.`,
+          "error",
+        );
         setEmitido(true);
         procesarSegundoPlano(comprobanteId);
         reintentarEnSegundoPlano(comprobanteId); // ← sin await
@@ -1762,65 +1958,115 @@ function FacturaContent() {
     try {
       const resA4 = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (resA4.ok) {
         const blob = await resA4.blob();
-        setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+        setPdfA4Url(
+          URL.createObjectURL(new Blob([blob], { type: "application/pdf" })),
+        );
       }
-    } catch { showToast("Error al cargar el PDF", "error"); }
-    finally { setCargandoPreview(false); }
+    } catch {
+      showToast("Error al cargar el PDF", "error");
+    } finally {
+      setCargandoPreview(false);
+    }
 
     // ── PDF Ticket ──
     try {
       const resTicket = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=Ticket58mm`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (resTicket.ok) {
         const blob = await resTicket.blob();
-        setPdfTicketUrl(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+        setPdfTicketUrl(
+          URL.createObjectURL(new Blob([blob], { type: "application/pdf" })),
+        );
       }
     } catch {}
 
     // ── Correo y WhatsApp ──
-    if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
+    if (
+      (enviarCorreo && correoCliente) ||
+      (enviarWhatsapp && telefonoCliente)
+    ) {
       try {
         const corrNum = String(correlativoActual ?? 1).padStart(8, "0");
         const serieNum = `${factura.serie}-${corrNum}`;
         const resPdf = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/pdf?tamano=A4`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
+          { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         if (!resPdf.ok) throw new Error("No se pudo obtener el PDF");
         const pdfBlob = await resPdf.blob();
-        const pdfFile = new File([pdfBlob], `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, { type: "application/pdf" });
+        const pdfFile = new File(
+          [pdfBlob],
+          `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`,
+          { type: "application/pdf" },
+        );
 
         if (enviarCorreo && correoCliente) {
-          const correosLista = correoCliente.split(',').map(s => s.trim()).filter(Boolean);
+          const correosLista = correoCliente
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
           const comprobanteJson = JSON.stringify({
-            serieNumero: serieNum, estadoSunat: "ACEPTADO",
-            items: detalles.map(d => ({ descripcion: d.descripcion ?? "", cantidad: d.cantidad ?? 1, precioUnitario: d.precioUnitario ?? 0 })),
-            igv: totales.igv, total: totales.importeTotal,
+            serieNumero: serieNum,
+            estadoSunat: "ACEPTADO",
+            items: detalles.map((d) => ({
+              descripcion: d.descripcion ?? "",
+              cantidad: d.cantidad ?? 1,
+              precioUnitario: d.precioUnitario ?? 0,
+            })),
+            igv: totales.igv,
+            total: totales.importeTotal,
           });
           const resultadosCorreo = await Promise.allSettled(
-            correosLista.map(correo => {
+            correosLista.map((correo) => {
               const formData = new FormData();
               formData.append("toEmail", correo);
-              formData.append("toName", factura.cliente?.razonSocial ?? "Cliente");
+              formData.append(
+                "toName",
+                factura.cliente?.razonSocial ?? "Cliente",
+              );
               formData.append("subject", `Factura Electrónica ${serieNum}`);
-              formData.append("body", "Se emitió la factura electrónica por los productos/servicios indicados.");
+              formData.append(
+                "body",
+                "Se emitió la factura electrónica por los productos/servicios indicados.",
+              );
               formData.append("tipo", "1");
               formData.append("comprobanteJson", comprobanteJson);
               formData.append("adjunto", pdfFile);
-              return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/email/send`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: formData })
-                .then(res => { if (!res.ok) throw new Error(`Error correo ${correo}`); });
-            })
+              return fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/email/send`,
+                {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                  body: formData,
+                },
+              ).then((res) => {
+                if (!res.ok) throw new Error(`Error correo ${correo}`);
+              });
+            }),
           );
-          const fallidosCorreo = resultadosCorreo.filter(r => r.status === 'rejected').length;
-          if (fallidosCorreo === correosLista.length) showToast("Error al enviar por correo", "error");
-          else if (fallidosCorreo > 0) showToast(`Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`, "error");
-          else showToast(correosLista.length > 1 ? `Factura enviada a ${correosLista.length} correos` : "Comprobante enviado por correo", "success");
+          const fallidosCorreo = resultadosCorreo.filter(
+            (r) => r.status === "rejected",
+          ).length;
+          if (fallidosCorreo === correosLista.length)
+            showToast("Error al enviar por correo", "error");
+          else if (fallidosCorreo > 0)
+            showToast(
+              `Correo enviado, pero falló ${fallidosCorreo} destinatario(s)`,
+              "error",
+            );
+          else
+            showToast(
+              correosLista.length > 1
+                ? `Factura enviada a ${correosLista.length} correos`
+                : "Comprobante enviado por correo",
+              "success",
+            );
         }
 
         if (enviarWhatsapp && telefonoCliente) {
@@ -1829,63 +2075,89 @@ function FacturaContent() {
             const whatsappBase = "https://do.velsat.pe:8443/whatsapp";
             const uploadForm = new FormData();
             uploadForm.append("file", pdfFile);
-            const resUpload = await fetch(`${whatsappBase}/api/upload`, { method: "POST", headers: { "x-api-key": whatsappApiKey }, body: uploadForm });
+            const resUpload = await fetch(`${whatsappBase}/api/upload`, {
+              method: "POST",
+              headers: { "x-api-key": whatsappApiKey },
+              body: uploadForm,
+            });
             if (!resUpload.ok) throw new Error("No se pudo subir el PDF");
             const fileUrl = (await resUpload.json()).datos.url;
-            const telefonosLista = telefonoCliente.split(',').map(s => s.trim()).filter(Boolean);
+            const telefonosLista = telefonoCliente
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
             const resultadosWsp = await Promise.allSettled(
-              telefonosLista.map(num => {
-                const numeroFormateado = num.startsWith("51") ? num : `51${num}`;
+              telefonosLista.map((num) => {
+                const numeroFormateado = num.startsWith("51")
+                  ? num
+                  : `51${num}`;
                 return fetch(`${whatsappBase}/api/send/single`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json", "x-api-key": whatsappApiKey },
-                  body: JSON.stringify({ phone: numeroFormateado, type: "documento", file_url: fileUrl, filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`, mime_type: "application/pdf", text: `Estimado(a) ${factura.cliente?.razonSocial ?? ""}, adjuntamos su factura electrónica ${serieNum}.` }),
-                }).then(res => { if (!res.ok) throw new Error(`Error WhatsApp ${num}`); });
-              })
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": whatsappApiKey,
+                  },
+                  body: JSON.stringify({
+                    phone: numeroFormateado,
+                    type: "documento",
+                    file_url: fileUrl,
+                    filename: `${empresa?.numeroDocumento}-Factura-${serieNum}.pdf`,
+                    mime_type: "application/pdf",
+                    text: `Estimado(a) ${factura.cliente?.razonSocial ?? ""}, adjuntamos su factura electrónica ${serieNum}.`,
+                  }),
+                }).then((res) => {
+                  if (!res.ok) throw new Error(`Error WhatsApp ${num}`);
+                });
+              }),
             );
-            const fallidosWsp = resultadosWsp.filter(r => r.status === 'rejected').length;
-            if (fallidosWsp === telefonosLista.length) showToast("Error al enviar por WhatsApp", "error");
-            else if (fallidosWsp > 0) showToast(`WhatsApp enviado, pero falló ${fallidosWsp} número(s)`, "error");
-            else showToast(telefonosLista.length > 1 ? `Factura enviada a ${telefonosLista.length} números` : "Comprobante enviado por WhatsApp", "success");
-          } catch { showToast("Error al enviar por WhatsApp", "error"); }
+            const fallidosWsp = resultadosWsp.filter(
+              (r) => r.status === "rejected",
+            ).length;
+            if (fallidosWsp === telefonosLista.length)
+              showToast("Error al enviar por WhatsApp", "error");
+            else if (fallidosWsp > 0)
+              showToast(
+                `WhatsApp enviado, pero falló ${fallidosWsp} número(s)`,
+                "error",
+              );
+            else
+              showToast(
+                telefonosLista.length > 1
+                  ? `Factura enviada a ${telefonosLista.length} números`
+                  : "Comprobante enviado por WhatsApp",
+                "success",
+              );
+          } catch {
+            showToast("Error al enviar por WhatsApp", "error");
+          }
         }
-      } catch { showToast("Error al procesar envíos", "error"); }
-    }
-
-    // ── Stock ──
-    const itemsParaStock = detalles.filter(d => d.productoId && d._sucursalProductoId && d._tipoProducto === "BIEN");
-    if (itemsParaStock.length > 0) {
-      try {
-        await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/actualizarstock`,
-          itemsParaStock.map(d => ({ sucursalProductoId: d._sucursalProductoId, cantidad: d.cantidad ?? 1 })),
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        await fetchProductosSucursal();
-      } catch { console.error("Error al actualizar stock"); }
+      } catch {
+        showToast("Error al procesar envíos", "error");
+      }
     }
 
     // ── Correlativo ──
     const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
     const resSucursal = await axios.get(
       `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sucursalId}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     setCorrelativoActual(resSucursal.data.correlativoFactura);
-    setFactura(prev => ({
+    setFactura((prev) => ({
       ...prev,
       serie: resSucursal.data.serieFactura,
-      correlativo: String(resSucursal.data.correlativoFactura).padStart(8, "0")
+      correlativo: String(resSucursal.data.correlativoFactura).padStart(8, "0"),
     }));
   };
 
   // ── Reintento silencioso — solo si SUNAT no responde ────────
   const reintentarEnSegundoPlano = async (comprobanteId: number) => {
-    await new Promise(res => setTimeout(res, 3000));
+    await new Promise((res) => setTimeout(res, 3000));
     try {
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteId}/enviar-sunat`,
         null,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
     } catch {
       // silencioso
@@ -1984,10 +2256,7 @@ function FacturaContent() {
     <div className="space-y-2 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-
-          <Card
-    
-          >
+          <Card>
             {cargandoComprobante && (
               <div className="flex items-center pb-3 gap-2 text-xs text-brand-blue">
                 <div className="w-4 h-4 shrink-0 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
@@ -1997,10 +2266,9 @@ function FacturaContent() {
 
             <form className="space-y-3">
               {/* ── 2. Serie y correlativo ── */}
-        
 
               {/* ── 3. Datos del Cliente ── */}
-            <div className=" rounded-xl space-y-2">
+              <div className=" rounded-xl space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                     <UserRound className="w-4 h-4 text-brand-blue" />
@@ -2014,7 +2282,7 @@ function FacturaContent() {
                   {/* Columna izquierda: Tipo doc + Razón social */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-500 uppercase">
-                      Tipo y Nº Documento 
+                      Tipo y Nº Documento
                     </label>
                     <div className="flex gap-2">
                       <select
@@ -2148,16 +2416,34 @@ function FacturaContent() {
                     <div className="space-y-1">
                       <div
                         className={`flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2
-                        ${telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                        ${
+                          telefonoCliente &&
+                          !telefonoCliente
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean)
+                            .every((n) => n.startsWith("9") && n.length === 9)
+                            ? "border-red-300 bg-red-50"
+                            : "border-gray-200"
+                        }`}
                       >
                         <input
                           type="tel"
                           value={telefonoCliente}
                           onChange={(e) => {
-                            const s = e.target.value.replace(/[^\d,]/g, '');
+                            const s = e.target.value.replace(/[^\d,]/g, "");
                             setTelefonoCliente(s);
-                            const nums = s.split(',').map(x => x.trim()).filter(Boolean);
-                            if (!nums.length || !nums.every(n => n.startsWith('9') && n.length === 9)) setEnviarWhatsapp(false);
+                            const nums = s
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter(Boolean);
+                            if (
+                              !nums.length ||
+                              !nums.every(
+                                (n) => n.startsWith("9") && n.length === 9,
+                              )
+                            )
+                              setEnviarWhatsapp(false);
                           }}
                           disabled={!factura.cliente?.razonSocial}
                           placeholder="9XXXXXXXX, 9XXXXXXXX"
@@ -2167,16 +2453,36 @@ function FacturaContent() {
                           <input
                             type="checkbox"
                             checked={enviarWhatsapp}
-                            onChange={(e) => setEnviarWhatsapp(e.target.checked)}
-                            disabled={!telefonoCliente || !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9)}
+                            onChange={(e) =>
+                              setEnviarWhatsapp(e.target.checked)
+                            }
+                            disabled={
+                              !telefonoCliente ||
+                              !telefonoCliente
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .every(
+                                  (n) => n.startsWith("9") && n.length === 9,
+                                )
+                            }
                             className="w-3.5 h-3.5 accent-brand-blue"
                           />
                           <span className="text-xs text-gray-500">Enviar</span>
                         </label>
                       </div>
-                      {telefonoCliente && !telefonoCliente.split(',').map(s => s.trim()).filter(Boolean).every(n => n.startsWith('9') && n.length === 9) && (
-                        <p className="text-[10px] text-red-500 pl-1 mt-0.5">Cada número debe empezar con 9 y tener 9 dígitos</p>
-                      )}
+                      {telefonoCliente &&
+                        !telefonoCliente
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .every(
+                            (n) => n.startsWith("9") && n.length === 9,
+                          ) && (
+                          <p className="text-[10px] text-red-500 pl-1 mt-0.5">
+                            Cada número debe empezar con 9 y tener 9 dígitos
+                          </p>
+                        )}
                     </div>
                   </div>
 
@@ -2245,7 +2551,7 @@ function FacturaContent() {
                   />
                 </div>
 
-                  <div className="space-y-1.5">
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-500 uppercase">
                     Moneda
                   </label>
@@ -2341,13 +2647,9 @@ function FacturaContent() {
                     <option value="CreditoInicial">Crédito con Inicial</option>
                   </select>
                 </div>
-          
-
               </div>
 
               {/* ── Moneda y Tipo Pago ── */}
-            
-              
 
               {/* ── Pagos ── */}
               {(factura.tipoPago === "Contado" ||
@@ -2371,94 +2673,152 @@ function FacturaContent() {
                       )}
                     </div>
 
-<div className="space-y-3">
-  {pagos.map((pago, i) => (
-    <div key={i} className="pb-3 border-b border-gray-100 last:border-0">
-      <div className="flex items-end gap-3">
+                    <div className="space-y-3">
+                      {pagos.map((pago, i) => (
+                        <div
+                          key={i}
+                          className="pb-3 border-b border-gray-100 last:border-0"
+                        >
+                          <div className="flex items-end gap-3">
+                            <div className="space-y-1.5 w-36 shrink-0">
+                              <label className="text-xs text-gray-500">
+                                Medio de Pago
+                              </label>
+                              <select
+                                value={pago.medioPago}
+                                onChange={(e) =>
+                                  actualizarPago(i, "medioPago", e.target.value)
+                                }
+                                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                              >
+                                {todosMedios.map((m) => (
+                                  <option
+                                    key={m}
+                                    value={m}
+                                    disabled={
+                                      mediosUsados.includes(m) &&
+                                      pago.medioPago !== m
+                                    }
+                                  >
+                                    {m}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
 
-        <div className="space-y-1.5 w-36 shrink-0">
-          <label className="text-xs text-gray-500">Medio de Pago</label>
-          <select
-            value={pago.medioPago}
-            onChange={(e) => actualizarPago(i, "medioPago", e.target.value)}
-            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-          >
-            {todosMedios.map((m) => (
-              <option key={m} value={m} disabled={mediosUsados.includes(m) && pago.medioPago !== m}>{m}</option>
-            ))}
-          </select>
-        </div>
+                            <div className="space-y-1.5 w-32 shrink-0">
+                              <label className="text-xs text-gray-500">
+                                Monto
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  value={pago.monto}
+                                  onChange={(e) => {
+                                    actualizarPago(i, "monto", e.target.value);
+                                    setPagosEditados((prev) => {
+                                      const n = [...prev];
+                                      n[i] = e.target.value !== "";
+                                      return n;
+                                    });
+                                  }}
+                                  onBlur={(e) => {
+                                    if (
+                                      e.target.value === "" ||
+                                      e.target.value === "0"
+                                    ) {
+                                      setPagosEditados((prev) => {
+                                        const n = [...prev];
+                                        n[i] = false;
+                                        return n;
+                                      });
+                                      actualizarPago(i, "monto", "");
+                                    }
+                                  }}
+                                  placeholder={montoRestante(i)}
+                                  disabled={
+                                    pago.medioPago === "Efectivo" &&
+                                    pagos.length === 1 &&
+                                    factura.tipoPago !== "CreditoInicial"
+                                  }
+                                  className={`w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
+                ${pago.medioPago === "Efectivo" && pagos.length === 1 && factura.tipoPago !== "CreditoInicial" ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+                                />
+                                {pagos.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => eliminarPago(i)}
+                                    className="text-red-400 hover:text-red-600 px-1"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
 
-        <div className="space-y-1.5 w-32 shrink-0">
-          <label className="text-xs text-gray-500">Monto</label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={pago.monto}
-              onChange={(e) => {
-                actualizarPago(i, "monto", e.target.value);
-                setPagosEditados((prev) => { const n = [...prev]; n[i] = e.target.value !== ""; return n; });
-              }}
-              onBlur={(e) => {
-                if (e.target.value === "" || e.target.value === "0") {
-                  setPagosEditados((prev) => { const n = [...prev]; n[i] = false; return n; });
-                  actualizarPago(i, "monto", "");
-                }
-              }}
-              placeholder={montoRestante(i)}
-              disabled={pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial'}
-              className={`w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm
-                ${pago.medioPago === 'Efectivo' && pagos.length === 1 && factura.tipoPago !== 'CreditoInicial' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-            />
-            {pagos.length > 1 && (
-              <button type="button" onClick={() => eliminarPago(i)} className="text-red-400 hover:text-red-600 px-1">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
+                            {pago.medioPago !== "Efectivo" && (
+                              <>
+                                <div className="space-y-1.5 w-36 shrink-0">
+                                  <label className="text-xs text-gray-500">
+                                    Nº Operación
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={pago.numeroOperacion}
+                                    onChange={(e) =>
+                                      actualizarPago(
+                                        i,
+                                        "numeroOperacion",
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Nº operación"
+                                    className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-1.5 w-36 shrink-0">
+                                  <label className="text-xs text-gray-500">
+                                    Entidad Financiera
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={pago.entidadFinanciera}
+                                    onChange={(e) =>
+                                      actualizarPago(
+                                        i,
+                                        "entidadFinanciera",
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Banco / entidad"
+                                    className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                                  />
+                                </div>
+                              </>
+                            )}
 
-        {pago.medioPago !== "Efectivo" && (
-          <>
-            <div className="space-y-1.5 w-36 shrink-0">
-              <label className="text-xs text-gray-500">Nº Operación</label>
-              <input
-                type="text"
-                value={pago.numeroOperacion}
-                onChange={(e) => actualizarPago(i, "numeroOperacion", e.target.value)}
-                placeholder="Nº operación"
-                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-              />
-            </div>
-            <div className="space-y-1.5 w-36 shrink-0">
-              <label className="text-xs text-gray-500">Entidad Financiera</label>
-              <input
-                type="text"
-                value={pago.entidadFinanciera}
-                onChange={(e) => actualizarPago(i, "entidadFinanciera", e.target.value)}
-                placeholder="Banco / entidad"
-                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-              />
-            </div>
-          </>
-        )}
-
-        <div className="space-y-1.5 flex-1">
-          <label className="text-xs text-gray-500">Observaciones</label>
-          <input
-            type="text"
-            value={pago.observaciones}
-            onChange={(e) => actualizarPago(i, "observaciones", e.target.value)}
-            placeholder="Observaciones (opcional)"
-            className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-          />
-        </div>
-
-      </div>
-    </div>
-  ))}
-</div>
-
+                            <div className="space-y-1.5 flex-1">
+                              <label className="text-xs text-gray-500">
+                                Observaciones
+                              </label>
+                              <input
+                                type="text"
+                                value={pago.observaciones}
+                                onChange={(e) =>
+                                  actualizarPago(
+                                    i,
+                                    "observaciones",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Observaciones (opcional)"
+                                className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
                     {factura.tipoPago === "CreditoInicial" && (
                       <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
@@ -2575,14 +2935,21 @@ function FacturaContent() {
                     {/* Monto base informativo debajo de cuotas */}
                     <div className="flex justify-end text-xs pt-2 gap-2 border-t border-gray-100">
                       <span className="text-gray-400">
-                        {aplicarDetraccion ? 'Monto base crédito después de detracción: ' : 'Monto base crédito: '}
+                        {aplicarDetraccion
+                          ? "Monto base crédito después de detracción: "
+                          : "Monto base crédito: "}
                       </span>
                       <span className="font-semibold text-brand-blue">
-                        {simbolo} {Math.max(
+                        {simbolo}{" "}
+                        {Math.max(
                           0,
-                          totales.total
-                          - (aplicarDetraccion ? detraccion.montoDetraccion : 0)
-                          - (factura.tipoPago === 'CreditoInicial' ? totalPagado : 0)
+                          totales.total -
+                            (aplicarDetraccion
+                              ? detraccion.montoDetraccion
+                              : 0) -
+                            (factura.tipoPago === "CreditoInicial"
+                              ? totalPagado
+                              : 0),
                         ).toFixed(2)}
                       </span>
                     </div>
@@ -3071,25 +3438,10 @@ function FacturaContent() {
                                             <button
                                               key={p.productoId}
                                               type="button"
-                                              disabled={
-                                                p.tipoProducto === "BIEN" &&
-                                                p.sucursalProducto.stock === 0
+                                              onMouseDown={() =>
+                                                seleccionarProducto(p, i)
                                               }
-                                              onMouseDown={() => {
-                                                if (
-                                                  p.tipoProducto === "BIEN" &&
-                                                  p.sucursalProducto.stock === 0
-                                                )
-                                                  return;
-                                                seleccionarProducto(p, i);
-                                              }}
-                                              className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0
-                                            ${
-                                              p.tipoProducto === "BIEN" &&
-                                              p.sucursalProducto.stock === 0
-                                                ? "opacity-50 cursor-not-allowed bg-gray-50"
-                                                : "hover:bg-gray-50"
-                                            }`}
+                                              className="w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50"
                                             >
                                               <p className="text-xs font-medium text-gray-800">
                                                 {p.nomProducto}
@@ -3098,21 +3450,6 @@ function FacturaContent() {
                                                 {p.codigo} · S/{" "}
                                                 {p.sucursalProducto.precioUnitario.toFixed(
                                                   2,
-                                                )}
-                                                {p.tipoProducto === "BIEN" && (
-                                                  <span
-                                                    className={
-                                                      p.sucursalProducto
-                                                        .stock === 0
-                                                        ? " text-red-400"
-                                                        : " text-green-600"
-                                                    }
-                                                  >
-                                                    {p.sucursalProducto
-                                                      .stock === 0
-                                                      ? " · Sin stock"
-                                                      : ` · Stock: ${p.sucursalProducto.stock}`}
-                                                  </span>
                                                 )}
                                               </p>
                                             </button>
@@ -3200,14 +3537,6 @@ function FacturaContent() {
                                         +
                                       </button>
                                     </div>
-                                    {d._tipoProducto === "BIEN" &&
-                                      d._stockDisponible != null && (
-                                        <p
-                                          className={`text-[9px] text-center ${d._stockDisponible === 0 ? "text-red-500" : (d.cantidad ?? 1) > d._stockDisponible ? "text-red-400" : "text-gray-400"}`}
-                                        >
-                                          Stock: {d._stockDisponible}
-                                        </p>
-                                      )}
                                   </div>
                                 )}
                               </td>
@@ -3229,7 +3558,9 @@ function FacturaContent() {
                                   <option value="11">
                                     11 - Grav. Gratuito
                                   </option>
-                                  <option value="21">21 - Exon. Gratuito</option>
+                                  <option value="21">
+                                    21 - Exon. Gratuito
+                                  </option>
                                   <option value="31">
                                     31 - Inaf. Gratuito
                                   </option>
@@ -3287,7 +3618,12 @@ function FacturaContent() {
                                 <div className="relative w-full">
                                   <select
                                     value={d.codigoTipoDescuento ?? "01"}
-                                    onChange={e => actualizarCodigoDescuento(i, e.target.value)}
+                                    onChange={(e) =>
+                                      actualizarCodigoDescuento(
+                                        i,
+                                        e.target.value,
+                                      )
+                                    }
                                     disabled={!!d._esIcbper || esPorConsumo}
                                     style={{ color: "transparent" }}
                                     className={`w-full py-1 pl-1 pr-4 border rounded-lg text-xs outline-none focus:border-brand-blue appearance-none ${
@@ -3296,8 +3632,18 @@ function FacturaContent() {
                                         : "bg-gray-50 border-gray-200"
                                     }`}
                                   >
-                                    <option style={{ color: "#374151" }} value="00">00 - Afecta base</option>
-                                    <option style={{ color: "#374151" }} value="01">01 - No afecta base</option>
+                                    <option
+                                      style={{ color: "#374151" }}
+                                      value="00"
+                                    >
+                                      00 - Afecta base
+                                    </option>
+                                    <option
+                                      style={{ color: "#374151" }}
+                                      value="01"
+                                    >
+                                      01 - No afecta base
+                                    </option>
                                   </select>
                                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-mono text-gray-700">
                                     {d.codigoTipoDescuento ?? "01"}
@@ -3363,15 +3709,15 @@ function FacturaContent() {
 
                 {/* Aviso gratuitas */}
                 {totales.hayGratuitas && (
-                <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-100 rounded-lg">
-                  <Info size={14} className="text-green-700 shrink-0" />
-                  <span className="text-[10px] text-green-700">
-                    Los ítems gratuitos (11, 21, 31) tienen precio de venta{" "}
-                    <strong>S/ 0.00</strong>. El IGV del tipo 11 se informa a
-                    SUNAT pero no se cobra.
-                  </span>
-                </div>
-              )}
+                  <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-100 rounded-lg">
+                    <Info size={14} className="text-green-700 shrink-0" />
+                    <span className="text-[10px] text-green-700">
+                      Los ítems gratuitos (11, 21, 31) tienen precio de venta{" "}
+                      <strong>S/ 0.00</strong>. El IGV del tipo 11 se informa a
+                      SUNAT pero no se cobra.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* ── Bolsa Plástica — req 5 ── */}
@@ -3579,126 +3925,133 @@ function FacturaContent() {
 
         {/* ── Sidebar ── */}
         <div className="space-y-6">
-          <Card title="Vista Previa" subtitle="Representación gráfica del comprobante">
+          <Card
+            title="Vista Previa"
+            subtitle="Representación gráfica del comprobante"
+          >
+            {/* ── Serie y correlativo ── */}
 
-     {/* ── Serie y correlativo ── */}
+            <div>
+              {isSuperAdmin ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-600 uppercase">
+                      Sucursal
+                    </label>
+                    <select
+                      value={sucursal?.sucursalId ?? ""}
+                      disabled={loadingSucursales}
+                      onChange={async (e) => {
+                        if (!e.target.value) {
+                          setSucursal(null);
+                          setCorrelativoActual(null);
+                          setDetalles([]);
+                          setBusquedaProducto([]);
+                          setShowDropdownProducto([]);
+                          setCantidadBolsa(0);
+                          return;
+                        }
+                        const sel = sucursales.find(
+                          (s: Sucursal) =>
+                            s.sucursalId === Number(e.target.value),
+                        );
+                        if (!sel) return;
+                        setSucursal(sel);
+                        setDetalles([]);
+                        setBusquedaProducto([]);
+                        setShowDropdownProducto([]);
+                        setCantidadBolsa(0);
+                        const res = await axios.get(
+                          `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
+                          {
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                          },
+                        );
+                        setCorrelativoActual(res.data.correlativoFactura);
+                        setFactura((prev) => ({
+                          ...prev,
+                          serie: sel.serieFactura,
+                          correlativo: String(
+                            res.data.correlativoFactura,
+                          ).padStart(8, "0"),
+                        }));
+                      }}
+                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
+                    >
+                      <option value="">Seleccionar sucursal</option>
+                      {sucursales.map((s: Sucursal) => (
+                        <option key={s.sucursalId} value={s.sucursalId}>
+                          {s.serieFactura} — {s.nombre ?? s.codEstablecimiento}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-<div>
-  {isSuperAdmin ? (
-    <>
-      <div className="space-y-1.5">
-        <label className="text-[10px] font-bold text-gray-600 uppercase">
-          Sucursal
-        </label>
-        <select
-          value={sucursal?.sucursalId ?? ""}
-          disabled={loadingSucursales}
-          onChange={async (e) => {
-            if (!e.target.value) {
-              setSucursal(null);
-              setCorrelativoActual(null);
-              setDetalles([]);
-              setBusquedaProducto([]);
-              setShowDropdownProducto([]);
-              setCantidadBolsa(0);
-              return;
-            }
-            const sel = sucursales.find(
-              (s: Sucursal) => s.sucursalId === Number(e.target.value),
-            );
-            if (!sel) return;
-            setSucursal(sel);
-            setDetalles([]);
-            setBusquedaProducto([]);
-            setShowDropdownProducto([]);
-            setCantidadBolsa(0);
-            const res = await axios.get(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Sucursal/${sel.sucursalId}`,
-              { headers: { Authorization: `Bearer ${accessToken}` } },
-            );
-            setCorrelativoActual(res.data.correlativoFactura);
-            setFactura((prev) => ({
-              ...prev,
-              serie: sel.serieFactura,
-              correlativo: String(res.data.correlativoFactura).padStart(8, "0"),
-            }));
-          }}
-          className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm"
-        >
-          <option value="">Seleccionar sucursal</option>
-          {sucursales.map((s: Sucursal) => (
-            <option key={s.sucursalId} value={s.sucursalId}>
-              {s.serieFactura} — {s.nombre ?? s.codEstablecimiento}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Info serie - estilos compactos */}
-      <div
-        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full mt-3 text-sm ${
-          !sucursal
-            ? "bg-amber-50 border-amber-200"
-            : serieDisplay
-              ? "bg-green-50 border-green-300"
-              : "bg-gray-50 border-gray-200"
-        }`}
-      >
-        {!sucursal ? (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-3.5 h-3.5 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
-            </svg>
-            <span>Elige una sucursal</span>
-          </span>
-        ) : !serieDisplay ? (
-          <span className="text-xs text-gray-400">Sin serie</span>
-        ) : (
-          <>
-            <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
-              Factura:
-            </p>
-            <span className="text-xs font-mono font-semibold text-gray-800">
-              {serieDisplay}-{correlativoDisplay}
-            </span>
-          </>
-        )}
-      </div>
-    </>
-  ) : (
-    <div
-      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
-        serieDisplay
-          ? "bg-green-50 border-green-300"
-          : "bg-gray-50 border-gray-200"
-      }`}
-    >
-      {loadingSucursal ? (
-        <span className="text-gray-400 text-xs">Cargando...</span>
-      ) : !serieDisplay ? (
-        <span className="text-xs text-gray-400">Sin serie</span>
-      ) : (
-        <>
-          <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
-            Factura:
-          </p>
-          <span className="text-xs font-mono font-semibold text-gray-800">
-            {serieDisplay}-{correlativoDisplay}
-          </span>
-        </>
-      )}
-    </div>
-  )}
-</div>
+                  {/* Info serie - estilos compactos */}
+                  <div
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full mt-3 text-sm ${
+                      !sucursal
+                        ? "bg-amber-50 border-amber-200"
+                        : serieDisplay
+                          ? "bg-green-50 border-green-300"
+                          : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    {!sucursal ? (
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="w-3.5 h-3.5 shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 21h18M9 8h1m-1 4h1m4-4h1m-1 4h1M5 21V7l7-4 7 4v14" />
+                        </svg>
+                        <span>Elige una sucursal</span>
+                      </span>
+                    ) : !serieDisplay ? (
+                      <span className="text-xs text-gray-400">Sin serie</span>
+                    ) : (
+                      <>
+                        <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+                          Factura:
+                        </p>
+                        <span className="text-xs font-mono font-semibold text-gray-800">
+                          {serieDisplay}-{correlativoDisplay}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border w-full text-sm ${
+                    serieDisplay
+                      ? "bg-green-50 border-green-300"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  {loadingSucursal ? (
+                    <span className="text-gray-400 text-xs">Cargando...</span>
+                  ) : !serieDisplay ? (
+                    <span className="text-xs text-gray-400">Sin serie</span>
+                  ) : (
+                    <>
+                      <p className="text-[11px] font-bold uppercase text-gray-500 tracking-wide">
+                        Factura:
+                      </p>
+                      <span className="text-xs font-mono font-semibold text-gray-800">
+                        {serieDisplay}-{correlativoDisplay}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="mb-3 mt-3">
               <select
@@ -3711,14 +4064,21 @@ function FacturaContent() {
                   try {
                     const res = await fetch(
                       `${process.env.NEXT_PUBLIC_API_URL}/api/Comprobantes/${comprobanteIdEmitido}/pdf?tamano=${e.target.value}`,
-                      { headers: { Authorization: `Bearer ${accessToken}` } }
+                      { headers: { Authorization: `Bearer ${accessToken}` } },
                     );
                     if (res.ok) {
                       const blob = await res.blob();
-                      setPdfA4Url(URL.createObjectURL(new Blob([blob], { type: "application/pdf" })));
+                      setPdfA4Url(
+                        URL.createObjectURL(
+                          new Blob([blob], { type: "application/pdf" }),
+                        ),
+                      );
                     }
-                  } catch { showToast("Error al cargar el PDF", "error"); }
-                  finally { setCargandoPreview(false); }
+                  } catch {
+                    showToast("Error al cargar el PDF", "error");
+                  } finally {
+                    setCargandoPreview(false);
+                  }
                 }}
                 className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-brand-blue"
               >
@@ -3732,14 +4092,21 @@ function FacturaContent() {
 
             {pdfA4Url && !cargandoPreview ? (
               <div className="space-y-3">
-                <iframe src={pdfA4Url} className="w-full rounded-lg border border-gray-200" style={{ height: "400px" }} />
+                <iframe
+                  src={pdfA4Url}
+                  className="w-full rounded-lg border border-gray-200"
+                  style={{ height: "400px" }}
+                />
                 <div className="flex gap-2">
-                  <button type="button"
+                  <button
+                    type="button"
                     onClick={() => window.open(pdfA4Url, "_blank")}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-violet-500 hover:bg-violet-400 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200">
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-violet-500 hover:bg-violet-400 active:scale-95 shadow-sm py-2.5 rounded-lg transition-all duration-200"
+                  >
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir
                   </button>
-                  <button type="button"
+                  <button
+                    type="button"
                     disabled={descargando}
                     onClick={async () => {
                       setDescargando(true);
@@ -3748,40 +4115,64 @@ function FacturaContent() {
                         a.href = pdfA4Url;
                         a.download = `${empresa?.numeroDocumento}-01-${factura.serie}-${factura.correlativo}.pdf`;
                         a.click();
-                      } finally { setTimeout(() => setDescargando(false), 1000); }
+                      } finally {
+                        setTimeout(() => setDescargando(false), 1000);
+                      }
                     }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-70">
-                    {descargando
-                      ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Descargando...</>
-                      : <><Download className="w-3.5 h-3.5" /> Descargar</>
-                    }
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-70"
+                  >
+                    {descargando ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                        Descargando...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5" /> Descargar
+                      </>
+                    )}
                   </button>
-                  <button type="button"
+                  <button
+                    type="button"
                     disabled={!pdfA4Url}
                     onClick={imprimirPdf}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50">
-                    {!pdfA4Url
-                      ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
-                      : <><Printer className="w-3.5 h-3.5" /> Imprimir</>
-                    }
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 active:scale-95 py-2.5 rounded-lg transition-all duration-200 shadow-sm disabled:opacity-50"
+                  >
+                    {!pdfA4Url ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="w-3.5 h-3.5" /> Imprimir
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             ) : cargandoPreview ? (
-              <div className="w-full flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200" style={{ height: "400px" }}>
+              <div
+                className="w-full flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200"
+                style={{ height: "400px" }}
+              >
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
                   <p className="text-xs text-gray-400">Cargando PDF...</p>
                 </div>
               </div>
             ) : (
-        <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
+              <div className="h-68 bg-gray-50 rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center space-y-2">
                 <div className="p-4 rounded-full bg-white shadow-sm">
                   <Printer className="w-8 h-8 text-gray-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Previsualización del PDF</p>
-                  <p className="text-xs text-gray-400 mt-1">Se generará automáticamente al emitir</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Previsualización del PDF
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Se generará automáticamente al emitir
+                  </p>
                 </div>
               </div>
             )}
@@ -3795,7 +4186,9 @@ function FacturaContent() {
                   emitiendo ||
                   (!emitido && sinSucursal) ||
                   (!emitido && !serieDisplay) ||
-                  (!emitido && !factura.cliente?.razonSocial && !factura.cliente?.numeroDocumento) ||
+                  (!emitido &&
+                    !factura.cliente?.razonSocial &&
+                    !factura.cliente?.numeroDocumento) ||
                   (!emitido && detalles.length === 0)
                 }
               >
@@ -3804,10 +4197,22 @@ function FacturaContent() {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Emitiendo...
                   </span>
-                ) : emitido ? "Nueva Factura" : "Emitir Factura"}
+                ) : emitido ? (
+                  "Nueva Factura"
+                ) : (
+                  "Emitir Factura"
+                )}
               </Button>
-              {sinSucursal && <p className="text-xs text-amber-600 text-center">Selecciona una sucursal para emitir</p>}
-              {errorEmision && <p className="text-xs text-red-500 text-center">{errorEmision}</p>}
+              {sinSucursal && (
+                <p className="text-xs text-amber-600 text-center">
+                  Selecciona una sucursal para emitir
+                </p>
+              )}
+              {errorEmision && (
+                <p className="text-xs text-red-500 text-center">
+                  {errorEmision}
+                </p>
+              )}
               {/* <Button variant="outline" className="w-full" type="button">Guardar como Borrador</Button> */}
             </div>
           </Card>
