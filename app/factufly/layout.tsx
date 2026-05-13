@@ -3,19 +3,17 @@ import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FileText, Users, Package,
-  BarChart3, Zap, Settings, UserCircle, Download, Plus, FileBox,
+  BarChart3, Zap, Settings, UserCircle,
   Building2,
   Grip,
   Truck,
-  DollarSign
+  DollarSign,
+  Wallet
 } from 'lucide-react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Topbar } from '../components/layout/Topbar';
 import { ToastProvider } from '../components/ui/Toast';
-import { Button } from '../components/ui/Button';
 import { MenuItem, View } from '../types';
-import { RECENT_DOCS } from '../components/data/mockData';
-
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -30,24 +28,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [pathname]);
 
-  const handleExport = () => {
-    const headers = "Fecha,ID Comprobante,Cliente,Total,Estado\n";
-    const rows = RECENT_DOCS.map(doc => `${doc.date},${doc.id},"${doc.client}",${doc.total},${doc.status}`).join("\n");
-    const csvContent = "data:text/csv;charset=utf-8," + headers + rows;
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `reporte_ventas_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'operaciones', label: 'Emisión', icon: Grip },
     { id: 'comprobantes', label: 'Comprobantes', icon: FileText },
-    { id: 'guiasremision', label: 'Guias de Remision', icon: Truck },
+    { id: 'guiasremision', label: 'Guias de Remisión', icon: Truck },
+    { id: 'deudasporcobrar', label: 'Deudas por Cobrar', icon: Wallet },
     { id: 'cuentasporcobrar', label: 'Cuentas por Cobrar', icon: DollarSign },
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'productos', label: 'Productos', icon: Package },
@@ -75,7 +61,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
           <main className="flex-1 px-6  overflow-y-auto overflow-x-hidden custom-scrollbar py-2">
             <div className="mx-auto">
-          
               {children}
             </div>
           </main>
