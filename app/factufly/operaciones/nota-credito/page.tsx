@@ -587,28 +587,6 @@ function NotaCreditoContent() {
     return true;
   };
 
-  // ── Stock devolución ─────────────────────────────────────────
-const actualizarStockDevolucion = async () => {
-  if (!MOTIVOS_DEVOLUCION_STOCK.includes(codMotivo)) return;
-  const items = detalles.filter((d) => d.productoId && d.productoId > 0);
-  if (!items.length) return;
-  
-  const sucursalId = isSuperAdmin ? sucursal?.sucursalId : user?.sucursalID;
-  if (!sucursalId) return;
-  console.log("items a actualizar", items)
-  try {
-    await axios.put(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/productos/devolverstock`,
-      items.map((d) => ({
-        productoId: d.productoId,
-        sucursalId: sucursalId,
-        cantidad: Number(d.cantidad) || 0,
-      })),
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-  } catch { console.error("Error al actualizar stock"); }
-};
-
   // ── Emitir ───────────────────────────────────────────────────
   const emitirNotaCredito = async () => {
     if (!validar()) return;
@@ -695,7 +673,6 @@ const actualizarStockDevolucion = async () => {
 
   const procesarSegundoPlano = async (comprobanteId: number, payload: NotaCredito) => {
     await cargarPdf(comprobanteId, tamanoPdf);
-    await actualizarStockDevolucion();
 
     if ((enviarCorreo && correoCliente) || (enviarWhatsapp && telefonoCliente)) {
       const serieNum = `${payload.serie}-${payload.correlativo}`;
