@@ -668,10 +668,10 @@ export default function ConfiguracionPage() {
     setLoadingEmpresa(true);
     axios
       .get(`${BASE_URL}/api/companies/${ruc}?t=${Date.now()}`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${accessToken}`,
           "Cache-Control": "no-cache",
-          "Pragma": "no-cache"
+          Pragma: "no-cache",
         },
       })
       .then((res) => {
@@ -703,7 +703,7 @@ export default function ConfiguracionPage() {
     // Cargar logo desde nueva API
     axios
       .get(`${BASE_URL}/api/companies/logo?ruc=${ruc}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: { Authorization: `Bearer ${accessToken}` },
       })
       .then((res) => {
         const data = res.data;
@@ -731,10 +731,10 @@ export default function ConfiguracionPage() {
     if (isSuperAdmin) {
       axios
         .get(`${BASE_URL}/api/Sucursal?ruc=${ruc}&t=${Date.now()}`, {
-          headers: { 
+          headers: {
             Authorization: `Bearer ${accessToken}`,
             "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
+            Pragma: "no-cache",
           },
         })
         .then((res) => setSucursales(res.data ?? []))
@@ -748,10 +748,10 @@ export default function ConfiguracionPage() {
       }
       axios
         .get(`${BASE_URL}/api/Sucursal/${sucursalId}?t=${Date.now()}`, {
-          headers: { 
+          headers: {
             Authorization: `Bearer ${accessToken}`,
             "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
+            Pragma: "no-cache",
           },
         })
         .then((res) => setSucursales([res.data]))
@@ -807,7 +807,7 @@ export default function ConfiguracionPage() {
 
       // Validación específica para teléfono (Perú: 9 dígitos, empieza con 9)
       if (key === "telefono") {
-        value = value.replace(/\D/g, "").slice(0, 9);
+        value = value.replace(/[^0-9\s\-]/g, "").slice(0, 25);
       }
 
       setForm((f) => ({ ...f, [key]: value }));
@@ -835,18 +835,10 @@ export default function ConfiguracionPage() {
       return;
     }
 
-    // Validación de Teléfono (Perú: 9 dígitos y empieza con 9)
     // Se hace obligatorio porque la API no permite borrarlo una vez establecido
     if (!form.telefono) {
       showToast(
         "El teléfono no puede quedar vacío. Si deseas cambiarlo, ingresa el nuevo número.",
-        "error",
-      );
-      return;
-    }
-    if (!/^9\d{8}$/.test(form.telefono)) {
-      showToast(
-        "El teléfono debe tener exactamente 9 dígitos y empezar con 9",
         "error",
       );
       return;
@@ -956,7 +948,7 @@ export default function ConfiguracionPage() {
             <>
               {isFacturador && <ReadOnlyBanner />}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3" >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <LogoUploader
                   logoDataUrl={logoDataUrl}
                   uploading={uploadingLogo}
@@ -973,7 +965,6 @@ export default function ConfiguracionPage() {
                     subtitle="Datos registrados en SUNAT"
                   />
                 </div>
-                
 
                 <Input
                   label="RUC"
@@ -1065,11 +1056,12 @@ export default function ConfiguracionPage() {
                   onChange={upd("telefono")}
                   required
                   placeholder="999 123 456"
-                  type="tel"
+                  type="text"
                   disabled={!canEdit}
-                  maxLength={9}
+                  maxLength={25}
                   hint="Formato Perú: 9 dígitos, empieza con 9"
                 />
+
                 <Input
                   label="Email"
                   value={form.email}
