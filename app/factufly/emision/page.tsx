@@ -881,6 +881,20 @@ export default function EmisionRapidaPage({
       showToast("Debe ingresar un cliente", "error");
       return;
     }
+
+    // Validar longitud de documento
+    if (!clienteVarios && clienteSeleccionado) {
+      const numDoc = clienteSeleccionado.numeroDocumento;
+      if (tipo === "boleta" && tipoDoc === "01" && numDoc.length !== 8) {
+        showToast("El DNI debe tener exactamente 8 dígitos", "error");
+        return;
+      }
+      if (tipo === "factura" && tipoDoc === "06" && numDoc.length !== 11) {
+        showToast("El RUC debe tener exactamente 11 dígitos", "error");
+        return;
+      }
+    }
+
     if (
       tipo === "factura" &&
       clienteSeleccionado?.tipoDocumento !== "06" &&
@@ -1435,6 +1449,14 @@ export default function EmisionRapidaPage({
       setTimeout(() => document.body.removeChild(iframe), 1000);
     };
   };
+
+  const longEsperadaDoc = tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : null;
+  const docInvalido =
+    !clienteVarios &&
+    !!busqueda &&
+    longEsperadaDoc !== null &&
+    busqueda.length !== longEsperadaDoc;
+
   //activar boton emitir
   const puedeEmitir =
     !emitiendo &&
@@ -1545,6 +1567,7 @@ export default function EmisionRapidaPage({
                       <option value="04">CE</option>
                     </select>
                   )}
+
                   <div className="relative w-2/3">
                     <input
                       type="text"
@@ -1581,7 +1604,8 @@ export default function EmisionRapidaPage({
                             ? "8 dígitos DNI"
                             : "Nº documento"
                       }
-                      className="w-full pl-4 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 transition-all disabled:opacity-50"
+                      className={`w-full pl-4 pr-10 py-2 bg-gray-50 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-blue/10 transition-all disabled:opacity-50
+                        ${docInvalido ? "border-red-300 bg-red-50 focus:border-red-400" : "border-gray-200 focus:border-brand-blue"}`}
                     />
                     {loadingCli && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
@@ -1604,6 +1628,13 @@ export default function EmisionRapidaPage({
                           ))}
                         </div>
                       )}
+                    {docInvalido && (
+                      <p className="text-[10px] text-red-500 pl-1 mt-1">
+                        {tipoDoc === "01"
+                          ? "El DNI debe tener 8 dígitos"
+                          : "El RUC debe tener 11 dígitos"}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {/* Razón social */}

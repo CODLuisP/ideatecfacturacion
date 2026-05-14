@@ -1608,6 +1608,16 @@ function BoletaContent() {
       showToast("Debe seleccionar o ingresar un cliente", "error");
       return;
     }
+    if (docInvalido) {
+      showToast(
+        tipoDoc === "01"
+          ? "El DNI debe tener exactamente 8 dígitos"
+          : "El RUC debe tener exactamente 11 dígitos",
+        "error",
+      );
+      return;
+    }
+
     const itemsReales = detalles.filter((d) => !d._esIcbper);
     if (!itemsReales.length) {
       showToast("Debe agregar al menos un ítem", "error");
@@ -2072,9 +2082,17 @@ function BoletaContent() {
     correlativoActual ?? sucursal?.correlativoBoleta ?? "",
   ).padStart(8, "0");
 
+  const longEsperadaDoc = tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : null;
+  const docInvalido =
+    !clienteVarios &&
+    !!busqueda &&
+    longEsperadaDoc !== null &&
+    busqueda.length !== longEsperadaDoc;
+
   const puedeEmitir =
     !emitiendo &&
     !sinSucursal &&
+    !docInvalido &&
     !!boleta.cliente?.razonSocial &&
     detalles.filter((d) => !d._esIcbper).length > 0;
   // ── Render ───────────────────────────────────────────────────
@@ -2166,7 +2184,8 @@ function BoletaContent() {
                             tipoDoc === "01" ? 8 : tipoDoc === "06" ? 11 : 12
                           }
                           placeholder="Buscar por nº doc o nombre..."
-                          className="w-full pl-4 pr-10 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-sm disabled:opacity-50"
+                          className={`w-full pl-4 pr-10 py-2 bg-white border rounded-xl focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all text-sm disabled:opacity-50
+                            ${docInvalido ? "border-red-300 bg-red-50 focus:border-red-400" : "border-gray-200 focus:border-brand-blue"}`}
                         />
                         {loadingCliente && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin" />
@@ -2225,6 +2244,13 @@ function BoletaContent() {
                     </div>
                     {errorCliente && (
                       <p className="text-xs text-red-500">{errorCliente}</p>
+                    )}
+                    {docInvalido && (
+                      <p className="text-[10px] text-red-500 pl-1 mt-0.5">
+                        {tipoDoc === "01"
+                          ? "El DNI debe tener 8 dígitos"
+                          : "El RUC debe tener 11 dígitos"}
+                      </p>
                     )}
                   </div>
 
