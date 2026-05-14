@@ -1,48 +1,66 @@
 "use client";
-import React, { useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import React, { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
-  LayoutDashboard, FileText, Users, Package,
-  BarChart3, Zap, Settings, UserCircle,
+  LayoutDashboard,
+  FileText,
+  Users,
+  Package,
+  BarChart3,
+  Zap,
+  Settings,
+  UserCircle,
   Building2,
   Grip,
   Truck,
   DollarSign,
-  Wallet
-} from 'lucide-react';
-import { Sidebar } from '../components/layout/Sidebar';
-import { Topbar } from '../components/layout/Topbar';
-import { ToastProvider } from '../components/ui/Toast';
-import { MenuItem, View } from '../types';
+  Wallet,
+} from "lucide-react";
+import { Sidebar } from "../components/layout/Sidebar";
+import { Topbar } from "../components/layout/Topbar";
+import { ToastProvider } from "../components/ui/Toast";
+import { MenuItem, View } from "../types";
+import { useAuth } from "@/context/AuthContext";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const activeView = (pathname.split('/')[2] as View) || 'dashboard';
+  const activeView = (pathname.split("/")[2] as View) || "dashboard";
 
   React.useEffect(() => {
-    if (pathname === '/factufly' || pathname === '/factufly/') {
-      router.push('/factufly/dashboard');
+    if (pathname === "/factufly" || pathname === "/factufly/") {
+      router.push("/factufly/dashboard");
     }
   }, [pathname]);
 
-  const menuItems: MenuItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'operaciones', label: 'Emisión', icon: Grip },
-    { id: 'comprobantes', label: 'Comprobantes', icon: FileText },
-    { id: 'guiasremision', label: 'Guias de Remisión', icon: Truck },
-    { id: 'deudasporcobrar', label: 'Deudas por Cobrar', icon: Wallet },
-    { id: 'cuentasporcobrar', label: 'Cuentas por Cobrar', icon: DollarSign },
-    { id: 'clientes', label: 'Clientes', icon: Users },
-    { id: 'productos', label: 'Productos', icon: Package },
-    { id: 'reportes', label: 'Reportes', icon: BarChart3 },
-    { id: 'sunat', label: 'SUNAT', icon: Zap },
-    { id: 'empresa', label: 'Empresa', icon: Settings },
-    { id: 'sucursales', label: 'Sucursales', icon: Building2 }, 
-    { id: 'usuarios', label: 'Usuarios', icon: UserCircle },
+  const todosLosMenuItems: MenuItem[] = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "operaciones", label: "Emisión", icon: Grip },
+    { id: "comprobantes", label: "Comprobantes", icon: FileText },
+    { id: "guiasremision", label: "Guias de Remisión", icon: Truck },
+    { id: "deudasporcobrar", label: "Deudas por Cobrar", icon: Wallet },
+    { id: "cuentasporcobrar", label: "Cuentas por Cobrar", icon: DollarSign },
+    { id: "clientes", label: "Clientes", icon: Users },
+    { id: "trabajadores", label: "Trabajadores", icon: UserCircle },
+    { id: "productos", label: "Productos", icon: Package },
+    { id: "reportes", label: "Reportes", icon: BarChart3 },
+    { id: "sunat", label: "SUNAT", icon: Zap },
+    { id: "empresa", label: "Empresa", icon: Settings },
+    { id: "sucursales", label: "Sucursales", icon: Building2 },
+    { id: "usuarios", label: "Usuarios", icon: UserCircle },
   ];
+
+  const menuItems = todosLosMenuItems.filter((item) => {
+    if (item.id === "trabajadores") return user?.ruc === "10073587382";
+    return true;
+  });
 
   return (
     <ToastProvider>
@@ -60,9 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             activeView={activeView}
           />
           <main className="flex-1 px-6  overflow-y-auto overflow-x-hidden custom-scrollbar py-2">
-            <div className="mx-auto">
-              {children}
-            </div>
+            <div className="mx-auto">{children}</div>
           </main>
         </div>
       </div>

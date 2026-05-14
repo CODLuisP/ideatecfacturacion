@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 
-export type View = 'dashboard' | 'emision' |'operaciones' | 'clientes' | 'productos' | 'reportes' | 'sunat' | 'empresa' | 'sucursales' | 'usuarios' | 'comprobantes' | 'guiasremision' | 'cuentasporcobrar' | 'deudasporcobrar';
+export type View = 'dashboard' | 'emision' | 'operaciones' | 'clientes' | 'trabajadores' | 'productos' | 'reportes' | 'sunat' | 'empresa' | 'sucursales' | 'usuarios' | 'comprobantes' | 'guiasremision' | 'cuentasporcobrar' | 'deudasporcobrar';
 
 export interface MenuItem {
   id: View;

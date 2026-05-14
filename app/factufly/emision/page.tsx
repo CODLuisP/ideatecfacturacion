@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Building2,
   Hash,
+  UserCircle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -30,6 +31,8 @@ import { useProductosSucursal } from "../productos/gestioProductos/useProductosS
 import { sharedVentaStore } from "../operaciones/sharedVentaStore";
 import { cn } from "@/app/utils/cn";
 import { ModalGuardarClienteBoleta } from "../operaciones/boleta/gestionBoletas/Modalguardarclienteboleta";
+import { useTrabajadoresSucursal } from "../trabajadores/gestionTrabajadores/useTrabajadoresSucursal";
+
 // ── Tipos ──────────────────────────────────────────────────────
 type TipoComprobante = "boleta" | "factura";
 
@@ -96,6 +99,7 @@ export default function EmisionRapidaPage({
   const { accessToken, user } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
   const IGV_DEFAULT = user?.igv ?? 18;
+
   const { empresa } = useEmpresaEmisor();
 
   //estado para envio por resumen
@@ -260,6 +264,10 @@ export default function EmisionRapidaPage({
         setTamañoBolsa(data.extra.tamañoBolsa);
       if (data.extra.aplicarIcbper !== undefined)
         setAplicarIcbper(data.extra.aplicarIcbper);
+      if (data.extra.trabajadorIdGlobal !== undefined)
+        setTrabajadorIdGlobal(data.extra.trabajadorIdGlobal);
+      if (data.extra.trabajadoresPorItem !== undefined)
+        setTrabajadoresPorItem(data.extra.trabajadoresPorItem);
     }
 
     if (data.items && data.items.length > 0) {
@@ -285,6 +293,17 @@ export default function EmisionRapidaPage({
         _stockDisponible: i._stockDisponible,
         _esIcbper: i._esIcbper,
       }));
+      if (data.extra.trabajadoresPorItem !== undefined) {
+        const normalizado: Record<string, number> = {};
+        mapped.forEach((item: any, i: number) => {
+          const claveOriginal = item._id ?? String(i);
+          const valor =
+            data.extra.trabajadoresPorItem[claveOriginal] ??
+            data.extra.trabajadoresPorItem[String(i)];
+          if (valor) normalizado[item.id] = valor;
+        });
+        setTrabajadoresPorItem(normalizado);
+      }
       setItems(mapped);
       setBusquedaProducto(mapped.map((i) => i.descripcion || ""));
       setShowDropdownProducto(mapped.map(() => false));
@@ -426,6 +445,32 @@ export default function EmisionRapidaPage({
     null,
   );
 
+  const RUC_TRABAJADORES = "10073587382";
+  const esSalonBelleza = user?.ruc === RUC_TRABAJADORES;
+  const sucursalIdEfectivo = isSuperAdmin
+    ? (sucursalActual?.sucursalId ?? 0)
+    : parseInt(user?.sucursalID ?? "0");
+
+  const { trabajadores } = useTrabajadoresSucursal(
+    esSalonBelleza ? sucursalIdEfectivo : undefined,
+    esSalonBelleza,
+  );
+  const [trabajadorIdGlobal, setTrabajadorIdGlobal] = useState<number>(0);
+  const [trabajadoresPorItem, setTrabajadoresPorItem] = useState<
+    Record<string, number>
+  >({});
+
+  useEffect(() => {
+    if (!trabajadorIdGlobal) return;
+    setTrabajadoresPorItem((prev) => {
+      const nuevo = { ...prev };
+      items.forEach((item) => {
+        if (!nuevo[item.id]) nuevo[item.id] = trabajadorIdGlobal;
+      });
+      return nuevo;
+    });
+  }, [trabajadorIdGlobal]);
+
   useEffect(() => {
     if (!sucursal) return;
     if (isSuperAdmin) return; // ← superadmin elige manualmente
@@ -488,6 +533,7 @@ export default function EmisionRapidaPage({
           unidadMedida: "ZZ",
           codigo: null,
         };
+
         return [consumoItem, ...sinBolsa];
       });
       setBusquedaProducto((prev) => {
@@ -542,6 +588,7 @@ export default function EmisionRapidaPage({
       unidadMedida: "NIU",
       codigo: null,
     };
+
     setItems((prev) => [
       ...prev.filter((i) => !i._esIcbper),
       nuevo,
@@ -560,6 +607,13 @@ export default function EmisionRapidaPage({
       null,
       ...inputRefs.current.filter((_, i) => items[i]?._esIcbper),
     ];
+
+    if (trabajadorIdGlobal) {
+      setTrabajadoresPorItem((prev) => ({
+        ...prev,
+        [nuevo.id]: trabajadorIdGlobal,
+      }));
+    }
   };
 
   const eliminarItem = (index: number) => {
@@ -713,6 +767,8 @@ export default function EmisionRapidaPage({
       cantidadBolsa,
       tamañoBolsa,
       aplicarIcbper,
+      trabajadorIdGlobal,
+      trabajadoresPorItem,
     });
   }, [
     clienteSeleccionado,
@@ -759,6 +815,7 @@ export default function EmisionRapidaPage({
         _stockDisponible: productoBolsa?.sucursalProducto?.stock ?? null,
         _esIcbper: true,
       };
+
       return [...sinBolsa, bolsaItem];
     });
     setBusquedaProducto((prev) => {
@@ -901,6 +958,9 @@ export default function EmisionRapidaPage({
           totalVentaItem: calc.totalVentaItem + icbper,
           icbper,
           factorIcbper: item._esIcbper && aplicarIcbper ? ICBPER_FACTOR : 0,
+          trabajadorId: esSalonBelleza
+            ? trabajadoresPorItem[item.id] || null
+            : null,
         };
       });
 
@@ -1334,6 +1394,9 @@ export default function EmisionRapidaPage({
 
     //Envio por resumen
     setEnviarEnResumen(false);
+
+    setTrabajadorIdGlobal(0);
+    setTrabajadoresPorItem({});
   };
 
   const descargarPdf = async () => {
@@ -1689,6 +1752,84 @@ export default function EmisionRapidaPage({
               </div>
             </div>
           </div>
+
+          {esSalonBelleza && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <UserCircle className="w-4 h-4 text-purple-500" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-800">
+                  Datos del Trabajador
+                </h3>
+              </div>
+
+              {/* Select global */}
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-gray-500 shrink-0">
+                  Realizado por:
+                </label>
+                <select
+                  value={trabajadorIdGlobal}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setTrabajadorIdGlobal(id);
+                    // aplicar a todos los items
+                    const nuevo: Record<string, number> = {};
+                    items.forEach((item) => {
+                      nuevo[item.id] = id;
+                    });
+                    setTrabajadoresPorItem(nuevo);
+                  }}
+                  className="flex-1 py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-purple-400"
+                >
+                  <option value={0}>Seleccionar trabajador...</option>
+                  {trabajadores.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombreCompleto}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Por item — solo si hay más de 1 servicio real */}
+              {items.filter((i) => !i._esIcbper).length > 1 && (
+                <div className="space-y-2 pt-1 border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">
+                    Asignar por servicio
+                  </p>
+                  {items
+                    .filter((i) => !i._esIcbper)
+                    .map((item) => (
+                      <div key={item.id} className="flex items-center gap-3">
+                        <span className="text-xs text-gray-600 flex-1 truncate">
+                          {item.descripcion || "Sin descripción"}
+                        </span>
+                        <select
+                          value={
+                            trabajadoresPorItem[item.id] ?? trabajadorIdGlobal
+                          }
+                          onChange={(e) =>
+                            setTrabajadoresPorItem((prev) => ({
+                              ...prev,
+                              [item.id]: Number(e.target.value),
+                            }))
+                          }
+                          className="w-44 py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-purple-400"
+                        >
+                          <option value={0}>Sin asignar</option>
+                          {trabajadores.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.nombreCompleto}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Detalle de Venta ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-4">

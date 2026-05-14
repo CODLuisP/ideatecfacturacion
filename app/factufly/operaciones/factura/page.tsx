@@ -50,6 +50,8 @@ import { DatePickerLimitado } from "@/app/components/ui/DatePickerLimitado";
 import { ModalGuardarCliente } from "./gestionFacturas/ModalGuardarCliente";
 import { sharedVentaStore } from "../sharedVentaStore";
 import { useComprobanteUnicoId } from "../../comprobantes/gestionComprobantes/UseComprobanteUnicoId";
+import { useTrabajadoresSucursal } from "../../trabajadores/gestionTrabajadores/useTrabajadoresSucursal";
+import { UserCircle } from "lucide-react";
 
 // ── Tipos afectación gratuita ────────────────────────────────
 const TIPOS_GRATUITOS = ["11", "21", "31"];
@@ -151,6 +153,33 @@ function FacturaContent() {
   const [correlativoActual, setCorrelativoActual] = useState<number | null>(
     null,
   );
+
+  const RUC_TRABAJADORES = "10073587382";
+  const esSalonBelleza = user?.ruc === RUC_TRABAJADORES;
+  const sucursalIdEfectivo = isSuperAdmin
+    ? (sucursal?.sucursalId ?? 0)
+    : parseInt(user?.sucursalID ?? "0");
+
+  const { trabajadores } = useTrabajadoresSucursal(
+    esSalonBelleza ? sucursalIdEfectivo : undefined,
+    esSalonBelleza,
+  );
+  const [trabajadorIdGlobal, setTrabajadorIdGlobal] = useState<number>(0);
+  const [trabajadoresPorItem, setTrabajadoresPorItem] = useState<
+    Record<string, number>
+  >({});
+
+  useEffect(() => {
+    if (!trabajadorIdGlobal) return;
+    setTrabajadoresPorItem(() => {
+      const nuevo: Record<string, number> = {};
+      detalles.forEach((d, i) => {
+        const key = d._id ?? String(i);
+        nuevo[key] = trabajadorIdGlobal;
+      });
+      return nuevo;
+    });
+  }, [trabajadorIdGlobal]);
 
   // ── 2. Productos según sucursal (admin normal usa hook sin arg, superadmin pasa id) ──
   const { productosSucursal, fetchProductosSucursal } = useProductosSucursal(
@@ -693,6 +722,10 @@ function FacturaContent() {
         setDescuentoGlobal(data.extra.descuentoGlobal);
       if (data.extra.codigoTipoDescGlobal !== undefined)
         setCodigoTipoDescGlobal(data.extra.codigoTipoDescGlobal);
+      if (data.extra.trabajadorIdGlobal !== undefined)
+        setTrabajadorIdGlobal(data.extra.trabajadorIdGlobal);
+      if (data.extra.trabajadoresPorItem !== undefined)
+        setTrabajadoresPorItem(data.extra.trabajadoresPorItem);
     }
 
     if (data.items && data.items.length > 0) {
@@ -763,6 +796,17 @@ function FacturaContent() {
         };
       });
       setDetalles(mapped);
+      if (data.extra.trabajadoresPorItem !== undefined) {
+        const normalizado: Record<string, number> = {};
+        mapped.forEach((d: any, i: number) => {
+          const claveOriginal = d._id ?? d.id ?? String(i);
+          const valor =
+            data.extra.trabajadoresPorItem[claveOriginal] ??
+            data.extra.trabajadoresPorItem[String(i)];
+          if (valor) normalizado[d._id ?? String(i)] = valor;
+        });
+        setTrabajadoresPorItem(normalizado);
+      }
       setBusquedaProducto(mapped.map((i: any) => i.descripcion || ""));
       setShowDropdownProducto(mapped.map(() => false));
     }
@@ -794,6 +838,8 @@ function FacturaContent() {
       aplicarIcbper,
       descuentoGlobal,
       codigoTipoDescGlobal,
+      trabajadorIdGlobal,
+      trabajadoresPorItem,
     });
   }, [
     factura.cliente,
@@ -904,20 +950,29 @@ function FacturaContent() {
 
   useEffect(() => {
     const detallesLimpios = detalles.map(
-      ({
-        _incluirIGV,
-        _precioBase,
-        _precioBaseOriginal,
-        _precioVentaConIGV,
-        _sucursalProductoId,
-        _tipoProducto,
-        _stockDisponible,
-        _esIcbper,
-        ...d
-      }) => d,
+      (
+        {
+          _id,
+          _incluirIGV,
+          _precioBase,
+          _precioBaseOriginal,
+          _precioVentaConIGV,
+          _sucursalProductoId,
+          _tipoProducto,
+          _stockDisponible,
+          _esIcbper,
+          ...d
+        },
+        i,
+      ) => ({
+        ...d,
+        trabajadorId: esSalonBelleza
+          ? trabajadoresPorItem[_id ?? String(i)] || null
+          : null,
+      }),
     ) as FacturaDetalle[];
     setFactura((prev) => ({ ...prev, details: detallesLimpios }));
-  }, [detalles]);
+  }, [detalles, trabajadoresPorItem, esSalonBelleza]);
 
   //Guias de remision enlazadas
   useEffect(() => {
@@ -2224,6 +2279,10 @@ function FacturaContent() {
       correlativo: String(correlativoActual ?? "1").padStart(8, "0"),
       company: prev.company,
     }));
+
+    setTrabajadorIdGlobal(0);
+    setTrabajadoresPorItem({});
+
     if (isSuperAdmin) {
       setSucursal(null);
       setCorrelativoActual(null);
@@ -2500,6 +2559,87 @@ function FacturaContent() {
                   )}
                 </div>
               </div>
+
+              {esSalonBelleza && (
+                <div className="rounded-xl border border-gray-100 space-y-3 p-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                      <UserCircle className="w-4 h-4 text-purple-500" />
+                    </div>
+                    <h3 className="text-sm font-bold text-gray-800">
+                      Datos del Trabajador
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-500 shrink-0">
+                      Trabajador general:
+                    </label>
+                    <select
+                      value={trabajadorIdGlobal}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        setTrabajadorIdGlobal(id);
+                        const nuevo: Record<string, number> = {};
+                        detalles
+                          .filter((d) => !d._esIcbper)
+                          .forEach((d, i) => {
+                            nuevo[d._id ?? String(i)] = id;
+                          });
+                        setTrabajadoresPorItem(nuevo);
+                      }}
+                      className="flex-1 py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-purple-400"
+                    >
+                      <option value={0}>Seleccionar trabajador...</option>
+                      {trabajadores.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nombreCompleto}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {detalles.filter((d) => !d._esIcbper).length > 1 && (
+                    <div className="space-y-2 pt-1 border-t border-gray-100">
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">
+                        Asignar por servicio
+                      </p>
+                      {detalles
+                        .filter((d) => !d._esIcbper)
+                        .map((d, i) => (
+                          <div
+                            key={d._id ?? i}
+                            className="flex items-center gap-3"
+                          >
+                            <span className="text-xs text-gray-600 flex-1 truncate">
+                              {d.descripcion || "Sin descripción"}
+                            </span>
+                            <select
+                              value={
+                                trabajadoresPorItem[d._id ?? String(i)] ??
+                                trabajadorIdGlobal
+                              }
+                              onChange={(e) =>
+                                setTrabajadoresPorItem((prev) => ({
+                                  ...prev,
+                                  [d._id ?? String(i)]: Number(e.target.value),
+                                }))
+                              }
+                              className="w-44 py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-purple-400"
+                            >
+                              <option value={0}>Sin asignar</option>
+                              {trabajadores.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.nombreCompleto}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── Fechas ── */}
               <div className="grid grid-cols-4 gap-4">
