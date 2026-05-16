@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Mail, MessageCircle, CheckCircle2, X, Send, Plus, Check } from 'lucide-react';
@@ -17,6 +16,13 @@ export interface ModalEnvioCorreoWhatsappProps {
     onEnviado: (tipo: 'email' | 'whatsapp', destino: string) => void;
 }
 
+// ─── Tipo interno para manejar destinos ───────────────────────────────────────
+interface Destino {
+    valor: string;
+    esNuevo: boolean;       // agregado en esta sesión
+    seleccionado: boolean;  // marcado para reenviar (solo aplica a existentes)
+}
+
 export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, onClose, onEnviado }: ModalEnvioCorreoWhatsappProps) => {
     const { actualizar } = useActualizarCorreoWhatsapp();
     const { showToast } = useToast();
@@ -24,11 +30,14 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
     const [detalles, setDetalles] = useState<ComprobanteDetalleItem[]>([]);
     const yaEnviado = esEmail ? comprobante.cliente.enviadoPorCorreo : comprobante.cliente.enviadoPorWhatsApp;
 
-    const [destinos, setDestinos] = useState<string[]>(
-        esEmail
+    // ── Inicializar destinos: los existentes arrancan sin seleccionar ──────────
+    const [destinos, setDestinos] = useState<Destino[]>(() => {
+        const raw = esEmail
             ? (comprobante.cliente.correo ?? '').split(',').map(s => s.trim()).filter(Boolean)
-            : (comprobante.cliente.whatsApp ?? '').split(',').map(s => s.trim()).filter(Boolean)
-    );
+            : (comprobante.cliente.whatsApp ?? '').split(',').map(s => s.trim()).filter(Boolean);
+        return raw.map(v => ({ valor: v, esNuevo: false, seleccionado: false }));
+    });
+
     const [mostrarInput, setMostrarInput] = useState(false);
     const [inputActual, setInputActual] = useState('');
     const [errorInput, setErrorInput] = useState('');
@@ -47,59 +56,56 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                 if (!res.ok) return;
                 const data = await res.json();
                 setDetalles(data.details ?? []);
-            } catch {}
+            } catch { }
         };
         if (esEmail) cargarDetalles();
     }, [comprobante.comprobanteId, accessToken, esEmail]);
 
-    // Cuando se muestra el input, enfocarlo automáticamente
     useEffect(() => {
-        if (mostrarInput) {
-            inputRef.current?.focus();
-        }
+        if (mostrarInput) inputRef.current?.focus();
     }, [mostrarInput]);
 
     const validarDestino = (valor: string): boolean => {
-        if (esEmail) {
-            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
-        } else {
-            const limpio = valor.startsWith('51') ? valor.slice(2) : valor;
-            return /^\d{9}$/.test(limpio);
-        }
+        if (esEmail) return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
+        const limpio = valor.startsWith('51') ? valor.slice(2) : valor;
+        return /^\d{9}$/.test(limpio);
     };
 
     const agregarDestino = () => {
         const val = inputActual.trim();
-        if (!val) {
-            setErrorInput('Escribe un valor válido');
-            inputRef.current?.focus();
-            return;
-        }
+        if (!val) { setErrorInput('Escribe un valor válido'); inputRef.current?.focus(); return; }
         if (!validarDestino(val)) {
             setErrorInput(esEmail ? 'Correo inválido, debe incluir @' : 'El número debe tener 9 dígitos');
             inputRef.current?.focus();
             return;
         }
-        if (destinos.includes(val)) {
+        if (destinos.some(d => d.valor === val)) {
             setErrorInput(esEmail ? 'Este correo ya está agregado' : 'Este número ya está agregado');
             inputRef.current?.focus();
             return;
         }
-        // Agregar destino
-        setDestinos(prev => [...prev, val]);
+        // Los nuevos arrancan siempre seleccionados (se van a enviar sí o sí)
+        setDestinos(prev => [...prev, { valor: val, esNuevo: true, seleccionado: true }]);
         setInputActual('');
         setErrorInput('');
-        setMostrarInput(false); // ocultar el input después de agregar
+        setMostrarInput(false);
     };
 
     const eliminarDestino = (i: number) => {
         setDestinos(prev => prev.filter((_, idx) => idx !== i));
     };
 
+    const toggleSeleccionado = (i: number) => {
+        setDestinos(prev => prev.map((d, idx) => idx === i ? { ...d, seleccionado: !d.seleccionado } : d));
+    };
+
+    // ── Solo se envían los nuevos + los existentes que el usuario seleccionó ──
+    const aEnviar = destinos.filter(d => d.esNuevo || d.seleccionado).map(d => d.valor);
+    const hayExistentes = destinos.some(d => !d.esNuevo);
     const serieNum = `${comprobante.serie}-${padCorrelativo(comprobante.correlativo)}`;
 
     const handleEnviar = async () => {
-        if (destinos.length === 0) return;
+        if (aEnviar.length === 0) return;
         setEnviando(true);
         try {
             const resPdf = await fetch(
@@ -118,17 +124,13 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                 const comprobanteJson = JSON.stringify({
                     serieNumero: serieNum,
                     estadoSunat: comprobante.estadoSunat,
-                    items: detalles.map(d => ({
-                        descripcion: d.descripcion,
-                        cantidad: d.cantidad,
-                        precioUnitario: d.precioVenta
-                    })),
+                    items: detalles.map(d => ({ descripcion: d.descripcion, cantidad: d.cantidad, precioUnitario: d.precioVenta })),
                     igv: comprobante.totalIGV,
                     total: comprobante.importeTotal,
                 });
 
                 const resultados = await Promise.allSettled(
-                    destinos.map(correo => {
+                    aEnviar.map(correo => {
                         const formData = new FormData();
                         formData.append('toEmail', correo);
                         formData.append('toName', comprobante.cliente.razonSocial ?? '');
@@ -145,17 +147,11 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                     })
                 );
 
-                const fallidos = resultados
-                    .filter(r => r.status === 'rejected')
-                    .map((r, i) => destinos[i]);
+                const fallidos = resultados.filter(r => r.status === 'rejected').map((_, i) => aEnviar[i]);
+                if (fallidos.length === aEnviar.length) throw new Error('No se pudo enviar ningún correo');
+                else if (fallidos.length > 0) showToast(`Enviado, pero falló: ${fallidos.join(', ')}`, 'error');
+                else showToast('Correos enviados correctamente', 'success');
 
-                if (fallidos.length === destinos.length) {
-                    throw new Error('No se pudo enviar ningún correo');
-                } else if (fallidos.length > 0) {
-                    showToast(`Enviado, pero falló: ${fallidos.join(', ')}`, 'error');
-                } else {
-                    showToast('Correos enviados correctamente', 'success');
-                }
             } else {
                 const whatsappApiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY!;
                 const whatsappBase = 'https://do.velsat.pe:8443/whatsapp';
@@ -171,7 +167,7 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                 const fileUrl = (await resUpload.json()).datos.url;
 
                 const resultados = await Promise.allSettled(
-                    destinos.map(num => {
+                    aEnviar.map(num => {
                         const numeroFormateado = num.startsWith('51') ? num : `51${num}`;
                         return fetch(`${whatsappBase}/api/send/single`, {
                             method: 'POST',
@@ -188,39 +184,33 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                     })
                 );
 
-                const fallidos = resultados
-                    .filter(r => r.status === 'rejected')
-                    .map((r, i) => destinos[i]);
-
-                if (fallidos.length === destinos.length) {
-                    throw new Error('No se pudo enviar a ningún número');
-                } else if (fallidos.length > 0) {
-                    showToast(`Enviado, pero falló: ${fallidos.join(', ')}`, 'error');
-                } else {
-                    showToast('WhatsApp enviados correctamente', 'success');
-                }
+                const fallidos = resultados.filter(r => r.status === 'rejected').map((_, i) => aEnviar[i]);
+                if (fallidos.length === aEnviar.length) throw new Error('No se pudo enviar a ningún número');
+                else if (fallidos.length > 0) showToast(`Enviado, pero falló: ${fallidos.join(', ')}`, 'error');
+                else showToast('WhatsApp enviados correctamente', 'success');
             }
 
-            const destinosStr = destinos.join(',');
+            // ── Guardar todos los destinos (existentes + nuevos) en el backend ─
+            const todosLosValores = destinos.map(d => d.valor).join(',');
             if (esEmail) {
                 await actualizar({
                     comprobanteId: comprobante.comprobanteId,
-                    correo: destinosStr,
+                    correo: todosLosValores,
                     enviadoPorCorreo: true,
                     whatsApp: comprobante.cliente.whatsApp,
-                    enviadoPorWhatsApp: comprobante.cliente.enviadoPorWhatsApp
+                    enviadoPorWhatsApp: comprobante.cliente.enviadoPorWhatsApp,
                 });
             } else {
                 await actualizar({
                     comprobanteId: comprobante.comprobanteId,
                     correo: comprobante.cliente.correo,
                     enviadoPorCorreo: comprobante.cliente.enviadoPorCorreo,
-                    whatsApp: destinosStr,
-                    enviadoPorWhatsApp: true
+                    whatsApp: todosLosValores,
+                    enviadoPorWhatsApp: true,
                 });
             }
 
-            onEnviado(tipo, destinosStr);
+            onEnviado(tipo, todosLosValores);
             setExito(true);
             setTimeout(() => { setExito(false); onClose(); }, 1500);
         } catch (e: any) {
@@ -233,6 +223,7 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 min-h-screen h-full">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
+
                 {/* Header */}
                 <div className={cn("px-6 py-4 flex items-center justify-between", esEmail ? "bg-blue-50 border-b border-blue-100" : "bg-green-50 border-b border-green-100")}>
                     <div className="flex items-center gap-3">
@@ -251,55 +242,127 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
 
                 {/* Body */}
                 <div className="px-6 py-5 space-y-4">
+
+                    {/* Aviso ya enviado */}
                     {yaEnviado && (
                         <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                             <CheckCircle2 size={15} className="text-amber-500 mt-0.5 shrink-0" />
                             <p className="text-xs text-amber-700">
                                 Este comprobante ya fue enviado el{" "}
-                                <span className="font-semibold">{formatFechaHora(comprobante.fechaCreacion)}</span>. Puedes volver a enviarlo.
+                                <span className="font-semibold">{formatFechaHora(comprobante.fechaCreacion)}</span>.
+                                Selecciona a quién reenviar o agrega nuevos destinatarios.
                             </p>
                         </div>
                     )}
 
+                    {/* Info cliente */}
                     <div className="bg-gray-50 rounded-xl px-4 py-3">
                         <p className="text-xs text-gray-500 mb-1">Cliente</p>
                         <p className="text-sm font-semibold text-gray-900">{comprobante.cliente.razonSocial}</p>
                         <p className="text-xs text-gray-500">{comprobante.cliente.numeroDocumento}</p>
                     </div>
 
-                    {/* Lista de destinatarios (chips) */}
+                    {/* Lista de destinos con checkboxes para existentes */}
                     {destinos.length > 0 && (
-                        <div>
-                            <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                {esEmail ? 'Correos agregados' : 'Números agregados'}
-                            </label>
-                            <div className="flex flex-wrap gap-1.5">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold text-gray-700">
+                                    {esEmail ? 'Correos registrados' : 'Números registrados'}
+                                </label>
+                                {hayExistentes && (
+                                    <span className="text-[10px] text-gray-400">
+                                        Marca los que quieres incluir
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
                                 {destinos.map((d, i) => (
-                                    <span
+                                    <div
                                         key={i}
                                         className={cn(
-                                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium",
-                                            esEmail ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
+                                            "flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all",
+                                            d.esNuevo
+                                                ? esEmail
+                                                    ? "bg-blue-50 border-blue-200"
+                                                    : "bg-green-50 border-green-200"
+                                                : d.seleccionado
+                                                    ? esEmail
+                                                        ? "bg-blue-50 border-blue-300"
+                                                        : "bg-green-50 border-green-300"
+                                                    : "bg-white border-gray-200 opacity-60"
                                         )}
                                     >
-                                        {d}
+                                        {/* Checkbox solo para existentes; los nuevos siempre van */}
+                                        {d.esNuevo ? (
+                                            <span
+                                                className={cn(
+                                                    "w-4 h-4 rounded flex items-center justify-center shrink-0 text-[10px] font-bold",
+                                                    esEmail ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+                                                )}
+                                                title="Nuevo — se enviará siempre"
+                                            >
+                                                N
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleSeleccionado(i)}
+                                                className={cn(
+                                                    "w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all",
+                                                    d.seleccionado
+                                                        ? esEmail
+                                                            ? "bg-blue-600 border-blue-600"
+                                                            : "bg-green-600 border-green-600"
+                                                        : "border-gray-300 bg-white"
+                                                )}
+                                            >
+                                                {d.seleccionado && <Check size={10} className="text-white" strokeWidth={3} />}
+                                            </button>
+                                        )}
+
+                                        <span className={cn(
+                                            "flex-1 text-xs font-medium truncate",
+                                            d.seleccionado || d.esNuevo ? "text-gray-900" : "text-gray-400"
+                                        )}>
+                                            {d.valor}
+                                        </span>
+
+                                        {d.esNuevo && (
+                                            <span className={cn(
+                                                "text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0",
+                                                esEmail ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"
+                                            )}>
+                                                Nuevo
+                                            </span>
+                                        )}
+
                                         <button
                                             type="button"
                                             onClick={() => eliminarDestino(i)}
-                                            className={cn(
-                                                "rounded-full p-0.5 transition-colors",
-                                                esEmail ? "hover:bg-blue-200" : "hover:bg-green-200"
-                                            )}
+                                            className="p-0.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
                                         >
-                                            <X size={10} />
+                                            <X size={12} />
                                         </button>
-                                    </span>
+                                    </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Botón para mostrar el input */}
+                    {/* Resumen de a quién se enviará */}
+                    {aEnviar.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                            Se enviará a{' '}
+                            <span className="font-semibold text-gray-800">{aEnviar.length}</span>{' '}
+                            {aEnviar.length === 1
+                                ? esEmail ? 'correo' : 'número'
+                                : esEmail ? 'correos' : 'números'
+                            }.
+                        </p>
+                    )}
+
+                    {/* Botón agregar */}
                     {!mostrarInput && (
                         <button
                             type="button"
@@ -316,7 +379,7 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                         </button>
                     )}
 
-                    {/* Input que aparece al hacer clic en el botón */}
+                    {/* Input agregar */}
                     {mostrarInput && (
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
@@ -338,10 +401,7 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                                 />
                                 <button
                                     onClick={agregarDestino}
-                                    className={cn(
-                                        "p-2 rounded-xl transition-colors",
-                                        esEmail ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
-                                    )}
+                                    className={cn("p-2 rounded-xl transition-colors", esEmail ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-green-600 hover:bg-green-700 text-white")}
                                 >
                                     <Check size={16} />
                                 </button>
@@ -367,7 +427,7 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                     </button>
                     <button
                         onClick={handleEnviar}
-                        disabled={enviando || exito || destinos.length === 0}
+                        disabled={enviando || exito || aEnviar.length === 0}
                         className={cn(
                             "flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-all",
                             exito ? "bg-emerald-500 text-white"
@@ -376,8 +436,8 @@ export const ModalEnvioCorreoWhatsapp = ({ comprobante, tipo, ruc, accessToken, 
                         )}
                     >
                         {exito ? <><CheckCircle2 size={16} /> Enviado</>
-                            : enviando ? <><RefreshCw size={16} className="animate-spin" /> Enviando {destinos.length > 1 ? `(${destinos.length})` : ''}...</>
-                                : <><Send size={16} /> Enviar {destinos.length > 1 ? `(${destinos.length})` : ''}</>}
+                            : enviando ? <><RefreshCw size={16} className="animate-spin" /> Enviando {aEnviar.length > 1 ? `(${aEnviar.length})` : ''}...</>
+                                : <><Send size={16} /> Enviar {aEnviar.length > 0 ? `(${aEnviar.length})` : ''}</>}
                     </button>
                 </div>
             </div>
