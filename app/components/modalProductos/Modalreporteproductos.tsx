@@ -168,97 +168,99 @@ export default function ModalReporteProductos({
             </div>
           </div>
 
-{/* Fila 2: Tipo IGV + Tipo Producto en la misma fila */}
-<div className="grid grid-cols-2 gap-4">
-  <div className="space-y-2">
-    <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-      <ReceiptText className="w-3 h-3" /> Tipo de afectación IGV
-    </label>
-    <div className="flex gap-2 flex-wrap">
-      {IGV_OPCIONES.map(({ value, label, color }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setIgvTipo(prev => prev === value ? undefined : value)}
-          className={cn(
-            "px-3.5 py-2 text-xs font-semibold border rounded-xl transition-all",
-            igvTipo === value ? color : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  </div>
-
-  <div className="space-y-2">
-    <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-      <Package className="w-3 h-3" /> Tipo de producto
-    </label>
-    <div className="flex gap-2">
-      {[
-        { value: "BIEN",     label: "Bien",     icon: <Package className="w-3.5 h-3.5" /> },
-        { value: "SERVICIO", label: "Servicio", icon: <Wrench className="w-3.5 h-3.5" /> },
-      ].map(({ value, label, icon }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setTipoProducto(prev => prev === value ? undefined : value)}
-          className={cn(
-            "flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold border rounded-xl transition-all",
-            tipoProducto === value
-              ? "bg-emerald-50 border-emerald-300 text-emerald-700"
-              : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
-          )}
-        >
-          {icon} {label}
-        </button>
-      ))}
-    </div>
-  </div>
-</div>
-
-          {/* Fila 4: Filtro de stock — oculto si es SERVICIO */}
-          {!esServicio && (
+          {/* Fila 2: Tipo IGV + Tipo Producto en la misma fila */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                <BarChart3 className="w-3 h-3" /> Filtro de stock
+                <ReceiptText className="w-3 h-3" /> Tipo de afectación IGV
               </label>
               <div className="flex gap-2 flex-wrap">
-                {STOCK_OPCIONES.map(({ value, label }) => (
+                {IGV_OPCIONES.map(({ value, label, color }) => (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => { setStockFiltro(value); if (value !== "menor_a") setStockValor(undefined); }}
+                    onClick={() => setIgvTipo(prev => prev === value ? undefined : value)}
                     className={cn(
                       "px-3.5 py-2 text-xs font-semibold border rounded-xl transition-all",
-                      stockFiltro === value
-                        ? "bg-slate-800 border-slate-800 text-white"
-                        : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                      igvTipo === value ? color : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
                     )}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-
-              {/* Input para "menor_a" */}
-              {stockFiltro === "menor_a" && (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-gray-500">Mostrar productos con stock menor a</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={stockValor ?? ""}
-                    onChange={e => setStockValor(e.target.value ? Number(e.target.value) : undefined)}
-                    placeholder="0"
-                    className="w-24 px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all bg-gray-50"
-                  />
-                  <span className="text-xs text-gray-400">unidades</span>
-                </div>
-              )}
             </div>
-          )}
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                <Package className="w-3 h-3" /> Tipo de producto
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { value: "BIEN",     label: "Bien",     icon: <Package className="w-3.5 h-3.5" /> },
+                  { value: "SERVICIO", label: "Servicio", icon: <Wrench className="w-3.5 h-3.5" /> },
+                ].map(({ value, label, icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTipoProducto(prev => prev === value ? undefined : value)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold border rounded-xl transition-all",
+                      tipoProducto === value
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                        : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                    )}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Fila 4 (NO SE USA ACTUALMENTE): Filtro de stock — oculto si es SERVICIO 
+            {!esServicio && (
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <BarChart3 className="w-3 h-3" /> Filtro de stock
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {STOCK_OPCIONES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { setStockFiltro(value); if (value !== "menor_a") setStockValor(undefined); }}
+                      className={cn(
+                        "px-3.5 py-2 text-xs font-semibold border rounded-xl transition-all",
+                        stockFiltro === value
+                          ? "bg-slate-800 border-slate-800 text-white"
+                          : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+
+                {stockFiltro === "menor_a" && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-gray-500">Mostrar productos con stock menor a</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={stockValor ?? ""}
+                      onChange={e => setStockValor(e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="0"
+                      className="w-24 px-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all bg-gray-50"
+                    />
+                    <span className="text-xs text-gray-400">unidades</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+          */}
 
           {/* Fila 5: Nombre del archivo */}
           <div className="space-y-1.5">
