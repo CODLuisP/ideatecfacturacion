@@ -212,42 +212,42 @@ export const EditarClienteModal: React.FC<Props> = ({
         />
 
         {/* ───────── Dirección RUC — siempre visible ───────── */}
-        {!esDni && form.direccion && form.direccion.length > 0 && (
+        {!esDni && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputBase
               label="Ubigeo"
-              value={form.direccion[0].ubigeo ?? ""}
+              value={form.direccion?.[0]?.ubigeo ?? ""}
               onChange={(e) => updateDireccion("ubigeo", e.target.value)}
               showError={false}
             />
             <InputBase
               label="Dirección"
-              value={form.direccion[0].direccionLineal ?? ""}
+              value={form.direccion?.[0]?.direccionLineal ?? ""}
               onChange={(e) => updateDireccion("direccionLineal", e.target.value)}
               showError={false}
             />
             <InputBase
               label="Distrito"
-              value={form.direccion[0].distrito ?? ""}
+              value={form.direccion?.[0]?.distrito ?? ""}
               onChange={(e) => updateDireccion("distrito", e.target.value)}
               showError={false}
             />
             <InputBase
               label="Provincia"
-              value={form.direccion[0].provincia ?? ""}
+              value={form.direccion?.[0]?.provincia ?? ""}
               onChange={(e) => updateDireccion("provincia", e.target.value)}
               showError={false}
             />
             <InputBase
               label="Departamento"
-              value={form.direccion[0].departamento ?? ""}
+              value={form.direccion?.[0]?.departamento ?? ""}
               onChange={(e) => updateDireccion("departamento", e.target.value)}
               showError={false}
             />
             <InputBase
               label="Tipo Dirección"
               labelOptional="(opcional)"
-              value={form.direccion[0].tipoDireccion ?? ""}
+              value={form.direccion?.[0]?.tipoDireccion ?? ""}
               onChange={(e) => updateDireccion("tipoDireccion", e.target.value)}
               showError={false}
             />
