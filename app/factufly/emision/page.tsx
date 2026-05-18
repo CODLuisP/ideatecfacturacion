@@ -165,6 +165,7 @@ export default function EmisionRapidaPage({
 
   //comprobante sin detalle
   const [porConsumo, setPorConsumo] = useState(false);
+  const [focusedItemIndex, setFocusedItemIndex] = useState<number | null>(null);
 
   // ── Modal guardar cliente ────────────────────────────────────
   const [showModalCliente, setShowModalCliente] = useState(false);
@@ -510,7 +511,7 @@ export default function EmisionRapidaPage({
   const [showDropdownProducto, setShowDropdownProducto] = useState<boolean[]>(
     [],
   );
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const inputRefs = useRef<(HTMLInputElement | HTMLTextAreaElement | null)[]>([]);
 
   // guard: skip porConsumo else-branch on first render
   const porConsumoMountedRef = useRef(false);
@@ -744,6 +745,15 @@ export default function EmisionRapidaPage({
     const nd = [...showDropdownProducto];
     nd[index] = false;
     setShowDropdownProducto(nd);
+
+    // Auto-adjust height dynamically when product is selected
+    setTimeout(() => {
+      const el = inputRefs.current[index] as HTMLTextAreaElement | null;
+      if (el) {
+        el.style.height = "auto";
+        el.style.height = `${el.scrollHeight}px`;
+      }
+    }, 50);
   };
 
   // ── Bolsa ICBPER ───────────────────────────────────────────
@@ -1963,11 +1973,10 @@ export default function EmisionRapidaPage({
                               position: "relative",
                             }}
                           >
-                            <input
+                            <textarea
                               ref={(el) => {
                                 inputRefs.current[i] = el;
                               }}
-                              type="text"
                               value={busquedaProducto[i] ?? item.descripcion}
                               disabled={item._esIcbper || esPorConsumo}
                               onChange={(e) => {
@@ -1983,24 +1992,45 @@ export default function EmisionRapidaPage({
                                     "descripcion",
                                     e.target.value,
                                   );
+
+                                // Auto-grow height dynamically
+                                e.target.style.height = "auto";
+                                e.target.style.height = `${e.target.scrollHeight}px`;
                               }}
-                              onFocus={() => {
+                              onFocus={(e) => {
                                 const nd = [...showDropdownProducto];
                                 nd[i] = true;
                                 setShowDropdownProducto(nd);
+                                setFocusedItemIndex(i);
+
+                                // Auto-grow height on focus
+                                e.target.style.height = "auto";
+                                e.target.style.height = `${e.target.scrollHeight}px`;
                               }}
-                              onBlur={() => {
+                              onBlur={(e) => {
+                                const target = e.target;
                                 setTimeout(() => {
                                   const nd = [...showDropdownProducto];
                                   nd[i] = false;
                                   setShowDropdownProducto(nd);
-                                }, 150);
+                                  setFocusedItemIndex(null);
+
+                                  // Reset height to single-line collapsed state
+                                  if (target) {
+                                    target.style.height = "";
+                                  }
+                                }, 200);
                                 const txt = busquedaProducto[i] ?? "";
                                 if (txt && !item.productoId)
                                   actualizarCampo(i, "descripcion", txt);
                               }}
                               placeholder="Buscar o escribir producto..."
-                              className="w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                              rows={1}
+                              className={`w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-[border-color,box-shadow] duration-200 ${
+                                focusedItemIndex === i
+                                  ? "overflow-y-hidden"
+                                  : "h-8 overflow-y-hidden"
+                              }`}
                             />
                             {showDropdownProducto[i] &&
                               !item._esIcbper &&
