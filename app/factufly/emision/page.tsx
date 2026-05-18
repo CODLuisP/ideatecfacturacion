@@ -1550,7 +1550,6 @@ export default function EmisionRapidaPage({
                         —
                       </option>
                       <option value="01">DNI</option>
-                      <option value="06">RUC</option>
                       <option value="04">CE</option>
                     </select>
                   ) : (

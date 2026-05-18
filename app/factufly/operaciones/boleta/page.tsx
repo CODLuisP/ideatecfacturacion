@@ -2153,7 +2153,6 @@ function BoletaContent() {
                         className="w-1/3 py-2 px-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-brand-blue text-sm disabled:opacity-50"
                       >
                         <option value="01">DNI</option>
-                        <option value="06">RUC</option>
                         <option value="04">CE</option>
                       </select>
                       <div className="relative w-2/3">

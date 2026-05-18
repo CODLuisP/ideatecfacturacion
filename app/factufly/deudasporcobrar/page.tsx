@@ -2,7 +2,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search, X, Filter, ChevronDown, RefreshCw,
-  Check, CreditCard
+  Check, CreditCard,
+  FileSpreadsheet
 } from 'lucide-react';
 import { cn } from '@/app/utils/cn';
 import { useAuth } from '@/context/AuthContext';
@@ -15,6 +16,7 @@ import { formatFecha, formatMoneda, tipoComprobanteLabel, ESTADO_CUOTA_COLORS } 
 import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursalRuc';
 import { useSucursal } from '../operaciones/boleta/gestionBoletas/useSucursal';
 import { ModalDeudasPorCobrar } from '@/app/components/modalDeudasPorCobrar/ModalDeudasPorCobrar';
+import { ModalReporteDeudaContado } from '@/app/components/modalDeudasPorCobrar/ModalReporteDeudaContado';
 
 const TIPO_OPTS = ['Todos', 'Factura', 'Boleta'];
 
@@ -45,6 +47,7 @@ export default function DeudasPorCobrarPage() {
   const [avFechaDesde, setAvFechaDesde]   = useState('');
   const [avFechaHasta, setAvFechaHasta]   = useState('');
   const [avClienteDoc, setAvClienteDoc]   = useState('');
+  const [showModalReporte, setShowModalReporte] = useState(false);
 
   const hoy = new Date().toISOString().split('T')[0];
 
@@ -106,7 +109,13 @@ export default function DeudasPorCobrarPage() {
 
   return (
     <div className="space-y-3 py-1 animate-in fade-in duration-500">
-
+      {showModalReporte && (
+        <ModalReporteDeudaContado
+          empresaRuc={rucEmpresa}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setShowModalReporte(false)}
+        />
+      )}
       {/* Modal Pagar */}
       {deudaPagar && (
         <ModalDeudasPorCobrar
@@ -137,6 +146,12 @@ export default function DeudasPorCobrarPage() {
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <button
+              onClick={() => setShowModalReporte(true)}
+              className="flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border border-gray-200 rounded-md transition-all shadow-sm bg-white text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+            >
+              <FileSpreadsheet size={14} /> Reporte Excel
+            </button>
             {isSuperAdmin && (
               <div className="relative">
                 <select

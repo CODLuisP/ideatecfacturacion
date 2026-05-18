@@ -3,7 +3,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search, X, Filter, ChevronDown, RefreshCw,
   DollarSign, Calendar, Check, Eye, CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { cn } from '@/app/utils/cn';
 import { useAuth } from '@/context/AuthContext';
@@ -17,6 +18,7 @@ import { formatFecha, formatMoneda, tipoComprobanteLabel, getEstadoCuota, ESTADO
 import { ModalPagarCuota } from '@/app/components/modalCuentasPorCobrar/ModalPagarCuota';
 import { useSucursalRuc } from '../operaciones/boleta/gestionBoletas/useSucursalRuc';
 import { useSucursal } from '../operaciones/boleta/gestionBoletas/useSucursal';
+import { ModalReporteCuentasPorCobrar } from '@/app/components/modalCuentasPorCobrar/ModalReporteCuentasPorCobrar';
 
 const TIPO_OPTS = ['Todos', 'Factura', 'Boleta'];
 
@@ -55,6 +57,7 @@ export default function CuentasPorCobrarPage() {
   const [avFechaDesde, setAvFechaDesde]                 = useState('');
   const [avFechaHasta, setAvFechaHasta]                 = useState('');
   const [avClienteDoc, setAvClienteDoc]                 = useState('');
+  const [showModalReporte, setShowModalReporte] = useState(false)
   const hoy = new Date().toISOString().split('T')[0];
 
   const cargar = async () => {
@@ -132,7 +135,14 @@ export default function CuentasPorCobrarPage() {
 
   return (
     <div className="space-y-3 py-1 animate-in fade-in duration-500">
-
+      {showModalReporte && (
+        <ModalReporteCuentasPorCobrar
+          empresaRuc={rucEmpresa}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setShowModalReporte(false)}
+        />
+      )}
+      
       {/* Modal Pagar */}
       {cuotaPagar && comprobanteSeleccionado && (
         <ModalPagarCuota
@@ -164,6 +174,12 @@ export default function CuentasPorCobrarPage() {
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <button
+              onClick={() => setShowModalReporte(true)}
+              className="flex items-center gap-1.5 px-2.5 py-2.5 text-xs font-medium border border-gray-200 rounded-md transition-all shadow-sm bg-white text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+            >
+              <FileSpreadsheet size={14} /> Reporte Excel
+            </button>
               {/* Select sucursal — solo superadmin */}
               {isSuperAdmin && (
                 <div className="relative">
