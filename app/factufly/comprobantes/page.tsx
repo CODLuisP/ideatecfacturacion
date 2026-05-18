@@ -2,7 +2,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, RefreshCw, Mail, MessageCircle, CheckCircle2, X, 
   Eye, Filter, Search, MoreHorizontal, RotateCcw,
-  Ban, FileText, Plus, Calendar, Hash, UserRound, UserCog, 
+  Ban, FileText, Plus, Calendar, Hash, UserRound, UserCog,
+  Upload, 
 } from "lucide-react";
 import { useToast } from "@/app/components/ui/Toast";
 import { cn } from "@/app/utils/cn";
@@ -40,6 +41,8 @@ import { DropdownFiltro } from "@/app/components/ui/DropdownFiltro";
 import { ModalResumen } from "@/app/components/modalGenerarResumen/ModalResumen";
 import { useSucursal } from "../operaciones/boleta/gestionBoletas/useSucursal";
 import { ModalEnvioMasivo } from "@/app/components/modalVerComprobantes/Modalenviomasivo";
+import { ModalCargaMasivaComprobantes } from "@/app/components/modalCargaMasiva/Modalcargamasivacomprobantes";
+import { useEmpresaEmisor } from "../operaciones/boleta/gestionBoletas/useEmpresaEmisor";
 
 // ─── Constantes filtros ───────────────────────────────────────────────────────
 const TIPOS_OPTS = [
@@ -114,6 +117,10 @@ export default function VerComprobantesPage() {
   const [avUsuarioId, setAvUsuarioId] = useState("");
   const [avFechaDesde, setAvFechaDesde] = useState("");
   const [avFechaHasta, setAvFechaHasta] = useState("");
+
+  //CARGA MASIVA
+  const [showModalCargaMasiva, setShowModalCargaMasiva] = useState(false);
+  const { empresa } = useEmpresaEmisor();
 
   const hoy = new Date().toISOString().split("T")[0];
 
@@ -375,6 +382,21 @@ export default function VerComprobantesPage() {
           onEnviarTodos={enviarTodosEnBackground}
         />
       )}
+      
+      
+      {showModalCargaMasiva && (
+        <ModalCargaMasivaComprobantes
+          onClose={() => setShowModalCargaMasiva(false)}
+          onCargaExitosa={() => cargarComprobantes(0)}
+          isSuperAdmin={isSuperAdmin}
+          sucursales={isSuperAdmin ? sucursales : undefined}
+          sucursalUsuario={!isSuperAdmin ? sucursalUsuario : undefined}
+          empresa={empresa}
+          accessToken={accessToken ?? ""}
+          user={user}
+        />
+      )}
+
       {showModalResumen && (
         <ModalResumen
           comprobantes={comprobantes}
@@ -501,6 +523,9 @@ export default function VerComprobantesPage() {
                   <RotateCcw className="w-3.5 h-3.5" /> Enviar pendientes ({pendientes.length})
                 </Button>
               )}
+              <Button onClick={() => setShowModalCargaMasiva(true)}>
+                <Upload className="w-3.5 h-3.5" /> Carga Masiva
+              </Button>
               <Button className="py-2.5 px-3 text-xs rounded-md h-auto" onClick={() => router.push("/factufly/operaciones")}>
                 <Plus className="w-3.5 h-3.5" /> Nuevo Comprobante
               </Button>
@@ -957,3 +982,4 @@ const DropdownOpciones = ({
     </>
   );
 };
+
