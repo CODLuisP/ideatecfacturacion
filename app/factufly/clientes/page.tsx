@@ -386,7 +386,7 @@ export default function ClientesPage() {
   .clientes-table tbody {
     display: block;
     overflow-y: auto;
-    max-height: calc(100vh - 295px);
+    max-height: calc(100vh - 240px);
     scrollbar-width: thin;
     scrollbar-color: #CBD5E1 transparent;
   }
@@ -435,28 +435,28 @@ export default function ClientesPage() {
           </tr>
         ) : filtered.map((client) => (
           <tr key={client.clienteId} className="hover:bg-gray-50/50 transition-colors">
-            <td className="px-5 py-4 w-24">
+            <td className="px-5 py-2 w-24">
               <p className="text-xs font-bold text-gray-400 uppercase">{client.tipoDocumento.tipoDocumentoNombre}</p>
               <p className="text-sm font-mono text-gray-700">{client.numeroDocumento}</p>
             </td>
-            <td className="text-[12px] px-5 py-4 text-sm font-semibold text-gray-900 w-40">{client.razonSocialNombre}</td>
-            <td className="px-5 py-4 text-sm text-gray-600 w-40">
+            <td className="text-[12px] px-5 py-2 text-sm font-semibold text-gray-900 w-40">{client.razonSocialNombre}</td>
+            <td className="px-5 py-2 text-sm text-gray-600 w-40">
               {formatDireccion(client.direccion, client.tipoDocumento.tipoDocumentoId)}
             </td>
             {isSuperAdmin && (
-              <td className="px-5 py-4 text-sm text-gray-600 w-24">
+              <td className="px-5 py-2 text-sm text-gray-600 w-24">
                 {sucursales.find(s => s.sucursalId === client.sucursalID)?.nombre ?? "-"}
               </td>
             )}
-            <td className="px-5 py-4 text-sm text-gray-600 w-44 whitespace-normal wrap-break-word">{client.correo ?? '-'}</td>
-            <td className="px-5 py-4 text-sm text-gray-600 w-20">{client.telefono ?? '-'}</td>
-            <td className="px-5 py-4 text-sm text-gray-500 w-24">{formatFecha(client.fechaCreacion)}</td>
-            <td className="px-5 py-4 w-16">
+            <td className="px-5 py-2 text-sm text-gray-600 w-44 whitespace-normal wrap-break-word">{client.correo ?? '-'}</td>
+            <td className="px-5 py-2 text-sm text-gray-600 w-20">{client.telefono ?? '-'}</td>
+            <td className="px-5 py-2 text-sm text-gray-500 w-24">{formatFecha(client.fechaCreacion)}</td>
+            <td className="px-5 py-2 w-16">
               <Badge variant={client.estado ? 'success' : 'default'}>
                 {client.estado ? 'Activo' : 'Inactivo'}
               </Badge>
             </td>
-            <td className="px-5 py-4 w-36">
+            <td className="px-5 py-2 w-36">
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setClienteCorreo(client)}

@@ -21,6 +21,8 @@ import { Topbar } from "../components/layout/Topbar";
 import { ToastProvider } from "../components/ui/Toast";
 import { MenuItem, View } from "../types";
 import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
+
 
 export default function DashboardLayout({
   children,
@@ -38,7 +40,63 @@ export default function DashboardLayout({
     if (pathname === "/factufly" || pathname === "/factufly/") {
       router.push("/factufly/dashboard");
     }
+
+    // Configurar interceptores de Axios
+    const requestInterceptor = axios.interceptors.request.use((config) => {
+      console.log(`🚀 [API REQ] ${config.method?.toUpperCase()} ${config.url}`, config.data);
+      return config;
+    });
+
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => {
+        console.log(`✅ [API RES] ${response.status} ${response.config.url}`, response.data);
+        return response;
+      },
+      (error) => {
+        console.error(`❌ [API ERR] ${error.response?.status || 'Network Error'} ${error.config?.url}`, error.response?.data || error.message);
+        return Promise.reject(error);
+      }
+    );
+
+    // Interceptor para Fetch
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] as any).url;
+      const method = (args[1]?.method || 'GET').toUpperCase();
+      let bodyData = '';
+      try {
+        if (args[1]?.body && typeof args[1].body === 'string') {
+          bodyData = JSON.parse(args[1].body);
+        } else if (args[1]?.body) {
+          bodyData = '[Non-string body]';
+        }
+      } catch (e) {
+        bodyData = args[1]?.body as any;
+      }
+      
+      console.log(`🚀 [FETCH REQ] ${method} ${url}`, bodyData);
+      
+      try {
+        const response = await originalFetch(...args);
+        if (!response.ok) {
+          console.error(`❌ [FETCH ERR] ${response.status} ${url}`);
+        } else {
+          console.log(`✅ [FETCH RES] ${response.status} ${url}`);
+        }
+        return response;
+      } catch (error) {
+        console.error(`❌ [FETCH FAIL] ${url}`, error);
+        throw error;
+      }
+    };
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
+      window.fetch = originalFetch;
+    };
   }, [pathname]);
+
 
   const todosLosMenuItems: MenuItem[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
