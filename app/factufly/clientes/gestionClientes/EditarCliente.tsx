@@ -5,7 +5,7 @@ import { InputBase } from "@/app/components/ui/InputBase";
 import { Modal } from "@/app/components/ui/Modal";
 import { Cliente, Direccion } from "./typesCliente";
 import { useToast } from "@/app/components/ui/Toast";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 interface Props {
@@ -14,18 +14,42 @@ interface Props {
   onSave: (c: Cliente) => void;
 }
 
+const consultaRuc = async (ruc: string) => {
+  const res = await fetch("https://api.json.pe/api/ruc", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.NEXT_PUBLIC_JSONPE_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ruc }),
+  });
+
+  const data = await res.json();
+  if (!data.success || !data.data) return null;
+
+  const d = data.data;
+  return {
+    razonSocial: d.nombre_o_razon_social || "",
+    direccionLineal: d.direccion || "",
+    departamento: d.departamento || "",
+    provincia: d.provincia || "",
+    distrito: d.distrito || "",
+    ubigeo: d.ubigeo_sunat || "",
+  };
+};
+
 export const EditarClienteModal: React.FC<Props> = ({
   cliente,
   onClose,
   onSave,
 }) => {
   const { showToast } = useToast();
-  const { accessToken, user } = useAuth();
+  const { accessToken } = useAuth();
   const [form, setForm] = useState<Cliente>({ ...cliente });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRellenando, setIsRellenando] = useState(false);
   const [mostrarDireccion, setMostrarDireccion] = useState(
-    // si ya tiene dirección, mostrarla abierta por defecto
-    !!(cliente.direccion && cliente.direccion.length > 0)
+    !!(cliente.direccion && cliente.direccion.length > 0),
   );
 
   const updateForm = (campo: keyof Cliente, valor: any) => {
@@ -46,12 +70,52 @@ export const EditarClienteModal: React.FC<Props> = ({
               distrito: "",
               tipoDireccion: "",
             };
-
       return {
         ...f,
         direccion: [{ ...direccionBase, [campo]: valor }],
       };
     });
+  };
+
+  // ─── Botón Rellenar ───
+  const handleRellenar = async () => {
+    if (isRellenando) return;
+    setIsRellenando(true);
+    try {
+      const resultado = await consultaRuc(form.numeroDocumento);
+      if (!resultado) {
+        showToast("No se encontraron datos para este RUC.", "info");
+        return;
+      }
+
+      setForm((f) => {
+        const direccionActual =
+          f.direccion && f.direccion.length > 0
+            ? f.direccion[0]
+            : { direccionId: 0, tipoDireccion: "" };
+
+        return {
+          ...f,
+          razonSocialNombre: resultado.razonSocial || f.razonSocialNombre,
+          direccion: [
+            {
+              ...direccionActual,
+              direccionLineal: resultado.direccionLineal,
+              departamento: resultado.departamento,
+              provincia: resultado.provincia,
+              distrito: resultado.distrito,
+              ubigeo: resultado.ubigeo,
+            },
+          ],
+        };
+      });
+
+      showToast("Datos rellenados desde SUNAT.", "success");
+    } catch {
+      showToast("Error al consultar el RUC. Intenta nuevamente.", "error");
+    } finally {
+      setIsRellenando(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,7 +127,7 @@ export const EditarClienteModal: React.FC<Props> = ({
         form.tipoDocumento.tipoDocumentoId === "06"
           ? "La razón social es obligatoria."
           : "El nombre completo es obligatorio.",
-        "info"
+        "info",
       );
       return;
     }
@@ -85,17 +149,18 @@ export const EditarClienteModal: React.FC<Props> = ({
       await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/api/Cliente/${form.clienteId}`,
         payloadCliente,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
-      // ─── Dirección para cualquier tipo de documento ───
       if (form.direccion && form.direccion.length > 0) {
         const d = form.direccion[0];
         const tieneDatos = esDni
           ? d.direccionLineal || d.tipoDireccion
-          : d.direccionLineal || d.distrito || d.provincia || d.departamento || d.ubigeo;
+          : d.direccionLineal ||
+            d.distrito ||
+            d.provincia ||
+            d.departamento ||
+            d.ubigeo;
 
         if (tieneDatos) {
           const payloadDireccion = esDni
@@ -117,18 +182,16 @@ export const EditarClienteModal: React.FC<Props> = ({
               };
 
           if (d.direccionId && d.direccionId > 0) {
-            // ya existe → PUT
             await axios.put(
               `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion/${d.direccionId}`,
               { ...payloadDireccion, direccionId: d.direccionId },
-              { headers: { Authorization: `Bearer ${accessToken}` } }
+              { headers: { Authorization: `Bearer ${accessToken}` } },
             );
           } else {
-            // nueva dirección → POST
             await axios.post(
               `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion`,
               { ...payloadDireccion, clienteId: form.clienteId },
-              { headers: { Authorization: `Bearer ${accessToken}` } }
+              { headers: { Authorization: `Bearer ${accessToken}` } },
             );
           }
         }
@@ -140,13 +203,15 @@ export const EditarClienteModal: React.FC<Props> = ({
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
-        if (status === 400) {
+        if (status === 400)
           showToast("Los datos ingresados no son válidos.", "error");
-        } else if (status === 404) {
+        else if (status === 404)
           showToast("No se encontró el cliente a actualizar.", "error");
-        } else {
-          showToast("No se pudo actualizar el cliente. Intenta nuevamente.", "error");
-        }
+        else
+          showToast(
+            "No se pudo actualizar el cliente. Intenta nuevamente.",
+            "error",
+          );
       } else {
         showToast("Error inesperado. Intenta nuevamente.", "error");
       }
@@ -174,6 +239,29 @@ export const EditarClienteModal: React.FC<Props> = ({
               <option value="06">RUC</option>
               <option value="07">CE</option>
             </select>
+          </div>
+
+          {/* Número + botón Rellenar solo para RUC */}
+          <div className="space-y-1.5">
+            <InputBase
+              label="Número"
+              value={form.numeroDocumento}
+              disabled
+              showError={false}
+            />
+            {!esDni && (
+              <button
+                type="button"
+                onClick={handleRellenar}
+                disabled={isRellenando}
+                className="flex items-center gap-1.5 text-xs font-semibold text-brand-blue hover:text-brand-blue/80 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw
+                  className={`w-3 h-3 ${isRellenando ? "animate-spin" : ""}`}
+                />
+                {isRellenando ? "Consultando..." : "Rellenar desde SUNAT"}
+              </button>
+            )}
           </div>
 
           <InputBase
@@ -223,7 +311,9 @@ export const EditarClienteModal: React.FC<Props> = ({
             <InputBase
               label="Dirección"
               value={form.direccion?.[0]?.direccionLineal ?? ""}
-              onChange={(e) => updateDireccion("direccionLineal", e.target.value)}
+              onChange={(e) =>
+                updateDireccion("direccionLineal", e.target.value)
+              }
               showError={false}
             />
             <InputBase
@@ -256,14 +346,18 @@ export const EditarClienteModal: React.FC<Props> = ({
 
         {/* ───────── Dirección DNI/CE — opcional con toggle ───────── */}
         {esDni && (
-          <div className={`border rounded-xl transition-colors ${mostrarDireccion ? "border-brand-blue" : "border-gray-200"}`}>
+          <div
+            className={`border rounded-xl transition-colors ${mostrarDireccion ? "border-brand-blue" : "border-gray-200"}`}
+          >
             <button
               type="button"
               onClick={() => setMostrarDireccion((prev) => !prev)}
               className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-gray-500 hover:text-brand-blue transition-colors"
             >
               <span>Dirección (opcional)</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mostrarDireccion ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform ${mostrarDireccion ? "rotate-180" : ""}`}
+              />
             </button>
 
             {mostrarDireccion && (
@@ -272,14 +366,18 @@ export const EditarClienteModal: React.FC<Props> = ({
                   label="Dirección"
                   labelOptional="(opcional)"
                   value={form.direccion?.[0]?.direccionLineal ?? ""}
-                  onChange={(e) => updateDireccion("direccionLineal", e.target.value)}
+                  onChange={(e) =>
+                    updateDireccion("direccionLineal", e.target.value)
+                  }
                   showError={false}
                 />
                 <InputBase
                   label="Tipo Dirección"
                   labelOptional="(opcional)"
                   value={form.direccion?.[0]?.tipoDireccion ?? ""}
-                  onChange={(e) => updateDireccion("tipoDireccion", e.target.value)}
+                  onChange={(e) =>
+                    updateDireccion("tipoDireccion", e.target.value)
+                  }
                   showError={false}
                 />
               </div>
