@@ -189,7 +189,7 @@ export const EditarClienteModal: React.FC<Props> = ({
             );
           } else {
             await axios.post(
-              `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion`,
+              `${process.env.NEXT_PUBLIC_API_URL}/api/Direccion/direccion`,
               { ...payloadDireccion, clienteId: form.clienteId },
               { headers: { Authorization: `Bearer ${accessToken}` } },
             );
