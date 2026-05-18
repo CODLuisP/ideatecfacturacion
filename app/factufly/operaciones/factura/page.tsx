@@ -3578,8 +3578,8 @@ function FacturaContent() {
                                   rows={1}
                                   className={`w-full py-1.5 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-[border-color,box-shadow] duration-200 ${
                                     focusedItemIndex === i
-                                      ? "overflow-y-hidden"
-                                      : "h-8 overflow-y-hidden"
+                                      ? "overflow-y-hidden whitespace-pre-wrap"
+                                      : "h-8 overflow-hidden whitespace-nowrap text-ellipsis"
                                   }`}
                                 />
                                 {showDropdownProducto[i] &&
