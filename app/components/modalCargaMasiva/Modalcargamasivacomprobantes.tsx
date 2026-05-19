@@ -58,9 +58,11 @@ const FilaComprobante = ({ comp, idx }: { comp: ComprobanteAgrupado; idx: number
         <td className="px-3 py-3">
           <span className="text-xs font-mono text-gray-800">{comp.rucDni}</span>
         </td>
-        <td className="px-3 py-3">
+        <td className="px-3 py-3 min-w-40">
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-gray-800 leading-tight">{comp.razonSocial}</span>
+            <span className="text-xs font-medium text-gray-800 leading-tight wrap-break-word whitespace-normal">
+              {comp.razonSocial}
+            </span>
             {comp.correo && <span className="text-[10px] text-gray-400 truncate max-w-50">{comp.correo}</span>}
             {comp.whatsapp && <span className="text-[10px] text-green-600 font-medium">{comp.whatsapp}</span>}
           </div>
@@ -306,12 +308,13 @@ export function ModalCargaMasivaComprobantes({
                     value={fechaEmision}
                     min={dosAntesISO}
                     max={hoy}
+                    disabled
                     onChange={(e) => setFechaEmision(e.target.value)}
                     className="py-1.5 px-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
                     />
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">
-                    {fechaEmision ? formatFechaLarga(fechaEmision) : "—"} · Tomada del Excel (máx. 2 días antes)
+                    {fechaEmision ? formatFechaLarga(fechaEmision) : "—"} Será Tomada del Excel (máx. 2 días antes)
                 </p>
                 </div>
 

@@ -5,7 +5,7 @@ import { formatoFechaActual } from "@/app/components/ui/formatoFecha";
 import { numeroAlertas } from "@/app/components/ui/numeroAlertas";
 import axios from "axios";
 import { CargaMasivaState, ComprobanteAgrupado, ResultadoCargaMasiva } from "./Cargamasivatypes";
-import { generarPlantillaExcel, parsearExcel, validarFechaEmision, agruparComprobantes, calcularTotales } from "./Cargamasivautils";
+import { parsearExcel, validarFechaEmision, agruparComprobantes, calcularTotales } from "./Cargamasivautils";
 
 // ── Helper cálculo item ────────────────────────────────────────────────────────
 function calcItem(item: { precioUnitario: number; cantidad: number; igvPct: number }) {
@@ -34,7 +34,10 @@ export function useCargaMasiva(accessToken: string, empresa: any, user: any) {
 
   // ── Descargar plantilla ─────────────────────────────────────────────────────
   const descargarPlantilla = useCallback(() => {
-    generarPlantillaExcel();
+    const link = document.createElement("a");
+    link.href = "/Plantilla Carga Masiva Comprobantes.xlsx";
+    link.download = "Plantilla Carga Masiva Comprobantes.xlsx";
+    link.click();
   }, []);
 
   // ── Consultar API por RUC o DNI ─────────────────────────────────────────────
@@ -265,7 +268,7 @@ export function useCargaMasiva(accessToken: string, empresa: any, user: any) {
       descuentoGlobal: 0,
       codigoTipoDescGlobal: "03",
       usuarioCreacion: user?.id ?? 0,
-      enviadoEnResumen: comp.tipoComprobante === "03" ? true : null,
+      enviadoEnResumen: comp.tipoComprobante === "03" ? false : null,
       legends: [{ code: "1000", value: numeroAlertas(importeTotal, moneda) }],
     };
   }, [empresa, user]);

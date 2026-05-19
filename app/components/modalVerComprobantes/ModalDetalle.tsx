@@ -184,7 +184,7 @@ export const ModalDetalle = ({ comprobante, ruc, accessToken, loadingDetalles, n
                                                     <th className="px-3 py-2 text-left text-gray-400 font-semibold">Producto</th>
                                                     <th className="px-3 py-2 text-left text-gray-400 font-semibold">P. Base</th>
                                                     <th className="px-3 py-2 text-right text-gray-400 font-semibold w-24">Valor Venta</th>
-                                                    <th className="px-3 py-2 text-left text-gray-400 font-semibold">IGV(18%)</th>
+                                                    <th className="px-3 py-2 text-left text-gray-400 font-semibold">IGV({porcentajeIgv}%)</th>
                                                     <th className="px-3 py-2 text-right text-gray-400 font-semibold w-24">Total</th>
                                                 </tr>
                                             </thead>
