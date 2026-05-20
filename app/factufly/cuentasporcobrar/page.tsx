@@ -58,7 +58,7 @@ export default function CuentasPorCobrarPage() {
   const [avFechaHasta, setAvFechaHasta]                 = useState('');
   const [avClienteDoc, setAvClienteDoc]                 = useState('');
   const [showModalReporte, setShowModalReporte] = useState(false)
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date().toLocaleDateString('en-CA');
 
   const cargar = async () => {
     const data = await hookCuentas.fetchCuentas({

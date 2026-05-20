@@ -23,6 +23,7 @@ import {
 } from "@/app/factufly/cuentasporcobrar/gestionCuentasPorCobrar/helpers";
 import { useHistorialDeudaContado } from "@/app/factufly/deudasporcobrar/gestionDeudasPorCobrar/UseHistorialDeudaContado";
 import { useAuth } from "@/context/AuthContext";
+import { HistorialPagosDeuda } from "./HistorialPagosDeuda";
 
 interface ModalDeudasPorCobrarProps {
   deuda: DeudaContado;
@@ -30,6 +31,7 @@ interface ModalDeudasPorCobrarProps {
   onConfirm: (payload: RegistrarPagoDeudaPayload) => Promise<void>;
   loading: boolean;
   usuarioId: number;
+  onRefrescar: () => Promise<void>
 }
 
 export const ModalDeudasPorCobrar = ({
@@ -38,6 +40,7 @@ export const ModalDeudasPorCobrar = ({
   onConfirm,
   loading,
   usuarioId,
+  onRefrescar,
 }: ModalDeudasPorCobrarProps) => {
   const d = new Date();
   const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -46,7 +49,10 @@ export const ModalDeudasPorCobrar = ({
   const RUC_ESPECIAL = "20512134832";
   const esEmisorEspecial = user?.ruc === RUC_ESPECIAL;
 
-  const montoRestante = deuda.montoTotal - deuda.montoPagado;
+  const [montoPagadoActual, setMontoPagadoActual] = useState(deuda.montoPagado)
+  const [huboCambios, setHuboCambios] = useState(false)
+
+  const montoRestante = deuda.montoTotal - montoPagadoActual
   const [montoPagado, setMontoPagado] = useState(montoRestante.toFixed(2));
   const [fechaPago, setFechaPago] = useState(hoy);
   const [medioPago, setMedioPago] = useState(
@@ -63,7 +69,7 @@ export const ModalDeudasPorCobrar = ({
   const [historial, setHistorial] = useState<PagoDeudaContado[]>([]);
   const [historialCargado, setHistorialCargado] = useState(false);
 
-  const tieneHistorial = deuda.montoPagado > 0;
+  const tieneHistorial = montoPagadoActual > 0;
   const requiereEntidad = ["TRANSFERENCIA", "TARJETA", "CHEQUE"].includes(
     medioPago,
   );
@@ -75,7 +81,7 @@ export const ModalDeudasPorCobrar = ({
     "PLIN",
   ].includes(medioPago);
   const montoPagadoNum = parseFloat(montoPagado) || 0;
-  const montoTrasEstePago = deuda.montoPagado + montoPagadoNum;
+  const montoTrasEstePago = montoPagadoActual + montoPagadoNum;
   const quedaria = Math.max(0, deuda.montoTotal - montoTrasEstePago);
 
   const toggleHistorial = async () => {
@@ -119,10 +125,15 @@ export const ModalDeudasPorCobrar = ({
     await onConfirm(payload);
   };
 
+  const handleClose = async () => {
+    if (huboCambios) await onRefrescar()
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-50 w-full h-full flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col animate-in zoom-in-95 duration-200"
         style={{ maxHeight: "90vh" }}
       >
         {/* Header */}
@@ -141,7 +152,7 @@ export const ModalDeudasPorCobrar = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
           >
             <X size={16} className="text-white" />
@@ -176,7 +187,7 @@ export const ModalDeudasPorCobrar = ({
                 Pagado
               </p>
               <p className="text-sm font-bold text-emerald-600">
-                {formatMoneda(deuda.montoPagado, deuda.tipoMoneda)}
+                {formatMoneda(montoPagadoActual, deuda.tipoMoneda)}
               </p>
             </div>
             <div className="bg-blue-50 rounded-xl px-3 py-2.5 text-center">
@@ -386,69 +397,22 @@ export const ModalDeudasPorCobrar = ({
               </button>
 
               {historialAbierto && (
-                <div className="animate-in slide-in-from-top-1 duration-200">
-                  {hookHistorial.loading ? (
-                    <div className="flex items-center justify-center gap-2 py-5">
-                      <RefreshCw
-                        size={14}
-                        className="animate-spin text-blue-400"
-                      />
-                      <span className="text-xs text-gray-400">
-                        Cargando historial...
-                      </span>
-                    </div>
-                  ) : historial.length === 0 ? (
-                    <div className="py-5 text-center text-xs text-gray-400">
-                      Sin registros de pago
-                    </div>
-                  ) : (
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Fecha
-                          </th>
-                          <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Monto
-                          </th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Medio
-                          </th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Entidad
-                          </th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            N° Op.
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {historial.map((p) => (
-                          <tr
-                            key={p.deudaPagoID}
-                            className="hover:bg-gray-50/50 transition-colors"
-                          >
-                            <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                              {formatFecha(p.fechaPago)}
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-semibold text-emerald-600 whitespace-nowrap">
-                              {formatMoneda(p.montoPagado, deuda.tipoMoneda)}
-                            </td>
-                            <td className="px-3 py-2.5 text-gray-500">
-                              {p.medioPago ?? "-"}
-                            </td>
-                            <td className="px-3 py-2.5 text-gray-500">
-                              {p.entidadFinanciera ?? "-"}
-                            </td>
-                            <td className="px-3 py-2.5 text-gray-500">
-                              {p.numeroOperacion ?? "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                <HistorialPagosDeuda
+                  pagoId={deuda.pagoId}
+                  tipoMoneda={deuda.tipoMoneda}
+                  montoTotal={deuda.montoTotal}
+                  historial={historial}
+                  loadingHistorial={hookHistorial.loading}
+                  onHistorialActualizado={async () => {
+                    const data = await hookHistorial.fetchHistorial(deuda.pagoId)
+                    setHistorial(data)
+                    const nuevoMontoPagado = data.reduce((acc, p) => acc + p.montoPagado, 0)
+                    setMontoPagadoActual(nuevoMontoPagado)
+                    setMontoPagado((deuda.montoTotal - nuevoMontoPagado).toFixed(2))
+                    setHuboCambios(true)
+                  }}
+                  usuarioId={usuarioId}
+                />
               )}
             </div>
           )}
@@ -472,7 +436,7 @@ export const ModalDeudasPorCobrar = ({
             {loading ? "Registrando..." : "Confirmar Pago"}
           </button>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={loading}
             className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-colors border border-gray-200 hover:bg-gray-50 text-gray-700"
           >

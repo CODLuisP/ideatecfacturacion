@@ -11,11 +11,11 @@ import { calcularTotales } from "@/app/factufly/comprobantes/gestionComprobantes
 import { useCargaMasiva } from "@/app/factufly/comprobantes/gestionComprobantes/gestionCargaMasiva/Usecargamasiva";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const hoy = new Date().toISOString().split("T")[0];
+const hoy = new Date().toLocaleDateString("en-CA");
 const dosAntesISO = (() => {
   const d = new Date();
   d.setDate(d.getDate() - 2);
-  return d.toISOString().split("T")[0];
+  return d.toLocaleDateString("en-CA");
 })();
 
 function formatFechaLarga(iso: string) {

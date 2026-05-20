@@ -26,6 +26,7 @@ export const useHistorialDeudaContado = (): UseHistorialDeudaContadoReturn => {
         `${process.env.NEXT_PUBLIC_API_URL}/api/DeudaContado/${pagoId}/historial`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
+      if (response.status === 404) return [];
       if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`)
       const data: PagoDeudaContado[] = await response.json()
       setHistorial(data)

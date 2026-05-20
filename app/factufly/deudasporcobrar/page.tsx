@@ -49,7 +49,7 @@ export default function DeudasPorCobrarPage() {
   const [avClienteDoc, setAvClienteDoc]   = useState('');
   const [showModalReporte, setShowModalReporte] = useState(false);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date().toLocaleDateString('en-CA');
 
   const cargar = async () => {
     const data = await hookDeudas.fetchDeudas({
@@ -124,6 +124,7 @@ export default function DeudasPorCobrarPage() {
           onConfirm={handlePagar}
           loading={hookPagar.loading}
           usuarioId={Number(user?.id ?? 0)}
+          onRefrescar={cargar} 
         />
       )}
 

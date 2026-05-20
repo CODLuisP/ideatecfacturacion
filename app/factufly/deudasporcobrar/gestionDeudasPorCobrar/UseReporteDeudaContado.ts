@@ -42,7 +42,7 @@ export const useReporteDeudaContado = (): UseReporteDeudaContadoReturn => {
       const urlBlob = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = urlBlob
-      a.download = `DeudasPorCobrar_${filtros.empresaRuc}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.download = `DeudasPorCobrar_${filtros.empresaRuc}_${new Date().toLocaleDateString('en-CA')}.xlsx`
       document.body.appendChild(a)
       a.click()
       a.remove()

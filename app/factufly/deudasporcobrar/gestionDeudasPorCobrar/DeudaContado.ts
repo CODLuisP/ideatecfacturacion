@@ -61,3 +61,15 @@ export interface FiltrosDeudaContado {
   fechaFin?: string | null
   clienteNumDoc?: string | null
 }
+
+export interface EditarPagoDeudaPayload {
+  deudaPagoId: number
+  pagoId: number
+  montoPagado: number
+  fechaPago: string       // ISO string
+  medioPago: string
+  entidadFinanciera: string | null
+  numeroOperacion: string | null
+  observaciones: string | null
+  usuarioRegistroPago: number | null
+}

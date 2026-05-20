@@ -124,13 +124,20 @@ export default function ReportesPage() {
     hasta?: string
   ) => {
     if (!user) return;
+
+    // Forzar fecha local peruana cuando el periodo es 'hoy'
+    const fechaHoy = new Date().toLocaleDateString('en-CA');
+    const desdeLocal = p === 'hoy' ? fechaHoy : desde;
+    const hastaLocal = p === 'hoy' ? fechaHoy : hasta;
+
     const params = {
       periodo: p as Periodo,
       limite: 10,
       usuarioId: uId ?? undefined,
-      desde: desde || undefined,
-      hasta: hasta || undefined,
+      desde: desdeLocal || undefined,
+      hasta: hastaLocal || undefined,
     };
+
     if (isSuperAdmin && sId) {
       hookSucursal.fetchReportes({ ...params, sucursalId: sId });
     } else if (isSuperAdmin) {

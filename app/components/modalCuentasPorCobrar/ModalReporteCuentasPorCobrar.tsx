@@ -33,7 +33,7 @@ export const ModalReporteCuentasPorCobrar = ({
   const { sucursales } = useSucursalRuc(isSuperAdmin)
   const { sucursal } = useSucursal()
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = new Date().toLocaleDateString('en-CA')
 
   const [sucursalFiltro, setSucursalFiltro] = useState<string>('')
   const [fechaDesde, setFechaDesde]         = useState('')
@@ -67,21 +67,21 @@ export const ModalReporteCuentasPorCobrar = ({
     return sucursal?.codEstablecimiento ?? null
   }
 
-    const aplicarShortcut = (label: string) => {
-        setShortcutActivo(label)
-        const d = new Date()
-        if (label === 'Hoy') {
-            setFechaDesde(hoy); setFechaHasta(hoy)
-        } else if (label === 'Esta semana') {
-            const lunes = new Date(d)
-            lunes.setDate(d.getDate() - d.getDay() + 1)
-            setFechaDesde(lunes.toISOString().split('T')[0]); setFechaHasta(hoy)
-        } else if (label === 'Este mes') {
-            setFechaDesde(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]); setFechaHasta(hoy)
-        } else if (label === 'Este año') {
-            setFechaDesde(new Date(d.getFullYear(), 0, 1).toISOString().split('T')[0]); setFechaHasta(hoy)
-        }
-    }
+  const aplicarShortcut = (label: string) => {
+      setShortcutActivo(label)
+      const d = new Date()
+      if (label === 'Hoy') {
+          setFechaDesde(hoy); setFechaHasta(hoy)
+      } else if (label === 'Esta semana') {
+          const lunes = new Date(d)
+          lunes.setDate(d.getDate() - d.getDay() + 1)
+          setFechaDesde(lunes.toLocaleDateString('en-CA')); setFechaHasta(hoy)
+      } else if (label === 'Este mes') {
+          setFechaDesde(new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA')); setFechaHasta(hoy)
+      } else if (label === 'Este año') {
+          setFechaDesde(new Date(d.getFullYear(), 0, 1).toLocaleDateString('en-CA')); setFechaHasta(hoy)
+      }
+  }
 
     const handleFechaDesde = (val: string) => {
         setFechaDesde(val)
