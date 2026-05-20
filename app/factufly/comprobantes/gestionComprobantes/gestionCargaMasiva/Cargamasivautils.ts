@@ -52,6 +52,43 @@ export function determinarTipoDoc(rucDni: string): {
   };
 }
 
+// ─── Normalizar valor de celda a string ──────────────────────────────────────
+// XLSX.js puede traer números, fechas, booleans — normalizamos todo
+function celdaAString(val: any): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "number") return String(val);
+  if (typeof val === "boolean") return String(val);
+  // Fecha serial de Excel (número > 10000 probablemente es fecha)
+  if (typeof val === "number" && val > 10000) {
+    try {
+      const d = XLSX.SSF.parse_date_code(val);
+      return `${String(d.d).padStart(2, "0")}/${String(d.m).padStart(2, "0")}/${d.y}`;
+    } catch { return String(val); }
+  }
+  return String(val).trim();
+}
+
+// ─── Parsear fecha desde celda (string DD/MM/YYYY, número serial, o Date) ────
+function parsearFechaCelda(val: any): string {
+  if (!val) return "";
+  // Número serial de Excel
+  if (typeof val === "number") {
+    try {
+      const d = XLSX.SSF.parse_date_code(val);
+      return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
+    } catch { return ""; }
+  }
+  const s = String(val).trim();
+  // DD/MM/YYYY
+  const partes = s.split("/");
+  if (partes.length === 3) {
+    return `${partes[2]}-${partes[1].padStart(2, "0")}-${partes[0].padStart(2, "0")}`;
+  }
+  // YYYY-MM-DD ya formateado
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+  return s;
+}
+
 // ─── Leer y parsear el Excel ──────────────────────────────────────────────────
 export async function parsearExcel(file: File): Promise<{
   filas: FilaExcel[];
@@ -60,76 +97,86 @@ export async function parsearExcel(file: File): Promise<{
 }> {
   const erroresGlobales: string[] = [];
   const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: "array" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[][];
 
-  // Fila 2 (índice 1): FECHA EMISION columna J (índice 9)
+  // cellDates:true para que las fechas vengan como número serial (más predecible)
+  const wb = XLSX.read(buffer, { type: "array", cellDates: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as any[][];
+
+  // ── Leer fecha de J2 directamente desde la celda ──────────────────────────
   let fechaEmision = "";
-  const filaFecha = raw[1] ?? [];
-  const celdaFecha = filaFecha[9];
-  if (celdaFecha) {
-    if (typeof celdaFecha === "number") {
-      const dateObj = XLSX.SSF.parse_date_code(celdaFecha);
-      fechaEmision = `${dateObj.y}-${String(dateObj.m).padStart(2, "0")}-${String(dateObj.d).padStart(2, "0")}`;
-    } else {
-      const partes = String(celdaFecha).split("/");
-      if (partes.length === 3) {
-        fechaEmision = `${partes[2]}-${partes[1].padStart(2, "0")}-${partes[0].padStart(2, "0")}`;
-      } else {
-        fechaEmision = String(celdaFecha);
-      }
-    }
+  const celdaJ2 = ws["J2"];
+  if (celdaJ2) {
+    fechaEmision = parsearFechaCelda(celdaJ2.v);
+  }
+  // Fallback: buscar en raw[1][9]
+  if (!fechaEmision && raw[1]?.[9]) {
+    fechaEmision = parsearFechaCelda(raw[1][9]);
   }
 
   if (!fechaEmision) {
     erroresGlobales.push("No se encontró la fecha de emisión en la celda J2 del Excel");
   }
 
-  // Fila 3 (índice 2): cabeceras — datos desde fila 4 (índice 3)
-  const filas: FilaExcel[] = [];
-  let ultimoRucDni = ""; // para rastrear el grupo actual
-
-  for (let i = 3; i < raw.length; i++) {
+  // ── Buscar fila de cabeceras dinámicamente ────────────────────────────────
+  let filaInicioDatos = 3; // default fila 4
+  for (let i = 0; i < Math.min(raw.length, 10); i++) {
     const row = raw[i];
-    if (!row || row.every((c: any) => c === "" || c === null || c === undefined)) continue;
+    if (!row) continue;
+    const primeraCelda = String(row[0] ?? "").toUpperCase();
+    if (primeraCelda.includes("RUC") || primeraCelda.includes("DNI")) {
+      filaInicioDatos = i + 1;
+      break;
+    }
+  }
 
-    const rucDni = String(row[0] ?? "").trim();
-    const razonSocial = String(row[1] ?? "").trim();
-    const detalle = String(row[2] ?? "").trim();
+  // ── Parsear filas de datos ────────────────────────────────────────────────
+  const filas: FilaExcel[] = [];
+  let ultimoRucDni = "";
+
+  for (let i = filaInicioDatos; i < raw.length; i++) {
+    const row = raw[i];
+    // Saltar filas completamente vacías
+    if (!row || row.every((c: any) => c === null || c === undefined || c === "")) continue;
+
+    // RUC/DNI puede venir como número entero — convertir a string sin decimales
+    const rucDniRaw = row[0];
+    const rucDni = rucDniRaw !== null && rucDniRaw !== undefined
+      ? String(Math.floor(Number(rucDniRaw)) === Number(rucDniRaw) && typeof rucDniRaw === "number"
+          ? Math.floor(rucDniRaw)
+          : rucDniRaw).trim()
+      : "";
+
+    const razonSocial = celdaAString(row[1]);
+    const detalle = celdaAString(row[2]);
     const cantidad = Number(row[3]) || 0;
     const precioUnitario = Number(row[4]) || 0;
     const igv = Number(row[5]) || 18;
-    const unidadMedida = String(row[6] ?? "ZZ").trim() || "ZZ";
-    const moneda = String(row[7] ?? "PEN").trim() || "PEN";
-    const correo = String(row[8] ?? "").trim() || null;
-    const whatsapp = String(row[9] ?? "").trim() || null;
+    const unidadMedida = celdaAString(row[6]) || "ZZ";
+    const moneda = celdaAString(row[7]) || "PEN";
+    const correoRaw = celdaAString(row[8]);
+    const correo = correoRaw || null;
+    // WhatsApp puede venir como número — convertir
+    const whatsappRaw = row[9];
+    const whatsapp = whatsappRaw !== null && whatsappRaw !== undefined && whatsappRaw !== ""
+      ? String(typeof whatsappRaw === "number" ? Math.floor(whatsappRaw) : whatsappRaw).trim()
+      : null;
 
-    // Si rucDni está vacío, es fila de detalle adicional del grupo anterior
+    // Determinar si es fila de detalle (rucDni vacío y ya hay un grupo)
     const esFilaDetalle = !rucDni && !!ultimoRucDni;
 
     const erroresFila: string[] = [];
 
-    // Solo validar rucDni y razonSocial si NO es fila de detalle
     if (!esFilaDetalle) {
       if (!rucDni) {
-        erroresFila.push(`Fila ${i + 1}: RUC/DNI vacío (primera fila de un comprobante debe tener RUC/DNI)`);
+        erroresFila.push(`Fila ${i + 1}: La primera fila de un comprobante debe tener RUC/DNI`);
       } else {
         const { error } = determinarTipoDoc(rucDni);
         if (error) erroresFila.push(`Fila ${i + 1}: ${error}`);
-        ultimoRucDni = rucDni; // actualizar grupo actual
+        ultimoRucDni = rucDni;
       }
       if (!razonSocial) erroresFila.push(`Fila ${i + 1}: Razón social vacía`);
-    }
 
-    // Validaciones comunes para todas las filas
-    if (!detalle) erroresFila.push(`Fila ${i + 1}: Detalle vacío`);
-    if (cantidad <= 0) erroresFila.push(`Fila ${i + 1}: Cantidad debe ser mayor a 0`);
-    if (precioUnitario <= 0) erroresFila.push(`Fila ${i + 1}: Precio unitario debe ser mayor a 0`);
-    if (igv !== 18 && igv !== 10.5) erroresFila.push(`Fila ${i + 1}: IGV debe ser 18 o 10.5`);
-
-    // Validar correo y whatsapp solo en fila cabecera
-    if (!esFilaDetalle) {
       const errCorreo = validarCorreos(correo);
       if (errCorreo) erroresFila.push(`Fila ${i + 1}: ${errCorreo}`);
 
@@ -137,11 +184,16 @@ export async function parsearExcel(file: File): Promise<{
       if (errWsp) erroresFila.push(`Fila ${i + 1}: ${errWsp}`);
     }
 
+    if (!detalle) erroresFila.push(`Fila ${i + 1}: Detalle vacío`);
+    if (cantidad <= 0) erroresFila.push(`Fila ${i + 1}: Cantidad debe ser mayor a 0`);
+    if (precioUnitario <= 0) erroresFila.push(`Fila ${i + 1}: Precio unitario debe ser mayor a 0`);
+    if (igv !== 18 && igv !== 10.5) erroresFila.push(`Fila ${i + 1}: IGV debe ser 18 o 10.5`);
+
     erroresGlobales.push(...erroresFila);
 
     filas.push({
-      rucDni: rucDni || "",
-      razonSocial: razonSocial || "",
+      rucDni,
+      razonSocial,
       detalle,
       cantidad,
       precioUnitario,
@@ -232,34 +284,4 @@ export function calcularTotales(comp: ComprobanteAgrupado) {
   const importeTotal = parseFloat((gravadas + igv).toFixed(2));
 
   return { gravadas, igv, importeTotal };
-}
-
-// ─── Generar plantilla Excel básica ──────────────────────────────────────────
-export function generarPlantillaExcel(): void {
-  const wb = XLSX.utils.book_new();
-
-  const hoy = new Date();
-  const fechaStr = `${String(hoy.getDate()).padStart(2, "0")}/${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()}`;
-
-  const data: any[][] = [
-    ["CARGA MASIVA DE DOCUMENTOS", "", "", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", "", "FECHA EMISION:", fechaStr],
-    ["RUC/DNI", "RAZON SOCIAL", "DETALLE", "CANTIDAD", "PRECIO_UNITARIO", "IGV", "UNIDAD_MEDIDA", "MONEDA", "CORREO", "WHATSAAP"],
-    ["60288745", "HUGO CESAR GOMEZ LOVERA", "item 1 detalle Producto o servicio de ejemplo", 1, 59, 18, "ZZ", "PEN", "hugo@gmail.com", "989106686"],
-    ["", "", "item 2 detalle Producto o servicio de ejemplo", 3, 145, 18, "ZZ", "PEN", "", ""],
-    ["10602887451", "empresa peru sac", "item 1 detalle Producto o servicio de ejemplo", 1, 80, 18, "ZZ", "PEN", "empresa@gmail.com", ""],
-    ["", "", "item 2 detalle Producto o servicio de ejemplo", 1, 40, 18, "ZZ", "PEN", "", ""],
-    ["30201030", "nombre de ejemplo", "item 1 detalle Producto o servicio de ejemplo", 2, 118, 10.5, "ZZ", "PEN", "Correo1@mail.com, correo2@mail.com", "987654321"],
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-
-  ws["!cols"] = [
-    { wch: 14 }, { wch: 35 }, { wch: 50 }, { wch: 10 },
-    { wch: 16 }, { wch: 6 }, { wch: 14 }, { wch: 8 },
-    { wch: 30 }, { wch: 15 },
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, "Carga Masiva");
-  XLSX.writeFile(wb, "plantilla_carga_masiva.xlsx");
 }

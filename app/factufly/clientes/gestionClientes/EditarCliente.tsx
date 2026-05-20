@@ -263,13 +263,6 @@ export const EditarClienteModal: React.FC<Props> = ({
               </button>
             )}
           </div>
-
-          <InputBase
-            label="Número"
-            value={form.numeroDocumento}
-            disabled
-            showError={false}
-          />
         </div>
 
         <InputBase
