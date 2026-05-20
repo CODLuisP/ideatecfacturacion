@@ -2003,9 +2003,20 @@ export default function EmisionRapidaPage({
                                 setShowDropdownProducto(nd);
                                 setFocusedItemIndex(i);
 
-                                // Auto-grow height on focus
-                                e.target.style.height = "auto";
-                                e.target.style.height = `${e.target.scrollHeight}px`;
+                                // Force layout update with wrap to get correct scrollHeight synchronously
+                                const target = e.target;
+                                target.style.whiteSpace = "pre-wrap";
+                                target.style.height = "auto";
+                                target.style.height = `${target.scrollHeight}px`;
+                                target.style.whiteSpace = "";
+
+                                // Re-verify on next tick after React DOM updates
+                                setTimeout(() => {
+                                  if (target) {
+                                    target.style.height = "auto";
+                                    target.style.height = `${target.scrollHeight}px`;
+                                  }
+                                }, 50);
                               }}
                               onBlur={(e) => {
                                 const target = e.target;

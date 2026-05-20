@@ -24,6 +24,7 @@ export default function DeudasPorCobrarPage() {
   const { user, accessToken } = useAuth();
   const { showToast } = useToast();
   const rucEmpresa = user?.ruc ?? '';
+  const isBeta = user?.environment === 'beta';
 
   const isSuperAdmin = user?.rol === 'superadmin';
   const { sucursales } = useSucursalRuc(isSuperAdmin);
@@ -236,15 +237,15 @@ export default function DeudasPorCobrarPage() {
 
       {/* Tabla */}
       <style>{`
-        .dc-table tbody { display: block; overflow-y: auto; max-height: calc(100vh - 295px); scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
-        .dc-table-avanzado tbody { max-height: calc(100vh - 380px); }
+        .dc-table tbody { display: block; overflow-y: auto; 
+        max-height: calc(100vh - ${showAvanzado ? (isBeta ? 365 : 305) : (isBeta ? 280 : 220)}px); scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
         .dc-table thead tr, .dc-table tbody tr { display: table; width: 100%; table-layout: fixed; }
         .dc-table thead { width: 100%; }
       `}</style>
 
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className={cn("w-full text-left border-collapse dc-table", showAvanzado && "dc-table-avanzado")}>
+          <table className="w-full text-left border-collapse dc-table">
             <thead>
               <tr className="bg-gray-100">
                 <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Fecha</th>
