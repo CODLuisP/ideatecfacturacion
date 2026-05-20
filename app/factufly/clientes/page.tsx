@@ -50,6 +50,7 @@ export default function ClientesPage() {
   const { showToast } = useToast();
   const { accessToken, user } = useAuth();
   const isSuperAdmin = user?.rol === "superadmin";
+  const isBeta = user?.environment === "beta";
 
   // Hook correcto según rol
   const { clientes: clientesEmpresa, setClientes: setClientesEmpresa, loadingClientes: loadingEmpresa } = useClientesRuc(isSuperAdmin);
@@ -386,7 +387,7 @@ export default function ClientesPage() {
   .clientes-table tbody {
     display: block;
     overflow-y: auto;
-    max-height: calc(100vh - 240px);
+    max-height: calc(100vh - ${isBeta ? 280 : 220}px);
     scrollbar-width: thin;
     scrollbar-color: #CBD5E1 transparent;
   }

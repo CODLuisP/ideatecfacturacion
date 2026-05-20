@@ -77,6 +77,7 @@ export default function GuiasRemisionPage() {
   const { accessToken, user } = useAuth();
   const { showToast } = useToast();
   const isSuperAdmin = user?.rol === "superadmin";
+  const isBeta = user?.environment === "beta";
   const rucEmpresa: string = user?.ruc ?? "";
   const sucursalId: number = Number(user?.sucursalID ?? 0);
 
@@ -585,22 +586,14 @@ export default function GuiasRemisionPage() {
       <style>
         {` .guia-table-wrapper {
             overflow-y: auto;
-            max-height: calc(100vh - 290px);
+            max-height: calc(100vh - ${showAvanzado ? (isBeta ? 410 : 350) : (isBeta ? 280 : 220)}px);
             scrollbar-width: thin;
             scrollbar-color: #CBD5E1 transparent;
-          }
-          .guia-table-wrapper-avanzado {
-            max-height: calc(100vh - 420px);
           }`}
       </style>
 
       <Card className="p-0 rounded-2xl border border-gray-200 overflow-hidden">
-        <div
-          className={cn(
-            "guia-table-wrapper",
-            showAvanzado && "guia-table-wrapper-avanzado",
-          )}
-        >
+        <div className="guia-table-wrapper">
           {tipoGuia === "remitente" ? (
             <TablaRemitente
               guias={filtered}

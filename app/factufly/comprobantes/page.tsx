@@ -82,6 +82,7 @@ export default function VerComprobantesPage() {
   const { accessToken, user } = useAuth();
   const { showToast } = useToast();
   const isSuperAdmin = user?.rol === "superadmin";
+  const isBeta = user?.environment === "beta";
   const rucEmpresa: string = user?.ruc ?? "";
   const sucursalId: number = Number(user?.sucursalID ?? 0);
 
@@ -903,7 +904,7 @@ export default function VerComprobantesPage() {
         .comp-table tbody {
           display: block;
           overflow-y: auto;
-          max-height: calc(100vh - ${offset > 0 || hasMore ? 355 : 295}px);
+          max-height: calc(100vh - ${offset > 0 || hasMore ? 355 : (isBeta ? 290 : 250)}px);
           scrollbar-width: thin;
           scrollbar-color: #CBD5E1 transparent;
         }
@@ -928,37 +929,37 @@ export default function VerComprobantesPage() {
                   overflow: "hidden",
                 }}
               >
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-32">
                   FECHA
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-52">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-52">
                   COMPROBANTE
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-60">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-60">
                   CLIENTE
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
                   PDF
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
                   XML
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-16">
                   CDR
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-32">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-32">
                   SUNAT
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
                   CORREO
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
                   WHATSAPP
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-20">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-20">
                   VER
                 </th>
-                <th className="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
+                <th className="px-5 py-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-center w-24">
                   OPCIONES
                 </th>
               </tr>
@@ -996,18 +997,18 @@ export default function VerComprobantesPage() {
                     <td className="px-5 py-2 text-sm text-gray-900 font-medium whitespace-nowrap w-32">
                       {formatFecha(doc.fechaCreacion)}
                     </td>
-                    <td className="px-5 py-2 whitespace-nowrap w-52">
-                      <p className="text-sm font-medium text-gray-900">
-                        {doc.numeroCompleto}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {tipoLabel(doc.tipoComprobante)}
-                      </p>
-                      <p className="text-xs font-semibold text-gray-700">
-                        {doc.tipoMoneda === "USD" ? "$" : "S/"}{" "}
-                        {Number(doc.importeTotal ?? 0).toFixed(2)}
-                      </p>
-                    </td>
+               <td className="px-5 py-2 whitespace-nowrap w-52">
+  <p className="text-sm font-medium text-gray-900">
+    {doc.numeroCompleto}
+  </p>
+  <p className="text-xs text-gray-400">
+    {tipoLabel(doc.tipoComprobante)}
+    <span className="mx-1 text-gray-400">-</span>
+    <span className="font-semibold text-gray-700">
+      {doc.tipoMoneda === "USD" ? "$" : "S/"} {Number(doc.importeTotal ?? 0).toFixed(2)}
+    </span>
+  </p>
+</td>
                     <td className="px-5 py-2 w-60">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">
